@@ -1,0 +1,11 @@
+C:\Users\neilb\projects\PortfolioManager\src\FtoConsulting.PortfolioManager.Domain\bin\Debug\net9.0\FtoConsulting.PortfolioManager.Domain.deps.json
+C:\Users\neilb\projects\PortfolioManager\src\FtoConsulting.PortfolioManager.Domain\bin\Debug\net9.0\FtoConsulting.PortfolioManager.Domain.dll
+C:\Users\neilb\projects\PortfolioManager\src\FtoConsulting.PortfolioManager.Domain\bin\Debug\net9.0\FtoConsulting.PortfolioManager.Domain.pdb
+C:\Users\neilb\projects\PortfolioManager\src\FtoConsulting.PortfolioManager.Domain\obj\Debug\net9.0\FtoConsulting.PortfolioManager.Domain.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\neilb\projects\PortfolioManager\src\FtoConsulting.PortfolioManager.Domain\obj\Debug\net9.0\FtoConsulting.PortfolioManager.Domain.AssemblyInfoInputs.cache
+C:\Users\neilb\projects\PortfolioManager\src\FtoConsulting.PortfolioManager.Domain\obj\Debug\net9.0\FtoConsulting.PortfolioManager.Domain.AssemblyInfo.cs
+C:\Users\neilb\projects\PortfolioManager\src\FtoConsulting.PortfolioManager.Domain\obj\Debug\net9.0\FtoConsulting.PortfolioManager.Domain.csproj.CoreCompileInputs.cache
+C:\Users\neilb\projects\PortfolioManager\src\FtoConsulting.PortfolioManager.Domain\obj\Debug\net9.0\FtoConsulting.PortfolioManager.Domain.dll
+C:\Users\neilb\projects\PortfolioManager\src\FtoConsulting.PortfolioManager.Domain\obj\Debug\net9.0\refint\FtoConsulting.PortfolioManager.Domain.dll
+C:\Users\neilb\projects\PortfolioManager\src\FtoConsulting.PortfolioManager.Domain\obj\Debug\net9.0\FtoConsulting.PortfolioManager.Domain.pdb
+C:\Users\neilb\projects\PortfolioManager\src\FtoConsulting.PortfolioManager.Domain\obj\Debug\net9.0\ref\FtoConsulting.PortfolioManager.Domain.dll

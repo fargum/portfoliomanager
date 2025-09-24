@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FtoConsulting.PortfolioManager.Domain\FtoConsulting.PortfolioManager.Domain.csproj" />
+    <ProjectReference Include="..\FtoConsulting.PortfolioManager.Application\FtoConsulting.PortfolioManager.Application.csproj" />
+    <ProjectReference Include="..\FtoConsulting.PortfolioManager.Infrastructure\FtoConsulting.PortfolioManager.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>
