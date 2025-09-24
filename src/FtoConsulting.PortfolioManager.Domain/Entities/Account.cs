@@ -4,8 +4,8 @@ namespace FtoConsulting.PortfolioManager.Domain.Entities;
 
 public class Account : BaseEntity
 {
-    public string UserName { get; private set; }
-    public string Password { get; private set; }
+    public string UserName { get; private set; } = string.Empty;
+    public string Password { get; private set; } = string.Empty;
 
     // Navigation properties
     public virtual ICollection<Portfolio> Portfolios { get; private set; } = new List<Portfolio>();

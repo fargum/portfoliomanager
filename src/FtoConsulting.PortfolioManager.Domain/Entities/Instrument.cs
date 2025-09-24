@@ -4,14 +4,14 @@ namespace FtoConsulting.PortfolioManager.Domain.Entities;
 
 public class Instrument : BaseEntity
 {
-    public string ISIN { get; private set; }
+    public string ISIN { get; private set; } = string.Empty;
     public string? SEDOL { get; private set; }
-    public string Name { get; private set; }
+    public string Name { get; private set; } = string.Empty;
     public string? Description { get; private set; }
     public Guid InstrumentTypeId { get; private set; }
 
     // Navigation properties
-    public virtual InstrumentType InstrumentType { get; private set; }
+    public virtual InstrumentType InstrumentType { get; private set; } = null!;
     public virtual ICollection<Holding> Holdings { get; private set; } = new List<Holding>();
 
     // Private constructor for EF Core

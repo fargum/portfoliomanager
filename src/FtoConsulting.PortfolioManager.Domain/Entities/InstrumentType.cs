@@ -4,7 +4,7 @@ namespace FtoConsulting.PortfolioManager.Domain.Entities;
 
 public class InstrumentType : BaseEntity
 {
-    public string Name { get; private set; }
+    public string Name { get; private set; } = string.Empty;
     public string? Description { get; private set; }
 
     // Navigation properties

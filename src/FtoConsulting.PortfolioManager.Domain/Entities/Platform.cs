@@ -4,7 +4,7 @@ namespace FtoConsulting.PortfolioManager.Domain.Entities;
 
 public class Platform : BaseEntity
 {
-    public string Name { get; private set; }
+    public string Name { get; private set; } = string.Empty;
 
     // Navigation properties
     public virtual ICollection<Holding> Holdings { get; private set; } = new List<Holding>();

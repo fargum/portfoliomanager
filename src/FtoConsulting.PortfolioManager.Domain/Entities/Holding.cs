@@ -13,9 +13,9 @@ public class Holding : BaseEntity
     public decimal CurrentValue { get; private set; }
 
     // Navigation properties
-    public virtual Instrument Instrument { get; private set; }
-    public virtual Platform Platform { get; private set; }
-    public virtual Portfolio Portfolio { get; private set; }
+    public virtual Instrument Instrument { get; private set; } = null!;
+    public virtual Platform Platform { get; private set; } = null!;
+    public virtual Portfolio Portfolio { get; private set; } = null!;
 
     // Private constructor for EF Core
     private Holding() { }
