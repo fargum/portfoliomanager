@@ -10,6 +10,14 @@ public class PortfolioManagerDbContext : DbContext
     {
     }
 
+    // DbSets for all entities
+    public DbSet<Account> Accounts { get; set; }
+    public DbSet<Portfolio> Portfolios { get; set; }
+    public DbSet<Holding> Holdings { get; set; }
+    public DbSet<Instrument> Instruments { get; set; }
+    public DbSet<InstrumentType> InstrumentTypes { get; set; }
+    public DbSet<Platform> Platforms { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);

@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("FtoConsulting.PortfolioManager.Infrastructure")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+57db8d0d7e531c04079d4d71d6a1d0f152a07342")]
 [assembly: System.Reflection.AssemblyProductAttribute("FtoConsulting.PortfolioManager.Infrastructure")]
 [assembly: System.Reflection.AssemblyTitleAttribute("FtoConsulting.PortfolioManager.Infrastructure")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

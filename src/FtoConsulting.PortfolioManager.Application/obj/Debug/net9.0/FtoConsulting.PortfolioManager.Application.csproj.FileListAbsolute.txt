@@ -13,3 +13,4 @@ C:\Users\neilb\projects\PortfolioManager\src\FtoConsulting.PortfolioManager.Appl
 C:\Users\neilb\projects\PortfolioManager\src\FtoConsulting.PortfolioManager.Application\obj\Debug\net9.0\refint\FtoConsulting.PortfolioManager.Application.dll
 C:\Users\neilb\projects\PortfolioManager\src\FtoConsulting.PortfolioManager.Application\obj\Debug\net9.0\FtoConsulting.PortfolioManager.Application.pdb
 C:\Users\neilb\projects\PortfolioManager\src\FtoConsulting.PortfolioManager.Application\obj\Debug\net9.0\ref\FtoConsulting.PortfolioManager.Application.dll
+C:\Users\neilb\projects\PortfolioManager\src\FtoConsulting.PortfolioManager.Application\obj\Debug\net9.0\FtoConsulting.PortfolioManager.Application.sourcelink.json

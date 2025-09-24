@@ -48,3 +48,8 @@ C:\Users\neilb\projects\PortfolioManager\src\FtoConsulting.PortfolioManager.Api\
 C:\Users\neilb\projects\PortfolioManager\src\FtoConsulting.PortfolioManager.Api\obj\Debug\net9.0\FtoConsulting.PortfolioManager.Api.pdb
 C:\Users\neilb\projects\PortfolioManager\src\FtoConsulting.PortfolioManager.Api\obj\Debug\net9.0\FtoConsulting.PortfolioManager.Api.genruntimeconfig.cache
 C:\Users\neilb\projects\PortfolioManager\src\FtoConsulting.PortfolioManager.Api\obj\Debug\net9.0\ref\FtoConsulting.PortfolioManager.Api.dll
+C:\Users\neilb\projects\PortfolioManager\src\FtoConsulting.PortfolioManager.Api\bin\Debug\net9.0\Microsoft.EntityFrameworkCore.Relational.dll
+C:\Users\neilb\projects\PortfolioManager\src\FtoConsulting.PortfolioManager.Api\bin\Debug\net9.0\Microsoft.Extensions.Configuration.Abstractions.dll
+C:\Users\neilb\projects\PortfolioManager\src\FtoConsulting.PortfolioManager.Api\bin\Debug\net9.0\Npgsql.dll
+C:\Users\neilb\projects\PortfolioManager\src\FtoConsulting.PortfolioManager.Api\bin\Debug\net9.0\Npgsql.EntityFrameworkCore.PostgreSQL.dll
+C:\Users\neilb\projects\PortfolioManager\src\FtoConsulting.PortfolioManager.Api\obj\Debug\net9.0\FtoConsulting.PortfolioManager.Api.sourcelink.json

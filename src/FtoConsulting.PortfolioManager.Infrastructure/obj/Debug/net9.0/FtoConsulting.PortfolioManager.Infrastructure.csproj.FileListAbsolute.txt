@@ -17,3 +17,4 @@ C:\Users\neilb\projects\PortfolioManager\src\FtoConsulting.PortfolioManager.Infr
 C:\Users\neilb\projects\PortfolioManager\src\FtoConsulting.PortfolioManager.Infrastructure\obj\Debug\net9.0\FtoConsulting.PortfolioManager.Infrastructure.pdb
 C:\Users\neilb\projects\PortfolioManager\src\FtoConsulting.PortfolioManager.Infrastructure\obj\Debug\net9.0\FtoConsulting.PortfolioManager.Infrastructure.genruntimeconfig.cache
 C:\Users\neilb\projects\PortfolioManager\src\FtoConsulting.PortfolioManager.Infrastructure\obj\Debug\net9.0\ref\FtoConsulting.PortfolioManager.Infrastructure.dll
+C:\Users\neilb\projects\PortfolioManager\src\FtoConsulting.PortfolioManager.Infrastructure\obj\Debug\net9.0\FtoConsulting.PortfolioManager.Infrastructure.sourcelink.json
