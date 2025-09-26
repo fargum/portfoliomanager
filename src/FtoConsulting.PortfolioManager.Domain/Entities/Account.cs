@@ -8,7 +8,7 @@ public class Account : BaseEntity
     public string Password { get; private set; } = string.Empty;
 
     // Navigation properties
-    public virtual ICollection<Portfolio> Portfolios { get; private set; } = new List<Portfolio>();
+    public virtual ICollection<Portfolio> Portfolios { get; private set; } = [];
 
     // Private constructor for EF Core
     private Account() { }

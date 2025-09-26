@@ -1,0 +1,54 @@
+{
+  "portfolioName": "Sample Tech Portfolio",
+  "accountId": "12345678-1234-1234-1234-123456789012",
+  "holdings": [
+    {
+      "valuationDate": "2024-01-15T00:00:00Z",
+      "platformId": "87654321-4321-4321-4321-210987654321",
+      "unitAmount": 100.0,
+      "boughtValue": 15000.00,
+      "currentValue": 18500.00,
+      "dailyProfitLoss": 250.00,
+      "dailyProfitLossPercentage": 1.37,
+      "instrument": {
+        "isin": "US0378331005",
+        "name": "Apple Inc",
+        "description": "Apple Inc Common Stock - Technology sector leader",
+        "sedol": "2046251",
+        "instrumentTypeId": "11111111-1111-1111-1111-111111111111"
+      }
+    },
+    {
+      "valuationDate": "2024-01-15T00:00:00Z",
+      "platformId": "87654321-4321-4321-4321-210987654321",
+      "unitAmount": 50.0,
+      "boughtValue": 12000.00,
+      "currentValue": 14250.00,
+      "dailyProfitLoss": 125.00,
+      "dailyProfitLossPercentage": 0.89,
+      "instrument": {
+        "isin": "US5949181045",
+        "name": "Microsoft Corporation",
+        "description": "Microsoft Corporation Common Stock - Cloud computing and software",
+        "sedol": "2588173",
+        "instrumentTypeId": "11111111-1111-1111-1111-111111111111"
+      }
+    },
+    {
+      "valuationDate": "2024-01-15T00:00:00Z",
+      "platformId": "87654321-4321-4321-4321-210987654321",
+      "unitAmount": 75.0,
+      "boughtValue": 8000.00,
+      "currentValue": 9750.00,
+      "dailyProfitLoss": 50.00,
+      "dailyProfitLossPercentage": 0.52,
+      "instrument": {
+        "isin": "US02079K3059",
+        "name": "Alphabet Inc Class A",
+        "description": "Alphabet Inc Class A - Google parent company",
+        "sedol": "BYY88Y7",
+        "instrumentTypeId": "11111111-1111-1111-1111-111111111111"
+      }
+    }
+  ]
+}

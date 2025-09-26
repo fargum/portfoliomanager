@@ -4,7 +4,7 @@ namespace FtoConsulting.PortfolioManager.Domain.Aggregates;
 
 public abstract class AggregateRoot : Entities.BaseEntity
 {
-    private readonly List<IDomainEvent> _domainEvents = new();
+    private readonly List<IDomainEvent> _domainEvents = [];
 
     public IReadOnlyCollection<IDomainEvent> DomainEvents => _domainEvents.AsReadOnly();
 
