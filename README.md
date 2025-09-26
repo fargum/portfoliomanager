@@ -112,13 +112,49 @@ PortfolioManager/
 └── README.md
 ```
 
-## Next Steps
+## Database Setup
 
-1. Define domain entities for portfolio management
-2. Implement specific repository interfaces
-3. Add application services and CQRS handlers
-4. Configure PostgreSQL database provider
-5. Set up database migrations
-6. Implement API controllers
-7. Add authentication and authorization
-8. Set up logging and monitoring
+This project uses PostgreSQL with Entity Framework Core and snake_case naming conventions.
+
+### Prerequisites
+
+1. Install PostgreSQL or use Docker:
+   ```bash
+   docker run --name portfolio-postgres -e POSTGRES_DB=portfolio_manager -e POSTGRES_USER=migrator -e POSTGRES_PASSWORD=your_password -p 5432:5432 -d postgres:15
+   ```
+
+### Configuration
+
+#### For Development (User Secrets - Recommended):
+```bash
+cd src/FtoConsulting.PortfolioManager.Api
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Port=5432;Database=portfolio_manager;Username=your_username;Password=your_password"
+```
+
+#### For Production (Environment Variables):
+Set the environment variable:
+```bash
+PORTFOLIO_DB_CONNECTION="Host=localhost;Port=5432;Database=portfolio_manager;Username=your_username;Password=your_password"
+```
+
+### Database Migration
+
+Run the following commands to set up the database:
+
+```bash
+cd src/FtoConsulting.PortfolioManager.Infrastructure
+dotnet ef database update --startup-project ../FtoConsulting.PortfolioManager.Api
+```
+
+### Database Schema
+
+The database uses snake_case naming conventions for PostgreSQL compatibility:
+- Tables: `accounts`, `portfolios`, `instruments`, `holdings`, etc.
+- Columns: `user_name`, `created_at`, `instrument_type_id`, etc.
+
+## Security Notes
+
+- **Never commit database credentials to source control**
+- Use User Secrets for development
+- Use environment variables or Azure Key Vault for production
+- The connection string in `appsettings.json` contains placeholder values only

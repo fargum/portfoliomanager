@@ -8,27 +8,31 @@ public class PlatformConfiguration : IEntityTypeConfiguration<Platform>
 {
     public void Configure(EntityTypeBuilder<Platform> builder)
     {
-        builder.ToTable("Platforms");
+        builder.ToTable("platforms");
 
         builder.HasKey(x => x.Id);
 
         builder.Property(x => x.Id)
+            .HasColumnName("id")
             .IsRequired()
             .ValueGeneratedNever();
 
         builder.Property(x => x.Name)
+            .HasColumnName("name")
             .IsRequired()
             .HasMaxLength(100);
 
         builder.Property(x => x.CreatedAt)
+            .HasColumnName("created_at")
             .IsRequired();
 
-        builder.Property(x => x.UpdatedAt);
+        builder.Property(x => x.UpdatedAt)
+            .HasColumnName("updated_at");
 
         // Index on Name for quick lookups
         builder.HasIndex(x => x.Name)
             .IsUnique()
-            .HasDatabaseName("IX_Platforms_Name");
+            .HasDatabaseName("ix_platforms_name");
 
         // Configure relationships
         builder.HasMany(x => x.Holdings)

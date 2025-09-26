@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FtoConsulting.PortfolioManager.Infrastructure.Migrations
 {
     [DbContext(typeof(PortfolioManagerDbContext))]
-    [Migration("20250924113341_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20250926110930_InitialCreateSnakeCase")]
+    partial class InitialCreateSnakeCase
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -28,25 +28,31 @@ namespace FtoConsulting.PortfolioManager.Infrastructure.Migrations
             modelBuilder.Entity("FtoConsulting.PortfolioManager.Domain.Entities.Account", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
 
                     b.Property<string>("Password")
                         .IsRequired()
                         .HasMaxLength(255)
-                        .HasColumnType("character varying(255)");
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("password");
 
                     b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
 
                     b.Property<string>("UserName")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("user_name");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_accounts");
 
                     b.HasIndex("UserName")
                         .IsUnique()
@@ -58,51 +64,66 @@ namespace FtoConsulting.PortfolioManager.Infrastructure.Migrations
             modelBuilder.Entity("FtoConsulting.PortfolioManager.Domain.Entities.Holding", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
 
                     b.Property<decimal>("BoughtValue")
                         .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("bought_value");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
 
                     b.Property<decimal>("CurrentValue")
                         .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("current_value");
 
                     b.Property<decimal>("DailyProfitLoss")
                         .HasPrecision(18, 2)
-                        .HasColumnType("numeric(18,2)");
+                        .HasColumnType("numeric(18,2)")
+                        .HasColumnName("daily_profit_loss");
 
                     b.Property<decimal>("DailyProfitLossPercentage")
                         .HasPrecision(18, 4)
-                        .HasColumnType("numeric(18,4)");
+                        .HasColumnType("numeric(18,4)")
+                        .HasColumnName("daily_profit_loss_percentage");
 
                     b.Property<Guid>("InstrumentId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("instrument_id");
 
                     b.Property<Guid>("PlatformId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("platform_id");
 
                     b.Property<Guid>("PortfolioId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("portfolio_id");
 
                     b.Property<decimal>("UnitAmount")
                         .HasPrecision(18, 8)
-                        .HasColumnType("numeric(18,8)");
+                        .HasColumnType("numeric(18,8)")
+                        .HasColumnName("unit_amount");
 
                     b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
 
                     b.Property<DateTime>("ValuationDate")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("valuation_date");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_holdings");
 
-                    b.HasIndex("InstrumentId");
+                    b.HasIndex("InstrumentId")
+                        .HasDatabaseName("ix_holdings_instrument_id");
 
-                    b.HasIndex("PlatformId");
+                    b.HasIndex("PlatformId")
+                        .HasDatabaseName("ix_holdings_platform_id");
 
                     b.HasIndex("PortfolioId")
                         .HasDatabaseName("IX_Holdings_PortfolioId");
@@ -119,42 +140,52 @@ namespace FtoConsulting.PortfolioManager.Infrastructure.Migrations
             modelBuilder.Entity("FtoConsulting.PortfolioManager.Domain.Entities.Instrument", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
 
                     b.Property<string>("Description")
                         .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
+                        .HasColumnType("character varying(1000)")
+                        .HasColumnName("description");
 
                     b.Property<string>("ISIN")
                         .IsRequired()
                         .HasMaxLength(12)
-                        .HasColumnType("character varying(12)");
+                        .HasColumnType("character varying(12)")
+                        .HasColumnName("isin");
 
                     b.Property<Guid>("InstrumentTypeId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("instrument_type_id");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
 
                     b.Property<string>("SEDOL")
                         .HasMaxLength(7)
-                        .HasColumnType("character varying(7)");
+                        .HasColumnType("character varying(7)")
+                        .HasColumnName("sedol");
 
                     b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_instruments");
 
                     b.HasIndex("ISIN")
                         .IsUnique()
                         .HasDatabaseName("IX_Instruments_ISIN");
 
-                    b.HasIndex("InstrumentTypeId");
+                    b.HasIndex("InstrumentTypeId")
+                        .HasDatabaseName("ix_instruments_instrument_type_id");
 
                     b.HasIndex("Name")
                         .HasDatabaseName("IX_Instruments_Name");
@@ -168,24 +199,30 @@ namespace FtoConsulting.PortfolioManager.Infrastructure.Migrations
             modelBuilder.Entity("FtoConsulting.PortfolioManager.Domain.Entities.InstrumentType", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
 
                     b.Property<string>("Description")
                         .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("description");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
 
                     b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_instrument_types");
 
                     b.HasIndex("Name")
                         .IsUnique()
@@ -197,20 +234,25 @@ namespace FtoConsulting.PortfolioManager.Infrastructure.Migrations
             modelBuilder.Entity("FtoConsulting.PortfolioManager.Domain.Entities.Platform", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("name");
 
                     b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_platforms");
 
                     b.HasIndex("Name")
                         .IsUnique()
@@ -222,23 +264,29 @@ namespace FtoConsulting.PortfolioManager.Infrastructure.Migrations
             modelBuilder.Entity("FtoConsulting.PortfolioManager.Domain.Entities.Portfolio", b =>
                 {
                     b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
 
                     b.Property<Guid>("AccountId")
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
 
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasColumnType("character varying(200)")
+                        .HasColumnName("name");
 
                     b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
 
-                    b.HasKey("Id");
+                    b.HasKey("Id")
+                        .HasName("pk_portfolios");
 
                     b.HasIndex("AccountId", "Name")
                         .IsUnique()
@@ -253,19 +301,22 @@ namespace FtoConsulting.PortfolioManager.Infrastructure.Migrations
                         .WithMany("Holdings")
                         .HasForeignKey("InstrumentId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_holdings_instruments_instrument_id");
 
                     b.HasOne("FtoConsulting.PortfolioManager.Domain.Entities.Platform", "Platform")
                         .WithMany("Holdings")
                         .HasForeignKey("PlatformId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_holdings_platforms_platform_id");
 
                     b.HasOne("FtoConsulting.PortfolioManager.Domain.Entities.Portfolio", "Portfolio")
                         .WithMany("Holdings")
                         .HasForeignKey("PortfolioId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_holdings_portfolios_portfolio_id");
 
                     b.Navigation("Instrument");
 
@@ -280,7 +331,8 @@ namespace FtoConsulting.PortfolioManager.Infrastructure.Migrations
                         .WithMany("Instruments")
                         .HasForeignKey("InstrumentTypeId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_instruments_instrument_types_instrument_type_id");
 
                     b.Navigation("InstrumentType");
                 });
@@ -291,7 +343,8 @@ namespace FtoConsulting.PortfolioManager.Infrastructure.Migrations
                         .WithMany("Portfolios")
                         .HasForeignKey("AccountId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .IsRequired()
+                        .HasConstraintName("fk_portfolios_accounts_account_id");
 
                     b.Navigation("Account");
                 });

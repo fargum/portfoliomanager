@@ -8,30 +8,35 @@ public class PortfolioConfiguration : IEntityTypeConfiguration<Portfolio>
 {
     public void Configure(EntityTypeBuilder<Portfolio> builder)
     {
-        builder.ToTable("Portfolios");
+        builder.ToTable("portfolios");
 
         builder.HasKey(x => x.Id);
 
         builder.Property(x => x.Id)
+            .HasColumnName("id")
             .IsRequired()
             .ValueGeneratedNever();
 
         builder.Property(x => x.Name)
+            .HasColumnName("name")
             .IsRequired()
             .HasMaxLength(200);
 
         builder.Property(x => x.AccountId)
+            .HasColumnName("account_id")
             .IsRequired();
 
         builder.Property(x => x.CreatedAt)
+            .HasColumnName("created_at")
             .IsRequired();
 
-        builder.Property(x => x.UpdatedAt);
+        builder.Property(x => x.UpdatedAt)
+            .HasColumnName("updated_at");
 
         // Index for quick lookups
         builder.HasIndex(x => new { x.AccountId, x.Name })
             .IsUnique()
-            .HasDatabaseName("IX_Portfolios_AccountId_Name");
+            .HasDatabaseName("ix_portfolios_account_id_name");
 
         // Configure relationships
         builder.HasOne(x => x.Account)

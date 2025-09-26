@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
+using Microsoft.Extensions.Configuration;
 
 namespace FtoConsulting.PortfolioManager.Infrastructure.Data;
 
@@ -9,9 +10,11 @@ public class PortfolioManagerDbContextFactory : IDesignTimeDbContextFactory<Port
     {
         var optionsBuilder = new DbContextOptionsBuilder<PortfolioManagerDbContext>();
         
-        // Use a default connection string for design-time operations (migrations)
-        // This will be replaced with actual connection string at runtime
-        optionsBuilder.UseNpgsql("Host=localhost;Database=PortfolioManager_Design;Username=postgres;Password=password");
+        // Try to get connection string from environment variable first, then use default
+        var connectionString = Environment.GetEnvironmentVariable("PORTFOLIO_DB_CONNECTION") 
+            ?? "Host=localhost;Port=5432;Database=portfolio_manager;Username=your_username;Password=your_password";
+        
+        optionsBuilder.UseNpgsql(connectionString);
 
         return new PortfolioManagerDbContext(optionsBuilder.Options);
     }

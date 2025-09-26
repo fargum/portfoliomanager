@@ -8,46 +8,54 @@ public class InstrumentConfiguration : IEntityTypeConfiguration<Instrument>
 {
     public void Configure(EntityTypeBuilder<Instrument> builder)
     {
-        builder.ToTable("Instruments");
+        builder.ToTable("instruments");
 
         builder.HasKey(x => x.Id);
 
         builder.Property(x => x.Id)
+            .HasColumnName("id")
             .IsRequired()
             .ValueGeneratedNever();
 
         builder.Property(x => x.ISIN)
+            .HasColumnName("isin")
             .IsRequired()
             .HasMaxLength(12); // ISIN is always 12 characters
 
         builder.Property(x => x.SEDOL)
+            .HasColumnName("sedol")
             .HasMaxLength(7); // SEDOL is 7 characters
 
         builder.Property(x => x.Name)
+            .HasColumnName("name")
             .IsRequired()
             .HasMaxLength(200);
 
         builder.Property(x => x.Description)
+            .HasColumnName("description")
             .HasMaxLength(1000);
 
         builder.Property(x => x.InstrumentTypeId)
+            .HasColumnName("instrument_type_id")
             .IsRequired();
 
         builder.Property(x => x.CreatedAt)
+            .HasColumnName("created_at")
             .IsRequired();
 
-        builder.Property(x => x.UpdatedAt);
+        builder.Property(x => x.UpdatedAt)
+            .HasColumnName("updated_at");
 
         // Indexes for quick lookups
         builder.HasIndex(x => x.ISIN)
             .IsUnique()
-            .HasDatabaseName("IX_Instruments_ISIN");
+            .HasDatabaseName("ix_instruments_isin");
 
         builder.HasIndex(x => x.SEDOL)
-            .HasDatabaseName("IX_Instruments_SEDOL");
+            .HasDatabaseName("ix_instruments_sedol");
 
         builder.HasIndex(x => x.Name)
-            .HasDatabaseName("IX_Instruments_Name");
+            .HasDatabaseName("ix_instruments_name");
 
         // Configure relationships
         builder.HasOne(x => x.InstrumentType)

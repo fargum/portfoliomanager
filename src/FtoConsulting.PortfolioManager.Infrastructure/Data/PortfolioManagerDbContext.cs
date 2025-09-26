@@ -26,6 +26,16 @@ public class PortfolioManagerDbContext : DbContext
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(PortfolioManagerDbContext).Assembly);
     }
 
+    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+    {
+        if (!optionsBuilder.IsConfigured)
+        {
+            // This will be overridden at runtime, but provides fallback for design-time
+            optionsBuilder.UseNpgsql("Host=localhost;Port=5432;Database=portfolio_manager;Username=migrator;Password=!Gangatala10!")
+                         .UseSnakeCaseNamingConvention();
+        }
+    }
+
     public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         // Update timestamps before saving

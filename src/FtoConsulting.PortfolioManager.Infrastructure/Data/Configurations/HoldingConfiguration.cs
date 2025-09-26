@@ -8,58 +8,70 @@ public class HoldingConfiguration : IEntityTypeConfiguration<Holding>
 {
     public void Configure(EntityTypeBuilder<Holding> builder)
     {
-        builder.ToTable("Holdings");
+        builder.ToTable("holdings");
 
         builder.HasKey(x => x.Id);
 
         builder.Property(x => x.Id)
+            .HasColumnName("id")
             .IsRequired()
             .ValueGeneratedNever();
 
         builder.Property(x => x.ValuationDate)
+            .HasColumnName("valuation_date")
             .IsRequired();
 
         builder.Property(x => x.InstrumentId)
+            .HasColumnName("instrument_id")
             .IsRequired();
 
         builder.Property(x => x.PlatformId)
+            .HasColumnName("platform_id")
             .IsRequired();
 
         builder.Property(x => x.PortfolioId)
+            .HasColumnName("portfolio_id")
             .IsRequired();
 
         builder.Property(x => x.UnitAmount)
+            .HasColumnName("unit_amount")
             .IsRequired()
             .HasPrecision(18, 8); // High precision for unit amounts
 
         builder.Property(x => x.BoughtValue)
+            .HasColumnName("bought_value")
             .IsRequired()
             .HasPrecision(18, 2); // Standard currency precision
 
         builder.Property(x => x.CurrentValue)
+            .HasColumnName("current_value")
             .IsRequired()
             .HasPrecision(18, 2); // Standard currency precision
 
         builder.Property(x => x.DailyProfitLoss)
+            .HasColumnName("daily_profit_loss")
             .HasPrecision(18, 2);
 
         builder.Property(x => x.DailyProfitLossPercentage)
+            .HasColumnName("daily_profit_loss_percentage")
             .HasPrecision(18, 4); // Higher precision for percentages
 
         builder.Property(x => x.CreatedAt)
+            .HasColumnName("created_at")
             .IsRequired();
 
-        builder.Property(x => x.UpdatedAt);
+        builder.Property(x => x.UpdatedAt)
+            .HasColumnName("updated_at");
 
         // Indexes for efficient queries
         builder.HasIndex(x => x.PortfolioId)
-            .HasDatabaseName("IX_Holdings_PortfolioId");
+            .HasDatabaseName("ix_holdings_portfolio_id");
 
         builder.HasIndex(x => x.ValuationDate)
-            .HasDatabaseName("IX_Holdings_ValuationDate");
+            .HasDatabaseName("ix_holdings_valuation_date");
 
         builder.HasIndex(x => new { x.PortfolioId, x.InstrumentId, x.ValuationDate })
-            .HasDatabaseName("IX_Holdings_Portfolio_Instrument_Date");
+            .HasDatabaseName("ix_holdings_portfolio_instrument_date");
 
         // Configure relationships
         builder.HasOne(x => x.Portfolio)

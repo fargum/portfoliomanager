@@ -8,30 +8,35 @@ public class InstrumentTypeConfiguration : IEntityTypeConfiguration<InstrumentTy
 {
     public void Configure(EntityTypeBuilder<InstrumentType> builder)
     {
-        builder.ToTable("InstrumentTypes");
+        builder.ToTable("instrument_types");
 
         builder.HasKey(x => x.Id);
 
         builder.Property(x => x.Id)
+            .HasColumnName("id")
             .IsRequired()
             .ValueGeneratedNever();
 
         builder.Property(x => x.Name)
+            .HasColumnName("name")
             .IsRequired()
             .HasMaxLength(100);
 
         builder.Property(x => x.Description)
+            .HasColumnName("description")
             .HasMaxLength(500);
 
         builder.Property(x => x.CreatedAt)
+            .HasColumnName("created_at")
             .IsRequired();
 
-        builder.Property(x => x.UpdatedAt);
+        builder.Property(x => x.UpdatedAt)
+            .HasColumnName("updated_at");
 
         // Index on Name for quick lookups
         builder.HasIndex(x => x.Name)
             .IsUnique()
-            .HasDatabaseName("IX_InstrumentTypes_Name");
+            .HasDatabaseName("ix_instrument_types_name");
 
         // Configure relationships
         builder.HasMany(x => x.Instruments)
