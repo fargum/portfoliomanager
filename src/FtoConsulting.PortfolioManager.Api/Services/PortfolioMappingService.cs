@@ -18,6 +18,16 @@ public interface IPortfolioMappingService
     /// Maps a domain portfolio to a response DTO
     /// </summary>
     IngestPortfolioResponse MapToResponse(Portfolio portfolio, int newInstrumentsCreated = 0, int instrumentsUpdated = 0);
+
+    /// <summary>
+    /// Maps a collection of holdings to flattened holding responses
+    /// </summary>
+    AccountHoldingsResponse MapToAccountHoldingsResponse(IEnumerable<Holding> holdings, Guid accountId, DateOnly valuationDate);
+
+    /// <summary>
+    /// Maps a single holding to a flattened holding response
+    /// </summary>
+    FlattenedHoldingResponse MapToFlattenedHoldingResponse(Holding holding);
 }
 
 /// <summary>
@@ -104,6 +114,68 @@ public class PortfolioMappingService : IPortfolioMappingService
                 CurrentValue = h.CurrentValue,
                 ProfitLoss = h.TotalProfitLoss
             }).ToList()
+        };
+    }
+
+    public AccountHoldingsResponse MapToAccountHoldingsResponse(IEnumerable<Holding> holdings, Guid accountId, DateOnly valuationDate)
+    {
+        if (holdings == null) throw new ArgumentNullException(nameof(holdings));
+
+        var holdingsList = holdings.ToList();
+        var flattenedHoldings = holdingsList.Select(MapToFlattenedHoldingResponse).ToList();
+
+        var totalCurrentValue = flattenedHoldings.Sum(h => h.CurrentValue);
+        var totalBoughtValue = flattenedHoldings.Sum(h => h.BoughtValue);
+        var totalGainLoss = totalCurrentValue - totalBoughtValue;
+        var totalGainLossPercentage = totalBoughtValue != 0 ? (totalGainLoss / totalBoughtValue) * 100 : 0;
+
+        return new AccountHoldingsResponse
+        {
+            AccountId = accountId,
+            ValuationDate = valuationDate,
+            TotalHoldings = flattenedHoldings.Count,
+            TotalCurrentValue = totalCurrentValue,
+            TotalBoughtValue = totalBoughtValue,
+            TotalGainLoss = totalGainLoss,
+            TotalGainLossPercentage = Math.Round(totalGainLossPercentage, 2),
+            Holdings = flattenedHoldings
+        };
+    }
+
+    public FlattenedHoldingResponse MapToFlattenedHoldingResponse(Holding holding)
+    {
+        if (holding == null) throw new ArgumentNullException(nameof(holding));
+
+        var gainLoss = holding.CurrentValue - holding.BoughtValue;
+        var gainLossPercentage = holding.BoughtValue != 0 ? (gainLoss / holding.BoughtValue) * 100 : 0;
+
+        return new FlattenedHoldingResponse
+        {
+            HoldingId = holding.Id,
+            ValuationDate = DateOnly.FromDateTime(holding.ValuationDate),
+            UnitAmount = holding.UnitAmount,
+            BoughtValue = holding.BoughtValue,
+            CurrentValue = holding.CurrentValue,
+            GainLoss = gainLoss,
+            GainLossPercentage = Math.Round(gainLossPercentage, 2),
+
+            // Portfolio Information
+            PortfolioId = holding.PortfolioId,
+            PortfolioName = holding.Portfolio?.Name ?? "Unknown Portfolio",
+            AccountId = holding.Portfolio?.AccountId ?? Guid.Empty,
+            AccountName = holding.Portfolio?.Account?.UserName ?? "Unknown Account",
+
+            // Instrument Information
+            InstrumentId = holding.InstrumentId,
+            ISIN = holding.Instrument?.ISIN ?? "Unknown",
+            SEDOL = holding.Instrument?.SEDOL,
+            InstrumentName = holding.Instrument?.Name ?? "Unknown Instrument",
+            InstrumentDescription = holding.Instrument?.Description,
+            InstrumentType = holding.Instrument?.InstrumentType?.Name ?? "Unknown Type",
+
+            // Platform Information
+            PlatformId = holding.PlatformId,
+            PlatformName = holding.Platform?.Name ?? "Unknown Platform"
         };
     }
 }

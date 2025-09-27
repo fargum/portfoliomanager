@@ -9,6 +9,7 @@ public static class ServiceCollectionExtensions
     {
         // Register application services
         services.AddScoped<IPortfolioIngest, PortfolioIngestService>();
+        services.AddScoped<IHoldingsRetrieval, HoldingsRetrievalService>();
         
         // Register MediatR for CQRS
         services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(ServiceCollectionExtensions).Assembly));

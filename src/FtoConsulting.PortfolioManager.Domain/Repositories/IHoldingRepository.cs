@@ -9,4 +9,5 @@ public interface IHoldingRepository : IRepository<Holding>
     Task<IEnumerable<Holding>> GetByInstrumentIdAsync(Guid instrumentId);
     Task<IEnumerable<Holding>> GetByValuationDateAsync(DateTime valuationDate);
     Task<IEnumerable<Holding>> GetByPortfolioAndDateRangeAsync(Guid portfolioId, DateTime fromDate, DateTime toDate);
+    Task<IEnumerable<Holding>> GetHoldingsByAccountAndDateAsync(Guid accountId, DateTime valuationDate, CancellationToken cancellationToken = default);
 }

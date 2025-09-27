@@ -54,4 +54,18 @@ public class HoldingRepository : Repository<Holding>, IHoldingRepository
             .OrderBy(h => h.ValuationDate)
             .ToListAsync();
     }
+
+    public async Task<IEnumerable<Holding>> GetHoldingsByAccountAndDateAsync(Guid accountId, DateTime valuationDate, CancellationToken cancellationToken = default)
+    {
+        return await _dbSet
+            .Where(h => h.Portfolio.AccountId == accountId && h.ValuationDate.Date == valuationDate.Date)
+            .Include(h => h.Instrument)
+                .ThenInclude(i => i.InstrumentType)
+            .Include(h => h.Platform)
+            .Include(h => h.Portfolio)
+                .ThenInclude(p => p.Account)
+            .OrderBy(h => h.Portfolio.Name)
+            .ThenBy(h => h.Instrument.Name)
+            .ToListAsync(cancellationToken);
+    }
 }

@@ -67,72 +67,10 @@ public class PortfolioIngestService : IPortfolioIngest
                 _logger.LogInformation("Updated existing portfolio {PortfolioId}", portfolio.Id);
             }
 
-            // Process instruments and holdings properly
+            // Process holdings (instruments are already processed above)
             if (portfolio.Holdings?.Any() == true)
             {
-                var holdingsList = portfolio.Holdings.ToList();
-                
-                // First, process and save all unique instruments
-                var uniqueInstruments = holdingsList
-                    .Where(h => h.Instrument != null)
-                    .GroupBy(h => h.Instrument!.ISIN)
-                    .Select(g => g.First().Instrument!)
-                    .ToList();
-
-                var instrumentIdMapping = new Dictionary<string, Guid>();
-
-                foreach (var instrument in uniqueInstruments)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    
-                    // Check if instrument already exists by ISIN
-                    var existingInstrument = await _instrumentRepository.GetByISINAsync(instrument.ISIN);
-                    
-                    if (existingInstrument == null)
-                    {
-                        // Create new instrument
-                        await _instrumentRepository.AddAsync(instrument);
-                        instrumentIdMapping[instrument.ISIN] = instrument.Id;
-                        _logger.LogDebug("Created new instrument {ISIN} - {Name}", instrument.ISIN, instrument.Name);
-                    }
-                    else
-                    {
-                        instrumentIdMapping[instrument.ISIN] = existingInstrument.Id;
-                        _logger.LogDebug("Using existing instrument {ISIN}", instrument.ISIN);
-                    }
-                }
-
-                // Save instruments first
-                await _unitOfWork.SaveChangesAsync();
-
-                // Now create holdings with correct instrument IDs
-                foreach (var holding in holdingsList)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    
-                    if (holding.Instrument != null && instrumentIdMapping.TryGetValue(holding.Instrument.ISIN, out var actualInstrumentId))
-                    {
-                        // Create a new holding with the correct instrument ID
-                        var newHolding = new Holding(
-                            holding.ValuationDate,
-                            actualInstrumentId,
-                            holding.PlatformId,
-                            resultPortfolio.Id,
-                            holding.UnitAmount,
-                            holding.BoughtValue,
-                            holding.CurrentValue);
-                        
-                        // Set daily P&L if it was provided
-                        if (holding.DailyProfitLoss != 0 || holding.DailyProfitLossPercentage != 0)
-                        {
-                            newHolding.SetDailyProfitLoss(holding.DailyProfitLoss, holding.DailyProfitLossPercentage);
-                        }
-
-                        await _holdingRepository.AddAsync(newHolding);
-                        _logger.LogDebug("Added holding for instrument {ISIN} to portfolio {PortfolioId}", 
-                            holding.Instrument.ISIN, resultPortfolio.Id);
-                    }
-                }
+                await ProcessHoldingsAsync(portfolio.Holdings, resultPortfolio.Id, cancellationToken);
             }
 
             _logger.LogInformation("Portfolio ingestion completed with instruments and holdings processed");
@@ -233,6 +171,9 @@ public class PortfolioIngestService : IPortfolioIngest
                 }
             }
         }
+
+        // Save all instrument changes before processing holdings
+        await _unitOfWork.SaveChangesAsync();
     }
 
     private async Task ProcessHoldingsAsync(IEnumerable<Holding> holdings, Guid portfolioId, CancellationToken cancellationToken)
