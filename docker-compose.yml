@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database Service
+  # (Uncomment and configure if you want to run the database in this compose stack)
+  # postgres:
+  #   image: postgres:15
+  #   container_name: portfoliomanager-db
+  #   environment:
+  #     POSTGRES_DB: portfoliomanager
+  #     POSTGRES_USER: postgres
+  #     POSTGRES_PASSWORD: your_password_here
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   networks:
+  #     - portfoliomanager-network
+  #   restart: unless-stopped
+
+  # Portfolio Manager API Service
+  portfoliomanager-api:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: portfoliomanager-api
+    environment:
+      # ASP.NET Core Configuration
+      - ASPNETCORE_ENVIRONMENT=Development  # Enable Swagger
+      - ASPNETCORE_URLS=http://+:8080
+      - ASPNETCORE_HTTP_PORTS=8080
+      
+      # Database Connection (connects to your existing PostgreSQL container)
+      # Uses environment variables from .env file
+      - ConnectionStrings__DefaultConnection=Host=${DB_HOST:-host.docker.internal};Port=${DB_PORT:-5432};Database=${DB_NAME:-portfoliomanager};Username=${DB_USERNAME};Password=${DB_PASSWORD};Include Error Detail=true
+      
+      # Logging Configuration
+      - Logging__LogLevel__Default=Information
+      - Logging__LogLevel__Microsoft.AspNetCore=Warning
+      - Logging__LogLevel__Microsoft.EntityFrameworkCore=Information
+      
+      # Optional: Additional settings
+      - AllowedHosts=*
+    ports:
+      - "8080:8080"
+    networks:
+      - portfoliomanager-network
+    restart: unless-stopped
+    # Removed depends_on since we're using external database
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+networks:
+  portfoliomanager-network:
+    driver: bridge
+    name: portfoliomanager-network
+
+# Uncomment if running database in this stack
+# volumes:
+#   postgres_data:

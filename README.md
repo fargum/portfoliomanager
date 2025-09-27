@@ -1,6 +1,30 @@
 # PortfolioManager
 
-A Domain Driven Design (DDD) based portfolio management solution built with .NET 9 and Entity Framework Core.
+A Domain Driven Design (DDD) based portfolio management solution built with .NET 9 and Entity Framework Core. The solution provides a containerized REST API for managing portfolio holdings and financial data.
+
+## Quick Start with Docker
+
+```bash
+# Build the Docker image
+docker build -t portfoliomanager-api:latest .
+
+# Run with your existing PostgreSQL database
+docker run -d \
+  --name portfoliomanager-api \
+  -p 8080:8080 \
+  -e ConnectionStrings__DefaultConnection="Host=your-db-host;Port=5432;Database=portfoliomanager;Username=postgres;Password=yourpassword" \
+  portfoliomanager-api:latest
+
+# Or use Docker Compose (update connection string in docker-compose.yml first)
+docker-compose up -d
+```
+
+**API Access:**
+- Health Check: http://localhost:8080/health
+- Swagger UI: http://localhost:8080/swagger
+- Holdings API: http://localhost:8080/api/holdings/
+
+📖 **See [Docker Deployment Guide](docs/Docker-Deployment-Guide.md) for comprehensive setup instructions**
 
 ## Architecture
 
@@ -118,7 +142,11 @@ This project uses PostgreSQL with Entity Framework Core and snake_case naming co
 
 ### Prerequisites
 
-1. Install PostgreSQL or use Docker:
+1. **For Docker Deployment (Recommended):**
+   - Docker and Docker Compose installed
+   - Existing PostgreSQL database container
+
+2. **For Local Development:**
    ```bash
    docker run --name portfolio-postgres -e POSTGRES_DB=portfolio_manager -e POSTGRES_USER=migrator -e POSTGRES_PASSWORD=your_password -p 5432:5432 -d postgres:15
    ```
@@ -139,8 +167,9 @@ PORTFOLIO_DB_CONNECTION="Host=localhost;Port=5432;Database=portfolio_manager;Use
 
 ### Database Migration
 
-Run the following commands to set up the database:
+**For Docker deployment:** Migrations run automatically when the container starts.
 
+**For local development:**
 ```bash
 cd src/FtoConsulting.PortfolioManager.Infrastructure
 dotnet ef database update --startup-project ../FtoConsulting.PortfolioManager.Api
@@ -151,6 +180,36 @@ dotnet ef database update --startup-project ../FtoConsulting.PortfolioManager.Ap
 The database uses snake_case naming conventions for PostgreSQL compatibility:
 - Tables: `accounts`, `portfolios`, `instruments`, `holdings`, etc.
 - Columns: `user_name`, `created_at`, `instrument_type_id`, etc.
+
+## Docker Deployment
+
+The application is fully containerized and ready for microservices architecture:
+
+### 🐳 **Container Architecture**
+- **API Service**: Containerized .NET 9 REST API
+- **Database**: External PostgreSQL container (your existing setup)
+- **Future UI**: Planned containerized frontend service
+
+### 🚀 **Quick Docker Commands**
+```bash
+# Build and run
+docker build -t portfoliomanager-api:latest .
+docker-compose up -d
+
+# View logs
+docker-compose logs -f portfoliomanager-api
+
+# Health check
+curl http://localhost:8080/health
+```
+
+### 📚 **Complete Docker Guide**
+See [Docker Deployment Guide](docs/Docker-Deployment-Guide.md) for:
+- Container networking configuration
+- Database connection setup
+- Production deployment
+- Troubleshooting
+- Integration with UI services
 
 ## Security Notes
 

@@ -1,54 +1,45 @@
-<!-- Use this file to provide workspace-specific custom instructions to Copilot. For more details, visit https://code.visualstudio.com/docs/copilot/copilot-customization#_use-a-githubcopilotinstructionsmd-file -->
-- [x] Verify that the copilot-instructions.md file in the .github directory is created.
+# Copilot Instructions for Portfolio Manager
 
-- [x] Clarify Project Requirements
-	<!-- C# DDD solution with Domain, Application, Infrastructure, and API layers. Entity Framework with code-first approach. -->
+## Project Overview
+This is a Domain Driven Design (DDD) based portfolio management solution built with .NET 9 and Entity Framework Core. The solution provides a containerized REST API for managing portfolio holdings and financial data.
 
-- [x] Scaffold the Project
-	<!--
-	Ensure that the previous step has been marked as completed.
-	Call project setup tool with projectType parameter.
-	Run scaffolding command to create project files and folders.
-	Use '.' as the working directory.
-	If no appropriate projectType is available, search documentation using available tools.
-	Otherwise, create the project structure manually using available file creation tools.
-	-->
+## Architecture
+- **Domain Layer**: Core business logic and domain entities
+- **Application Layer**: Application services, CQRS handlers, and DTOs  
+- **Infrastructure Layer**: Data access, external services, and infrastructure concerns
+- **API Layer**: REST API controllers and presentation layer
 
-- [x] Customize the Project
-	<!--
-	Verify that all previous steps have been completed successfully and you have marked the step as completed.
-	Develop a plan to modify codebase according to user requirements.
-	Apply modifications using appropriate tools and user-provided references.
-	Skip this step for "Hello World" projects.
-	-->
+## Technology Stack
+- .NET 9
+- Entity Framework Core with PostgreSQL
+- Docker containerization
+- RESTful API with Swagger/OpenAPI
+- Domain Driven Design patterns
+- Snake_case database naming conventions
 
-- [x] Install Required Extensions
-	<!-- ONLY install extensions provided mentioned in the get_project_setup_info. Skip this step otherwise and mark as completed. -->
+## Key Features
+- Portfolio holdings management
+- RESTful API endpoints
+- Containerized deployment
+- Health monitoring
+- Structured logging
+- Database migrations
 
-- [x] Compile the Project
-	<!--
-	Verify that all previous steps have been completed.
-	Install any missing dependencies.
-	Run diagnostics and resolve any issues.
-	Check for markdown files in project folder for relevant instructions on how to do this.
-	-->
+## Development Guidelines
+- Follow DDD principles and clean architecture
+- Use snake_case for database entities (PostgreSQL compatibility)
+- Implement proper error handling and logging
+- Maintain comprehensive API documentation
+- Use dependency injection for service management
+- Write unit tests for business logic
 
-- [x] Create and Run Task
-	<!--
-	Verify that all previous steps have been completed.
-	Check https://code.visualstudio.com/docs/debugtest/tasks to determine if the project needs a task. If so, use the create_and_run_task to create and launch a task based on package.json, README.md, and project structure.
-	Skip this step otherwise.
-	 -->
+## Container Architecture
+- API Service: Containerized .NET 9 REST API
+- Database: External PostgreSQL container
+- Future UI: Planned containerized frontend service
 
-- [x] Launch the Project
-	<!--
-	Verify that all previous steps have been completed.
-	Prompt user for debug mode, launch only if confirmed.
-	 -->
-
-- [x] Ensure Documentation is Complete
-	<!--
-	Verify that all previous steps have been completed.
-	Verify that README.md and the copilot-instructions.md file in the .github directory exists and contains current project information.
-	Clean up the copilot-instructions.md file in the .github directory by removing all HTML comments.
-	 -->
+## Important Files
+- `Dockerfile`: Multi-stage build configuration
+- `docker-compose.yml`: Container orchestration
+- `docs/Docker-Deployment-Guide.md`: Comprehensive deployment documentation
+- API endpoints available at `/swagger` when running

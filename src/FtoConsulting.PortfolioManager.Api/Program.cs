@@ -28,6 +28,9 @@ builder.Services.AddInfrastructureServices();
 // Register API services
 builder.Services.AddScoped<IPortfolioMappingService, PortfolioMappingService>();
 
+// Add health checks
+builder.Services.AddHealthChecks();
+
 // Configure Swagger/OpenAPI
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -73,6 +76,10 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseAuthorization();
+
+// Map health checks endpoint
+app.MapHealthChecks("/health");
+
 app.MapControllers();
 
 app.Run();
