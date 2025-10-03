@@ -19,6 +19,7 @@ export interface HoldingResponse {
   instrumentId: string;
   isin: string;
   sedol: string;
+  ticker: string;
   instrumentName: string;
   instrumentDescription: string;
   instrumentType: string;

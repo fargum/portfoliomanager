@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>891f0d69-b776-435e-a2c6-650369ce9179</UserSecretsId>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="EODHistoricalData.Wrapper" Version="1.3.4.5" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="9.0.5" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.9">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="9.0.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FtoConsulting.PortfolioManager.Domain\FtoConsulting.PortfolioManager.Domain.csproj" />
+    <ProjectReference Include="..\FtoConsulting.PortfolioManager.Application\FtoConsulting.PortfolioManager.Application.csproj" />
+    <ProjectReference Include="..\FtoConsulting.PortfolioManager.Infrastructure\FtoConsulting.PortfolioManager.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>

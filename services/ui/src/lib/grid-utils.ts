@@ -45,6 +45,14 @@ export const getHoldingsColumnDefs = (): ColDef<HoldingResponse>[] => [
     tooltipField: 'instrumentName',
   },
   {
+    field: 'ticker',
+    headerName: 'Ticker',
+    width: 100,
+    sortable: true,
+    filter: true,
+    cellStyle: { fontFamily: 'monospace', fontWeight: 'bold' },
+  },
+  {
     field: 'isin',
     headerName: 'ISIN',
     width: 120,
