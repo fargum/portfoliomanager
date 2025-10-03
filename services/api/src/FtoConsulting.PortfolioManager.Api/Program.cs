@@ -1,5 +1,6 @@
 using FtoConsulting.PortfolioManager.Api.Services;
 using FtoConsulting.PortfolioManager.Application;
+using FtoConsulting.PortfolioManager.Application.Configuration;
 using FtoConsulting.PortfolioManager.Infrastructure.Data;
 using FtoConsulting.PortfolioManager.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -24,6 +25,10 @@ builder.Services.AddApplicationServices();
 
 // Register infrastructure services  
 builder.Services.AddInfrastructureServices();
+
+// Configure EOD API options
+builder.Services.Configure<EodApiOptions>(
+    builder.Configuration.GetSection(EodApiOptions.SectionName));
 
 // Register API services
 builder.Services.AddScoped<IPortfolioMappingService, PortfolioMappingService>();

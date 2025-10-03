@@ -1,0 +1,71 @@
+# Docker ignore file to exclude unnecessary files from build context
+# Build artifacts
+**/bin/
+**/obj/
+**/out/
+
+# Runtime artifacts
+**/*.dll
+**/*.exe
+**/*.pdb
+
+# Visual Studio files
+.vs/
+.vscode/
+*.user
+*.suo
+*.userprefs
+.DS_Store
+
+# Test results
+TestResults/
+**/*.trx
+**/*.coverage
+**/*.coveragexml
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation (include only what's needed)
+*.md
+!README.md
+!docs/
+
+# Temporary files
+**/tmp/
+**/temp/
+**/*.tmp
+**/*.log
+
+# Package files
+*.nupkg
+*.snupkg
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment files (these should be handled via environment variables)
+.env
+.env.local
+.env.development
+.env.production
+
+# Test data
+test-portfolio.json
+cleanup.sql
+
+# IDE folders
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/

@@ -5,18 +5,12 @@ A Domain Driven Design (DDD) based portfolio management solution built with .NET
 ## Quick Start with Docker
 
 ```bash
-# Build the Docker image
-docker build -t portfoliomanager-api:latest .
-
-# Run with your existing PostgreSQL database
-docker run -d \
-  --name portfoliomanager-api \
-  -p 8080:8080 \
-  -e ConnectionStrings__DefaultConnection="Host=your-db-host;Port=5432;Database=portfoliomanager;Username=postgres;Password=yourpassword" \
-  portfoliomanager-api:latest
-
-# Or use Docker Compose (update connection string in docker-compose.yml first)
+# Build and run all services with Docker Compose
 docker-compose up -d
+
+# Or build individual services
+docker build -t portfoliomanager-api:latest ./services/api
+docker build -t portfoliomanager-ui:latest ./services/ui
 ```
 
 **API Access:**
@@ -27,6 +21,24 @@ docker-compose up -d
 📖 **See [Docker Deployment Guide](docs/Docker-Deployment-Guide.md) for comprehensive setup instructions**
 
 ## Architecture
+
+This solution follows Domain Driven Design (DDD) principles with a microservices architecture:
+
+### Monorepo Structure
+
+```
+PortfolioManager/
+├── services/
+│   ├── api/              # .NET 9 REST API Service
+│   │   ├── src/          # Domain, Application, Infrastructure, API layers
+│   │   ├── tests/        # Unit and integration tests
+│   │   └── Dockerfile    # API containerization
+│   └── ui/               # Frontend UI Service
+│       ├── src/          # UI application code
+│       └── Dockerfile    # UI containerization
+├── docker-compose.yml    # Multi-service orchestration
+└── docs/                 # Shared documentation
+```
 
 This solution follows Domain Driven Design (DDD) principles with a clean architecture approach:
 
@@ -174,6 +186,38 @@ PORTFOLIO_DB_CONNECTION="Host=localhost;Port=5432;Database=portfolio_manager;Use
 cd src/FtoConsulting.PortfolioManager.Infrastructure
 dotnet ef database update --startup-project ../FtoConsulting.PortfolioManager.Api
 ```
+
+## EOD Historical Data API Configuration
+
+The application uses EOD Historical Data API for fetching market prices. You need to configure your API token:
+
+### Setup Steps
+
+1. Get your API token from [EOD Historical Data](https://eodhd.com/)
+2. Copy `.env.example` to `.env`
+3. Update the `EOD_API_TOKEN` value in your `.env` file
+
+```bash
+# In .env file
+EOD_API_TOKEN=your_actual_api_token_here
+```
+
+### Configuration Options
+
+The EOD API can be configured in `appsettings.json` or via environment variables:
+
+```json
+{
+  "EodApi": {
+    "Token": "",
+    "BaseUrl": "https://eodhd.com/api",
+    "TimeoutSeconds": 30
+  }
+}
+```
+
+**For Docker:** The token is passed via the `EOD_API_TOKEN` environment variable.
+**For local development:** Set the token in user secrets or environment variables.
 
 ### Database Schema
 

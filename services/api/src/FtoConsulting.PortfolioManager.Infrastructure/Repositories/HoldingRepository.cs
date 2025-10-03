@@ -79,4 +79,16 @@ public class HoldingRepository : Repository<Holding>, IHoldingRepository
             .OrderBy(isin => isin)
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<IEnumerable<(string ISIN, string? Ticker)>> GetDistinctInstrumentsByDateAsync(DateTime valuationDate, CancellationToken cancellationToken = default)
+    {
+        return await _dbSet
+            .Where(h => h.ValuationDate.Date == valuationDate.Date)
+            .Include(h => h.Instrument)
+            .Select(h => new { h.Instrument.ISIN, h.Instrument.Ticker })
+            .Distinct()
+            .OrderBy(x => x.ISIN)
+            .Select(x => new ValueTuple<string, string?>(x.ISIN, x.Ticker))
+            .ToListAsync(cancellationToken);
+    }
 }

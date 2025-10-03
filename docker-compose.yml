@@ -21,8 +21,9 @@ services:
   # Portfolio Manager API Service
   portfoliomanager-api:
     build: 
-      context: .
+      context: ./services/api
       dockerfile: Dockerfile
+    image: portfoliomanager-api:latest
     container_name: portfoliomanager-api
     environment:
       # ASP.NET Core Configuration
@@ -33,6 +34,9 @@ services:
       # Database Connection (connects to your existing PostgreSQL container)
       # Uses environment variables from .env file
       - ConnectionStrings__DefaultConnection=Host=${DB_HOST:-host.docker.internal};Port=${DB_PORT:-5432};Database=${DB_NAME:-portfoliomanager};Username=${DB_USERNAME};Password=${DB_PASSWORD};Include Error Detail=true
+      
+      # EOD Historical Data API Configuration
+      - EodApi__Token=${EOD_API_TOKEN}
       
       # Logging Configuration
       - Logging__LogLevel__Default=Information
@@ -53,6 +57,26 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
+
+  # Portfolio Manager UI Service
+  portfoliomanager-ui:
+    build: 
+      context: ./services/ui
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
+    image: portfoliomanager-ui:latest
+    container_name: portfoliomanager-ui
+    environment:
+      - API_BASE_URL=http://portfoliomanager-api:8080
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
+    ports:
+      - "3000:3000"
+    networks:
+      - portfoliomanager-network
+    depends_on:
+      - portfoliomanager-api
+    restart: unless-stopped
 
 networks:
   portfoliomanager-network:
