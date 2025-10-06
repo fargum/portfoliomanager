@@ -44,7 +44,7 @@ public class PortfolioIngestServiceTests
         var platformId = Guid.NewGuid();
         var instrumentTypeId = Guid.NewGuid();
 
-        var instrument = new Instrument("US0378331005", "Apple Inc", instrumentTypeId, null, "Technology company", "AAPL", "USD");
+        var instrument = new Instrument("US0378331005", "Apple Inc", instrumentTypeId, null, "Technology company", "AAPL", "USD", "USD");
         // Use reflection to set the Id for testing purposes
         typeof(BaseEntity).GetProperty("Id")!.SetValue(instrument, instrumentId);
 
@@ -97,10 +97,10 @@ public class PortfolioIngestServiceTests
         var platformId = Guid.NewGuid();
         var instrumentTypeId = Guid.NewGuid();
 
-        var existingInstrument = new Instrument("US0378331005", "Apple Inc", instrumentTypeId, null, "Technology company", "AAPL", "USD");
+        var existingInstrument = new Instrument("US0378331005", "Apple Inc", instrumentTypeId, null, "Technology company", "AAPL", "USD", "USD");
         typeof(BaseEntity).GetProperty("Id")!.SetValue(existingInstrument, instrumentId);
 
-        var newInstrument = new Instrument("US0378331005", "Apple Inc Updated", instrumentTypeId, null, "Updated description", "AAPL", "USD");
+        var newInstrument = new Instrument("US0378331005", "Apple Inc Updated", instrumentTypeId, null, "Updated description", "AAPL", "USD", "GBP");
         typeof(BaseEntity).GetProperty("Id")!.SetValue(newInstrument, Guid.NewGuid());
 
         var holding = new Holding(DateTime.Today, newInstrument.Id, platformId, portfolioId, 100, 15000m, 18000m);

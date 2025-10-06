@@ -43,6 +43,10 @@ public class InstrumentConfiguration : IEntityTypeConfiguration<Instrument>
             .HasColumnName("currency_code")
             .HasMaxLength(3); // ISO 4217 currency codes are 3 characters
 
+        builder.Property(x => x.QuoteUnit)
+            .HasColumnName("quote_unit")
+            .HasMaxLength(3); // ISO quote unit codes are 3 characters
+
         builder.Property(x => x.InstrumentTypeId)
             .HasColumnName("instrument_type_id")
             .IsRequired();
@@ -70,6 +74,9 @@ public class InstrumentConfiguration : IEntityTypeConfiguration<Instrument>
 
         builder.HasIndex(x => x.CurrencyCode)
             .HasDatabaseName("ix_instruments_currency_code");
+
+        builder.HasIndex(x => x.QuoteUnit)
+            .HasDatabaseName("ix_instruments_quote_unit");
 
         // Configure relationships
         builder.HasOne(x => x.InstrumentType)

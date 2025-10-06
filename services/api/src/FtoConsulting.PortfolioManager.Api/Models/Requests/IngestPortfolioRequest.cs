@@ -126,6 +126,12 @@ public class InstrumentDto
     public string? CurrencyCode { get; set; }
 
     /// <summary>
+    /// ISO quote unit code (3 characters)
+    /// </summary>
+    [StringLength(3, MinimumLength = 3, ErrorMessage = "Quote unit must be exactly 3 characters")]
+    public string? QuoteUnit { get; set; }
+
+    /// <summary>
     /// Type/category of the instrument (equity, bond, etc.)
     /// </summary>
     [Required]

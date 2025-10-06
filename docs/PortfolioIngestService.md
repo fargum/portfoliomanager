@@ -45,8 +45,8 @@ public interface IPortfolioIngest
 public async Task<Portfolio> IngestPortfolio(IPortfolioIngest service)
 {
     // Create instruments with ISIN codes
-    var appleStock = new Instrument("US0378331005", "Apple Inc", equityTypeId);
-    var microsoftStock = new Instrument("US5949181045", "Microsoft Corporation", equityTypeId);
+    var appleStock = new Instrument("US0378331005", "Apple Inc", equityTypeId, null, null, "AAPL", "USD", "USD");
+    var microsoftStock = new Instrument("US5949181045", "Microsoft Corporation", equityTypeId, null, null, "MSFT", "USD", "USD");
 
     // Create portfolio
     var portfolio = new Portfolio("Tech Portfolio", accountId);

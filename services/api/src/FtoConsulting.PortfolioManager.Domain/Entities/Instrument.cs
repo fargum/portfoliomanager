@@ -10,6 +10,7 @@ public class Instrument : BaseEntity
     public string? Description { get; private set; }
     public string? Ticker { get; private set; }
     public string? CurrencyCode { get; private set; }
+    public string? QuoteUnit { get; private set; }
     public Guid InstrumentTypeId { get; private set; }
 
     // Navigation properties
@@ -19,7 +20,7 @@ public class Instrument : BaseEntity
     // Private constructor for EF Core
     private Instrument() { }
 
-    public Instrument(string isin, string name, Guid instrumentTypeId, string? sedol = null, string? description = null, string? ticker = null, string? currencyCode = null)
+    public Instrument(string isin, string name, Guid instrumentTypeId, string? sedol = null, string? description = null, string? ticker = null, string? currencyCode = null, string? quoteUnit = null)
     {
         ISIN = isin ?? throw new ArgumentNullException(nameof(isin));
         Name = name ?? throw new ArgumentNullException(nameof(name));
@@ -28,9 +29,10 @@ public class Instrument : BaseEntity
         Description = description;
         Ticker = ticker;
         CurrencyCode = currencyCode;
+        QuoteUnit = quoteUnit;
     }
 
-    public void UpdateDetails(string isin, string name, string? sedol = null, string? description = null, string? ticker = null, string? currencyCode = null)
+    public void UpdateDetails(string isin, string name, string? sedol = null, string? description = null, string? ticker = null, string? currencyCode = null, string? quoteUnit = null)
     {
         ISIN = isin ?? throw new ArgumentNullException(nameof(isin));
         Name = name ?? throw new ArgumentNullException(nameof(name));
@@ -38,6 +40,7 @@ public class Instrument : BaseEntity
         Description = description;
         Ticker = ticker;
         CurrencyCode = currencyCode;
+        QuoteUnit = quoteUnit;
         SetUpdatedAt();
     }
 

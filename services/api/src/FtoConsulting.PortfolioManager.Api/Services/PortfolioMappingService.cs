@@ -59,7 +59,8 @@ public class PortfolioMappingService : IPortfolioMappingService
                 holdingDto.Instrument.SEDOL,
                 holdingDto.Instrument.Description,
                 holdingDto.Instrument.Ticker,
-                holdingDto.Instrument.CurrencyCode
+                holdingDto.Instrument.CurrencyCode,
+                holdingDto.Instrument.QuoteUnit
             );
 
             // Create holding entity with the instrument reference
