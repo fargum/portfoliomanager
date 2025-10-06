@@ -197,16 +197,16 @@ public class PortfolioMappingService : IPortfolioMappingService
             TotalIsins = priceFetchResult.TotalIsins,
             SuccessfulPrices = priceFetchResult.SuccessfulPrices,
             FailedPrices = priceFetchResult.FailedPrices,
-            Prices = priceFetchResult.Prices.Select(MapToInstrumentPrice).ToList(),
+            Prices = new List<Api.Models.Responses.InstrumentPrice>(), // Prices are now persisted to database
             FailedIsins = priceFetchResult.FailedIsins.Select(MapToFailedPrice).ToList(),
             FetchedAt = priceFetchResult.FetchedAt,
             FetchDurationMs = (long)priceFetchResult.FetchDuration.TotalMilliseconds
         };
     }
 
-    private InstrumentPrice MapToInstrumentPrice(InstrumentPriceData priceData)
+    private Api.Models.Responses.InstrumentPrice MapToInstrumentPrice(InstrumentPriceData priceData)
     {
-        return new InstrumentPrice
+        return new Api.Models.Responses.InstrumentPrice
         {
             ISIN = priceData.ISIN,
             Symbol = priceData.Symbol,

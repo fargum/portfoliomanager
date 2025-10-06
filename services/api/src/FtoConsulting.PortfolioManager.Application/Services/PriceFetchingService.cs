@@ -1,5 +1,6 @@
 using FtoConsulting.PortfolioManager.Application.Configuration;
 using FtoConsulting.PortfolioManager.Application.Models;
+using FtoConsulting.PortfolioManager.Domain.Entities;
 using FtoConsulting.PortfolioManager.Domain.Repositories;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -15,20 +16,26 @@ namespace FtoConsulting.PortfolioManager.Application.Services;
 public class PriceFetchingService : IPriceFetching
 {
     private readonly IHoldingRepository _holdingRepository;
+    private readonly IInstrumentPriceRepository _instrumentPriceRepository;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<PriceFetchingService> _logger;
     private readonly EodApiOptions _eodApiOptions;
 
     public PriceFetchingService(
         IHoldingRepository holdingRepository,
+        IInstrumentPriceRepository instrumentPriceRepository,
+        IUnitOfWork unitOfWork,
         ILogger<PriceFetchingService> logger,
         IOptions<EodApiOptions> eodApiOptions)
     {
         _holdingRepository = holdingRepository ?? throw new ArgumentNullException(nameof(holdingRepository));
+        _instrumentPriceRepository = instrumentPriceRepository ?? throw new ArgumentNullException(nameof(instrumentPriceRepository));
+        _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _eodApiOptions = eodApiOptions?.Value ?? throw new ArgumentNullException(nameof(eodApiOptions));
     }
 
-    public async Task<PriceFetchResult> FetchPricesForDateAsync(DateOnly valuationDate, CancellationToken cancellationToken = default)
+    public async Task<PriceFetchResult> FetchAndPersistPricesForDateAsync(DateOnly valuationDate, CancellationToken cancellationToken = default)
     {
         var stopwatch = Stopwatch.StartNew();
         var result = new PriceFetchResult
@@ -36,25 +43,26 @@ public class PriceFetchingService : IPriceFetching
             FetchedAt = DateTime.UtcNow
         };
 
+        var pricesToPersist = new List<InstrumentPrice>();
+
         try
         {
-            _logger.LogInformation("Starting price fetch operation for holdings on date {ValuationDate}", valuationDate);
+            _logger.LogInformation("Starting price fetch and persist operation for valuation date {ValuationDate}", valuationDate);
 
-            // Step 1: Get distinct instruments (ISIN + Ticker) from holdings for the specified date
-            var dateTime = DateTime.SpecifyKind(valuationDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
-            var instruments = await _holdingRepository.GetDistinctInstrumentsByDateAsync(dateTime, cancellationToken);
+            // Step 1: Get distinct instruments (ISIN + Ticker) from all holdings regardless of date
+            var instruments = await _holdingRepository.GetAllDistinctInstrumentsAsync(cancellationToken);
             var instrumentList = instruments.ToList();
 
             result.TotalIsins = instrumentList.Count;
 
             if (!instrumentList.Any())
             {
-                _logger.LogWarning("No instruments found for date {ValuationDate}", valuationDate);
+                _logger.LogWarning("No instruments found in holdings database");
                 result.FetchDuration = stopwatch.Elapsed;
                 return result;
             }
 
-            _logger.LogInformation("Found {Count} distinct instruments for date {ValuationDate}. Fetching prices...", 
+            _logger.LogInformation("Found {Count} distinct instruments from all holdings. Fetching prices for valuation date {ValuationDate}...", 
                 instrumentList.Count, valuationDate);
 
             // Step 2: Fetch prices for each instrument using EOD Historical Data
@@ -67,7 +75,37 @@ public class PriceFetchingService : IPriceFetching
                     
                     if (priceData != null)
                     {
-                        result.Prices.Add(priceData);
+                        // Convert to InstrumentPrice entity for persistence
+                        var instrumentPrice = new InstrumentPrice
+                        {
+                            ISIN = priceData.ISIN,
+                            ValuationDate = valuationDate,
+                            Symbol = priceData.Symbol,
+                            Name = priceData.Name,
+                            Price = priceData.Price,
+                            Currency = priceData.Currency,
+                            Change = priceData.Change,
+                            ChangePercent = priceData.ChangePercent,
+                            PreviousClose = priceData.PreviousClose,
+                            Open = priceData.Open,
+                            High = priceData.High,
+                            Low = priceData.Low,
+                            Volume = priceData.Volume,
+                            Market = priceData.Market,
+                            MarketStatus = priceData.MarketStatus,
+                            PriceTimestamp = priceData.Timestamp?.Kind == DateTimeKind.Utc 
+                                ? priceData.Timestamp 
+                                : priceData.Timestamp?.ToUniversalTime()
+                        };
+                        
+                        // Explicitly ensure base entity timestamps are UTC
+                        instrumentPrice.GetType().GetProperty("CreatedAt")?.SetValue(instrumentPrice, DateTime.UtcNow);
+                        
+                        lock (pricesToPersist)
+                        {
+                            pricesToPersist.Add(instrumentPrice);
+                        }
+                        
                         _logger.LogDebug("Successfully fetched price for ISIN {ISIN} (Ticker: {Ticker}): {Price} {Currency}", 
                             instrument.ISIN, instrument.Ticker, priceData.Price, priceData.Currency);
                     }
@@ -96,10 +134,25 @@ public class PriceFetchingService : IPriceFetching
             // Execute all price fetching tasks concurrently
             await Task.WhenAll(priceTasks);
 
+            // Persist the collected prices to database
+            if (pricesToPersist.Any())
+            {
+                _logger.LogInformation("Persisting {Count} price records to database for valuation date {ValuationDate}", 
+                    pricesToPersist.Count, valuationDate);
+                
+                await _instrumentPriceRepository.BulkUpsertAsync(pricesToPersist, cancellationToken);
+                await _unitOfWork.SaveChangesAsync();
+                
+                _logger.LogInformation("Successfully persisted {Count} price records to database", pricesToPersist.Count);
+            }
+
             stopwatch.Stop();
             result.FetchDuration = stopwatch.Elapsed;
 
-            _logger.LogInformation("Price fetch operation completed. Success: {SuccessCount}, Failed: {FailedCount}, Duration: {Duration}ms",
+            // Update result with counts (but no actual price data since it's now persisted)
+            result.SuccessfulPrices = pricesToPersist.Count;
+
+            _logger.LogInformation("Price fetch and persist operation completed. Success: {SuccessCount}, Failed: {FailedCount}, Duration: {Duration}ms",
                 result.SuccessfulPrices, result.FailedPrices, result.FetchDuration.TotalMilliseconds);
 
             return result;

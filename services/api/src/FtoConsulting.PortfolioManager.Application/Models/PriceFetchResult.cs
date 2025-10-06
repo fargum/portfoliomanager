@@ -11,9 +11,9 @@ public class PriceFetchResult
     public int TotalIsins { get; set; }
 
     /// <summary>
-    /// Number of ISINs for which prices were successfully fetched
+    /// Number of ISINs for which prices were successfully fetched and persisted
     /// </summary>
-    public int SuccessfulPrices => Prices.Count;
+    public int SuccessfulPrices { get; set; }
 
     /// <summary>
     /// Number of ISINs for which price fetching failed
@@ -21,12 +21,8 @@ public class PriceFetchResult
     public int FailedPrices => FailedIsins.Count;
 
     /// <summary>
-    /// Collection of successfully fetched instrument prices
-    /// </summary>
-    public List<InstrumentPriceData> Prices { get; set; } = new();
-
-    /// <summary>
     /// Collection of ISINs for which price fetching failed
+    /// Note: Successful price data is now persisted to the database instead of being returned here
     /// </summary>
     public List<FailedPriceData> FailedIsins { get; set; } = new();
 

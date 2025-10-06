@@ -5,7 +5,7 @@
 echo "Building Portfolio Manager API Docker Image..."
 
 # Build the Docker image
-docker build -t portfoliomanager-api:latest .
+docker build -t portfoliomanager-api:latest ./services/api
 
 if [ $? -eq 0 ]; then
     echo "✅ Docker image built successfully!"

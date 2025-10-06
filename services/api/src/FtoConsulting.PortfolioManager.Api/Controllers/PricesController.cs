@@ -33,22 +33,23 @@ public class PricesController : ControllerBase
     }
 
     /// <summary>
-    /// Fetch current market prices for all distinct ISINs from holdings on a specific valuation date
+    /// Fetch market prices for all distinct ISINs from holdings for a specific valuation date
     /// </summary>
-    /// <param name="valuationDate">The valuation date to retrieve holdings and fetch prices for (YYYY-MM-DD format)</param>
+    /// <param name="valuationDate">The valuation date to fetch prices for (YYYY-MM-DD format)</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Collection of current market prices for all distinct ISINs found in holdings</returns>
+    /// <returns>Summary of price fetch operation with counts and metadata</returns>
     /// <remarks>
     /// This endpoint performs the following operations:
-    /// 1. Queries all distinct ISINs from holdings across all portfolios for the specified date
-    /// 2. Uses EOD Historical Data API to fetch current market prices for those ISINs
-    /// 3. Returns the pricing data with metadata about the fetch operation
+    /// 1. Queries all distinct ISINs from holdings across all portfolios (regardless of holding date)
+    /// 2. Uses EOD Historical Data API to fetch market prices for those ISINs on the specified valuation date
+    /// 3. Persists the pricing data to the instrument_prices table
+    /// 4. Returns a summary of the operation (not the actual price data)
     /// 
     /// **Process Flow:**
-    /// - Retrieves distinct ISINs from all portfolio holdings on the specified date
-    /// - Sends those ISINs to the EOD Historical Data pricing engine
-    /// - Returns current market prices, currency, and market status information
-    /// - Includes fetch timestamp and success/failure indicators
+    /// - Retrieves distinct ISINs from all portfolio holdings in the database
+    /// - Sends those ISINs to the EOD Historical Data pricing engine for the specified valuation date
+    /// - Persists market prices, currency, and market status information to database
+    /// - Returns operation summary with success/failure counts and timing
     /// 
     /// **Example Usage:**
     /// ```
@@ -56,15 +57,14 @@ public class PricesController : ControllerBase
     /// ```
     /// 
     /// **Response Features:**
-    /// - Real-time or latest available market prices
-    /// - Currency information for each instrument
-    /// - Market status (open/closed) and trading information  
-    /// - Error handling for ISINs that couldn't be priced
+    /// - Operation summary with success/failure counts
     /// - Fetch performance metrics and timing information
+    /// - Error details for ISINs that couldn't be priced
+    /// - Data is persisted to database, not returned in response
     /// </remarks>
-    /// <response code="200">Returns the collection of market prices for ISINs found on the specified date</response>
+    /// <response code="200">Returns operation summary after persisting prices to database</response>
     /// <response code="400">Invalid date format</response>
-    /// <response code="404">No holdings found for the specified date</response>
+    /// <response code="404">No instruments found in holdings database</response>
     /// <response code="500">Internal server error occurred while fetching prices</response>
     [HttpGet("date/{valuationDate:datetime}")]
     [ProducesResponseType(typeof(PricesResponse), (int)HttpStatusCode.OK)]
@@ -82,26 +82,40 @@ public class PricesController : ControllerBase
             // Convert DateTime to DateOnly for business logic
             var dateOnly = DateOnly.FromDateTime(valuationDate);
 
-            // Fetch prices using application service (which will internally get ISINs and fetch prices)
-            var pricesResult = await _priceFetching.FetchPricesForDateAsync(dateOnly, cancellationToken);
+            // Fetch and persist prices using application service
+            var pricesResult = await _priceFetching.FetchAndPersistPricesForDateAsync(dateOnly, cancellationToken);
 
-            // Check if any prices were fetched
-            if (pricesResult == null || !pricesResult.Prices.Any())
+            // Check if any prices were successfully fetched and persisted
+            if (pricesResult == null || pricesResult.SuccessfulPrices == 0)
             {
-                _logger.LogWarning("No prices could be fetched for date {ValuationDate}", dateOnly);
+                _logger.LogWarning("No prices could be fetched for valuation date {ValuationDate}. Failed ISINs: {FailedCount}", 
+                    dateOnly, pricesResult?.FailedPrices ?? 0);
+                
                 return NotFound(new ProblemDetails
                 {
                     Title = "No Prices Available",
-                    Detail = $"No market prices could be fetched for holdings on the specified date: {dateOnly:yyyy-MM-dd}",
+                    Detail = $"No market prices could be fetched for the specified valuation date: {dateOnly:yyyy-MM-dd}. " +
+                            $"Total failures: {pricesResult?.FailedPrices ?? 0}. " +
+                            $"This could be due to market closure, invalid ISINs, or external API issues.",
                     Status = (int)HttpStatusCode.NotFound
                 });
             }
 
-            // Map to response DTO
-            var response = _mappingService.MapToPricesResponse(pricesResult, dateOnly);
+            // Return success response with operation summary (no actual price data)
+            var response = new
+            {
+                ValuationDate = dateOnly,
+                TotalInstruments = pricesResult.TotalIsins,
+                SuccessfulPrices = pricesResult.SuccessfulPrices,
+                FailedPrices = pricesResult.FailedPrices,
+                FetchDurationMs = (long)pricesResult.FetchDuration.TotalMilliseconds,
+                FetchedAt = pricesResult.FetchedAt,
+                Message = $"Successfully fetched and persisted {pricesResult.SuccessfulPrices} prices to database",
+                FailedIsins = pricesResult.FailedIsins
+            };
 
-            _logger.LogInformation("Successfully fetched {SuccessCount} prices out of {TotalCount} ISINs for date {ValuationDate}", 
-                pricesResult.SuccessfulPrices, pricesResult.TotalIsins, dateOnly);
+            _logger.LogInformation("Successfully persisted {SuccessCount} prices for date {ValuationDate}", 
+                pricesResult.SuccessfulPrices, dateOnly);
 
             return Ok(response);
         }

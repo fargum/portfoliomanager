@@ -91,4 +91,15 @@ public class HoldingRepository : Repository<Holding>, IHoldingRepository
             .Select(x => new ValueTuple<string, string?>(x.ISIN, x.Ticker))
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<IEnumerable<(string ISIN, string? Ticker)>> GetAllDistinctInstrumentsAsync(CancellationToken cancellationToken = default)
+    {
+        return await _dbSet
+            .Include(h => h.Instrument)
+            .Select(h => new { h.Instrument.ISIN, h.Instrument.Ticker })
+            .Distinct()
+            .OrderBy(x => x.ISIN)
+            .Select(x => new ValueTuple<string, string?>(x.ISIN, x.Ticker))
+            .ToListAsync(cancellationToken);
+    }
 }

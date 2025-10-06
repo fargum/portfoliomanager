@@ -14,6 +14,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPortfolioRepository, PortfolioRepository>();
         services.AddScoped<IInstrumentRepository, InstrumentRepository>();
         services.AddScoped<IHoldingRepository, HoldingRepository>();
+        services.AddScoped<IInstrumentPriceRepository, InstrumentPriceRepository>();
         
         // Register Unit of Work
         services.AddScoped<IUnitOfWork, UnitOfWork>();

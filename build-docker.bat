@@ -4,7 +4,7 @@ REM Portfolio Manager API Docker Build Script for Windows
 echo Building Portfolio Manager API Docker Image...
 
 REM Build the Docker image
-docker build -t portfoliomanager-api:latest .
+docker build -t portfoliomanager-api:latest ./services/api
 
 if %ERRORLEVEL% equ 0 (
     echo ✅ Docker image built successfully!

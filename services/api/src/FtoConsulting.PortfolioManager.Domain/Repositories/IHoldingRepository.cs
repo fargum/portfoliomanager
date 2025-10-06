@@ -12,4 +12,5 @@ public interface IHoldingRepository : IRepository<Holding>
     Task<IEnumerable<Holding>> GetHoldingsByAccountAndDateAsync(Guid accountId, DateTime valuationDate, CancellationToken cancellationToken = default);
     Task<IEnumerable<string>> GetDistinctIsinsByDateAsync(DateTime valuationDate, CancellationToken cancellationToken = default);
     Task<IEnumerable<(string ISIN, string? Ticker)>> GetDistinctInstrumentsByDateAsync(DateTime valuationDate, CancellationToken cancellationToken = default);
+    Task<IEnumerable<(string ISIN, string? Ticker)>> GetAllDistinctInstrumentsAsync(CancellationToken cancellationToken = default);
 }
