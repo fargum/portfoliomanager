@@ -140,6 +140,11 @@ namespace FtoConsulting.PortfolioManager.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
+                    b.Property<string>("CurrencyCode")
+                        .HasMaxLength(3)
+                        .HasColumnType("character varying(3)")
+                        .HasColumnName("currency_code");
+
                     b.Property<string>("Description")
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)")
@@ -176,6 +181,9 @@ namespace FtoConsulting.PortfolioManager.Infrastructure.Migrations
                         .HasColumnName("updated_at");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("CurrencyCode")
+                        .HasDatabaseName("ix_instruments_currency_code");
 
                     b.HasIndex("ISIN")
                         .IsUnique()

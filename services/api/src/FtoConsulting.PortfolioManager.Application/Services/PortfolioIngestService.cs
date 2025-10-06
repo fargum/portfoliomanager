@@ -160,7 +160,7 @@ public class PortfolioIngestService : IPortfolioIngest
                 // Update existing instrument if needed
                 if (ShouldUpdateInstrument(existingInstrument, instrument))
                 {
-                    existingInstrument.UpdateDetails(instrument.ISIN, instrument.Name, instrument.SEDOL, instrument.Description);
+                    existingInstrument.UpdateDetails(instrument.ISIN, instrument.Name, instrument.SEDOL, instrument.Description, instrument.Ticker, instrument.CurrencyCode);
                     if (existingInstrument.InstrumentTypeId != instrument.InstrumentTypeId)
                     {
                         existingInstrument.UpdateInstrumentType(instrument.InstrumentTypeId);
@@ -270,6 +270,8 @@ public class PortfolioIngestService : IPortfolioIngest
         return existing.Name != incoming.Name ||
                existing.Description != incoming.Description ||
                existing.SEDOL != incoming.SEDOL ||
+               existing.Ticker != incoming.Ticker ||
+               existing.CurrencyCode != incoming.CurrencyCode ||
                existing.InstrumentTypeId != incoming.InstrumentTypeId;
     }
 }

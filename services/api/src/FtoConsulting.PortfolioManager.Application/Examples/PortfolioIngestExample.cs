@@ -25,9 +25,9 @@ public class PortfolioIngestExample
         var bondTypeId = Guid.NewGuid();
 
         // Create sample instruments
-        var appleStock = new Instrument("US0378331005", "Apple Inc", equityTypeId, "2046251", "Apple Inc Common Stock");
-        var microsoftStock = new Instrument("US5949181045", "Microsoft Corporation", equityTypeId, "2588173", "Microsoft Corporation Common Stock");
-        var treasuryBond = new Instrument("US912828XG55", "US Treasury Bond 2.75% 2025", bondTypeId, null, "US Treasury Bond maturing 2025");
+        var appleStock = new Instrument("US0378331005", "Apple Inc", equityTypeId, "2046251", "Apple Inc Common Stock", "AAPL", "USD");
+        var microsoftStock = new Instrument("US5949181045", "Microsoft Corporation", equityTypeId, "2588173", "Microsoft Corporation Common Stock", "MSFT", "USD");
+        var treasuryBond = new Instrument("US912828XG55", "US Treasury Bond 2.75% 2025", bondTypeId, null, "US Treasury Bond maturing 2025", null, "USD");
 
         // Create sample platforms
         var fidelityPlatformId = Guid.NewGuid();
@@ -111,7 +111,9 @@ public class PortfolioIngestExample
                     externalHolding.InstrumentName,
                     externalHolding.InstrumentTypeId,
                     externalHolding.SEDOL,
-                    externalHolding.Description
+                    externalHolding.Description,
+                    null, // ticker
+                    null  // currencyCode
                 );
             }
 
