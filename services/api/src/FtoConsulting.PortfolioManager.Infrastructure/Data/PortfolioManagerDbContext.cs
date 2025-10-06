@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using FtoConsulting.PortfolioManager.Domain.Entities;
 
 namespace FtoConsulting.PortfolioManager.Infrastructure.Data;
@@ -17,6 +19,7 @@ public class PortfolioManagerDbContext : DbContext
     public DbSet<Instrument> Instruments { get; set; }
     public DbSet<InstrumentType> InstrumentTypes { get; set; }
     public DbSet<Platform> Platforms { get; set; }
+    public DbSet<InstrumentPrice> InstrumentPrices { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -31,8 +34,11 @@ public class PortfolioManagerDbContext : DbContext
         if (!optionsBuilder.IsConfigured)
         {
             // This will be overridden at runtime, but provides fallback for design-time
-            optionsBuilder.UseNpgsql("Host=localhost;Port=5432;Database=portfolio_manager;Username=migrator;Password=!Gangatala10!")
-                         .UseSnakeCaseNamingConvention();
+            // Use environment variable or safer fallback for design-time operations
+            var connectionString = Environment.GetEnvironmentVariable("PORTFOLIO_DB_CONNECTION") 
+                ?? "Host=localhost;Port=5432;Database=portfolio_manager;Username=postgres;Password=design_time_placeholder";
+            optionsBuilder.UseNpgsql(connectionString);
+                        // .UseSnakeCaseNamingConvention();
         }
     }
 
@@ -43,11 +49,27 @@ public class PortfolioManagerDbContext : DbContext
         
         foreach (var entry in entries)
         {
-            if (entry.State == EntityState.Modified)
+            if (entry.State == EntityState.Added)
+            {
+                // Ensure CreatedAt is set to UTC for new entities
+                var createdAtProperty = entry.Property(nameof(BaseEntity.CreatedAt));
+                if (createdAtProperty.CurrentValue is DateTime createdAt && createdAt.Kind != DateTimeKind.Utc)
+                {
+                    createdAtProperty.CurrentValue = DateTime.SpecifyKind(createdAt, DateTimeKind.Utc);
+                }
+            }
+            else if (entry.State == EntityState.Modified)
             {
                 var updateMethod = entry.Entity.GetType().GetMethod("SetUpdatedAt", 
                     System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
                 updateMethod?.Invoke(entry.Entity, null);
+                
+                // Ensure UpdatedAt is set to UTC for modified entities
+                var updatedAtProperty = entry.Property(nameof(BaseEntity.UpdatedAt));
+                if (updatedAtProperty.CurrentValue is DateTime updatedAt && updatedAt.Kind != DateTimeKind.Utc)
+                {
+                    updatedAtProperty.CurrentValue = DateTime.SpecifyKind(updatedAt, DateTimeKind.Utc);
+                }
             }
         }
 
