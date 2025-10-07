@@ -12,7 +12,7 @@ public class InstrumentPriceConfiguration : IEntityTypeConfiguration<InstrumentP
     public void Configure(EntityTypeBuilder<InstrumentPrice> builder)
     {
         // Table name using snake_case convention
-        builder.ToTable("instrument_prices");
+        builder.ToTable("instrument_prices", "app");
 
         // Composite primary key
         builder.HasKey(ip => new { ip.ISIN, ip.ValuationDate });

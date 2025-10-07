@@ -8,7 +8,7 @@ public class HoldingConfiguration : IEntityTypeConfiguration<Holding>
 {
     public void Configure(EntityTypeBuilder<Holding> builder)
     {
-        builder.ToTable("holdings");
+        builder.ToTable("holdings", "app");
 
         builder.HasKey(x => x.Id);
 

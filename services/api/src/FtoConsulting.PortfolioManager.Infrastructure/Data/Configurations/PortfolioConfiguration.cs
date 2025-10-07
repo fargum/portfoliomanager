@@ -8,7 +8,7 @@ public class PortfolioConfiguration : IEntityTypeConfiguration<Portfolio>
 {
     public void Configure(EntityTypeBuilder<Portfolio> builder)
     {
-        builder.ToTable("portfolios");
+        builder.ToTable("portfolios", "app");
 
         builder.HasKey(x => x.Id);
 

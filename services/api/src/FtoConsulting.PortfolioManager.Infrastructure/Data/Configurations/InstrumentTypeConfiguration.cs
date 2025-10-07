@@ -8,7 +8,7 @@ public class InstrumentTypeConfiguration : IEntityTypeConfiguration<InstrumentTy
 {
     public void Configure(EntityTypeBuilder<InstrumentType> builder)
     {
-        builder.ToTable("instrument_types");
+        builder.ToTable("instrument_types", "app");
 
         builder.HasKey(x => x.Id);
 

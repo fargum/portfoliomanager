@@ -102,4 +102,41 @@ public class HoldingRepository : Repository<Holding>, IHoldingRepository
             .Select(x => new ValueTuple<string, string?>(x.ISIN, x.Ticker))
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<DateOnly?> GetLatestValuationDateAsync(CancellationToken cancellationToken = default)
+    {
+        var latestDate = await _dbSet
+            .OrderByDescending(h => h.ValuationDate)
+            .Select(h => h.ValuationDate)
+            .FirstOrDefaultAsync(cancellationToken);
+        
+        return latestDate == default ? null : DateOnly.FromDateTime(latestDate);
+    }
+
+    public async Task<IEnumerable<Holding>> GetHoldingsByValuationDateWithInstrumentsAsync(DateOnly valuationDate, CancellationToken cancellationToken = default)
+    {
+        var targetDate = DateTime.SpecifyKind(valuationDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
+        
+        return await _dbSet
+            .Where(h => h.ValuationDate.Date == targetDate.Date)
+            .Include(h => h.Instrument)
+            .Include(h => h.Portfolio)
+            .Include(h => h.Platform)
+            .OrderBy(h => h.Instrument.ISIN)
+            .ToListAsync(cancellationToken);
+    }
+
+    public async Task DeleteHoldingsByValuationDateAsync(DateOnly valuationDate, CancellationToken cancellationToken = default)
+    {
+        var targetDate = DateTime.SpecifyKind(valuationDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
+        
+        var holdingsToDelete = await _dbSet
+            .Where(h => h.ValuationDate.Date == targetDate.Date)
+            .ToListAsync(cancellationToken);
+        
+        if (holdingsToDelete.Any())
+        {
+            _dbSet.RemoveRange(holdingsToDelete);
+        }
+    }
 }

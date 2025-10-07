@@ -8,7 +8,7 @@ public class PlatformConfiguration : IEntityTypeConfiguration<Platform>
 {
     public void Configure(EntityTypeBuilder<Platform> builder)
     {
-        builder.ToTable("platforms");
+        builder.ToTable("platforms", "app");
 
         builder.HasKey(x => x.Id);
 

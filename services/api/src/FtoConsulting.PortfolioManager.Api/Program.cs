@@ -17,7 +17,9 @@ builder.Services.AddDbContext<PortfolioManagerDbContext>(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
         ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
-    options.UseNpgsql(connectionString);
+    options.UseNpgsql(connectionString)
+           .EnableSensitiveDataLogging()
+           .LogTo(Console.WriteLine, LogLevel.Information);
 });
 
 // Register application services

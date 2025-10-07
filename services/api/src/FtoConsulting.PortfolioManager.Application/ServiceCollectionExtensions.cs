@@ -11,6 +11,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IPortfolioIngest, PortfolioIngestService>();
         services.AddScoped<IHoldingsRetrieval, HoldingsRetrievalService>();
         services.AddScoped<IPriceFetching, PriceFetchingService>();
+        services.AddScoped<IHoldingRevaluationService, HoldingRevaluationService>();
         
         // Register MediatR for CQRS
         services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(ServiceCollectionExtensions).Assembly));
