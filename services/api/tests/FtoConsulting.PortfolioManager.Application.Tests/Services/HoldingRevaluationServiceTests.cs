@@ -57,12 +57,12 @@ public class HoldingRevaluationServiceTests
         var valuationDate = DateOnly.FromDateTime(DateTime.Today);
         var sourceDate = valuationDate.AddDays(-1);
         
-        var instrumentTypeId = Guid.NewGuid();
-        var instrumentId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
-        var platformId = Guid.NewGuid();
+        var instrumentTypeId = 1;
+        var instrumentId = 1;
+        var portfolioId = 1;
+        var platformId = 1;
 
-        var instrument = new Instrument("US0378331005", "Apple Inc", instrumentTypeId, null, "Technology company", "AAPL", "USD", "GBX");
+        var instrument = new Instrument("Apple Inc", "AAPL", instrumentTypeId, "Technology company", "USD", "GBX");
         typeof(BaseEntity).GetProperty("Id")!.SetValue(instrument, instrumentId);
 
         var sourceHolding = new Holding(sourceDate.ToDateTime(TimeOnly.MinValue), instrumentId, platformId, portfolioId, 100, 15000m, 18000m);
@@ -70,7 +70,7 @@ public class HoldingRevaluationServiceTests
 
         var instrumentPrice = new InstrumentPrice
         {
-            ISIN = "US0378331005",
+            Ticker = "AAPL",
             ValuationDate = valuationDate,
             Price = 12000m, // 120.00 pounds in pence
             Currency = "GBX"

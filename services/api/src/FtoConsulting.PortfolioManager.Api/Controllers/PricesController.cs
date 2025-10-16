@@ -105,13 +105,13 @@ public class PricesController : ControllerBase
             var response = new
             {
                 ValuationDate = dateOnly,
-                TotalInstruments = pricesResult.TotalIsins,
+                TotalInstruments = pricesResult.TotalTickers,
                 SuccessfulPrices = pricesResult.SuccessfulPrices,
                 FailedPrices = pricesResult.FailedPrices,
                 FetchDurationMs = (long)pricesResult.FetchDuration.TotalMilliseconds,
                 FetchedAt = pricesResult.FetchedAt,
                 Message = $"Successfully fetched and persisted {pricesResult.SuccessfulPrices} prices to database",
-                FailedIsins = pricesResult.FailedIsins
+                FailedTickers = pricesResult.FailedTickers
             };
 
             _logger.LogInformation("Successfully persisted {SuccessCount} prices for date {ValuationDate}", 

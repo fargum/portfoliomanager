@@ -79,13 +79,13 @@ public class HoldingsController : ControllerBase
     /// <response code="400">Invalid account ID format or date format</response>
     /// <response code="404">No holdings found for the specified account and date</response>
     /// <response code="500">Internal server error occurred while retrieving holdings</response>
-    [HttpGet("account/{accountId:guid}/date/{valuationDate:datetime}")]
+    [HttpGet("account/{accountId:int}/date/{valuationDate:datetime}")]
     [ProducesResponseType(typeof(AccountHoldingsResponse), (int)HttpStatusCode.OK)]
     [ProducesResponseType(typeof(ProblemDetails), (int)HttpStatusCode.BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), (int)HttpStatusCode.NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), (int)HttpStatusCode.InternalServerError)]
     public async Task<ActionResult<AccountHoldingsResponse>> GetHoldingsByAccountAndDate(
-        [FromRoute] Guid accountId,
+        [FromRoute] int accountId,
         [FromRoute] DateTime valuationDate,
         CancellationToken cancellationToken = default)
     {
@@ -94,13 +94,13 @@ public class HoldingsController : ControllerBase
             _logger.LogInformation("Retrieving holdings for account {AccountId} on date {ValuationDate}", accountId, valuationDate);
 
             // Validate input parameters
-            if (accountId == Guid.Empty)
+            if (accountId <= 0)
             {
                 _logger.LogWarning("Invalid account ID provided: {AccountId}", accountId);
                 return BadRequest(new ProblemDetails
                 {
                     Title = "Invalid Account ID",
-                    Detail = "Account ID cannot be empty",
+                    Detail = "Account ID must be a positive integer",
                     Status = (int)HttpStatusCode.BadRequest
                 });
             }

@@ -8,7 +8,7 @@ public class IngestPortfolioResponse
     /// <summary>
     /// ID of the ingested portfolio
     /// </summary>
-    public Guid PortfolioId { get; set; }
+    public int PortfolioId { get; set; }
 
     /// <summary>
     /// Name of the portfolio
@@ -18,7 +18,7 @@ public class IngestPortfolioResponse
     /// <summary>
     /// Account ID that owns the portfolio
     /// </summary>
-    public Guid AccountId { get; set; }
+    public int AccountId { get; set; }
 
     /// <summary>
     /// Number of holdings successfully ingested
@@ -64,12 +64,12 @@ public class HoldingSummaryDto
     /// <summary>
     /// ID of the holding
     /// </summary>
-    public Guid HoldingId { get; set; }
+    public int HoldingId { get; set; }
 
     /// <summary>
-    /// ISIN of the instrument
+    /// ID of the instrument
     /// </summary>
-    public string InstrumentISIN { get; set; } = string.Empty;
+    public int InstrumentId { get; set; }
 
     /// <summary>
     /// Name of the instrument

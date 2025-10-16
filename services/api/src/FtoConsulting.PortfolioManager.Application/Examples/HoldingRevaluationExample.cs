@@ -47,8 +47,8 @@ public static class HoldingRevaluationExample
                 logger.LogWarning("Failed to revalue {Count} instruments:", result.FailedInstruments.Count);
                 foreach (var failed in result.FailedInstruments)
                 {
-                    logger.LogWarning("- {ISIN} ({Name}): {Error} [{ErrorCode}]", 
-                        failed.ISIN, failed.InstrumentName, failed.ErrorMessage, failed.ErrorCode);
+                    logger.LogWarning("- {Ticker} ({Name}): {Error} [{ErrorCode}]", 
+                        failed.Ticker, failed.InstrumentName, failed.ErrorMessage, failed.ErrorCode);
                 }
             }
             

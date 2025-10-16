@@ -21,20 +21,20 @@ public class PortfolioIngestExample
     public async Task<Portfolio> IngestSamplePortfolioAsync()
     {
         // Create some sample instrument types (these would typically exist already)
-        var equityTypeId = Guid.NewGuid();
-        var bondTypeId = Guid.NewGuid();
+        var equityTypeId = 1;
+        var bondTypeId = 2;
 
-        // Create sample instruments
-        var appleStock = new Instrument("US0378331005", "Apple Inc", equityTypeId, "2046251", "Apple Inc Common Stock", "AAPL", "USD", "USD");
-        var microsoftStock = new Instrument("US5949181045", "Microsoft Corporation", equityTypeId, "2588173", "Microsoft Corporation Common Stock", "MSFT", "USD", "USD");
-        var treasuryBond = new Instrument("US912828XG55", "US Treasury Bond 2.75% 2025", bondTypeId, null, "US Treasury Bond maturing 2025", null, "USD", "USD");
+        // Create sample instruments (using ticker as the primary business identifier)
+        var appleStock = new Instrument("Apple Inc", "AAPL", equityTypeId, "Apple Inc Common Stock", "USD", "USD");
+        var microsoftStock = new Instrument("Microsoft Corporation", "MSFT", equityTypeId, "Microsoft Corporation Common Stock", "USD", "USD");
+        var treasuryBond = new Instrument("US Treasury Bond 2.75% 2025", "UST25", bondTypeId, "US Treasury Bond maturing 2025", "USD", "USD");
 
-        // Create sample platforms
-        var fidelityPlatformId = Guid.NewGuid();
-        var schwabPlatformId = Guid.NewGuid();
+        // Create sample platforms (using integers instead of GUIDs)
+        var fidelityPlatformId = 1;
+        var schwabPlatformId = 2;
 
-        // Create sample account and portfolio
-        var accountId = Guid.NewGuid();
+        // Create sample account and portfolio (using integers instead of GUIDs)
+        var accountId = 1;
         var portfolio = new Portfolio("My Investment Portfolio", accountId);
 
         // Create holdings for the portfolio
@@ -81,7 +81,7 @@ public class PortfolioIngestExample
         }
 
         // Ingest the portfolio - this will:
-        // 1. Check if instruments exist by ISIN, create them if they don't
+        // 1. Check if instruments exist by ticker, create them if they don't
         // 2. Create or update the portfolio
         // 3. Add all holdings with correct instrument references
         var ingestedPortfolio = await _portfolioIngest.IngestPortfolioAsync(portfolio);
@@ -104,17 +104,15 @@ public class PortfolioIngestExample
         {
             // Create instrument if we have the data
             Instrument? instrument = null;
-            if (!string.IsNullOrEmpty(externalHolding.ISIN))
+            if (!string.IsNullOrEmpty(externalHolding.Ticker))
             {
                 instrument = new Instrument(
-                    externalHolding.ISIN,
                     externalHolding.InstrumentName,
+                    externalHolding.Ticker,
                     externalHolding.InstrumentTypeId,
-                    externalHolding.SEDOL,
                     externalHolding.Description,
-                    null, // ticker
-                    null, // currencyCode
-                    null  // quoteUnit
+                    externalHolding.CurrencyCode,
+                    externalHolding.QuoteUnit
                 );
             }
 
@@ -156,7 +154,7 @@ public class PortfolioIngestExample
 public class ExternalPortfolioData
 {
     public string PortfolioName { get; set; } = string.Empty;
-    public Guid AccountId { get; set; }
+    public int AccountId { get; set; }
     public List<ExternalHoldingData> Holdings { get; set; } = new();
 }
 
@@ -166,13 +164,14 @@ public class ExternalPortfolioData
 public class ExternalHoldingData
 {
     public DateTime ValuationDate { get; set; }
-    public string ISIN { get; set; } = string.Empty;
+    public string Ticker { get; set; } = string.Empty;
     public string InstrumentName { get; set; } = string.Empty;
-    public string? SEDOL { get; set; }
     public string? Description { get; set; }
-    public Guid InstrumentId { get; set; } // Fallback if no ISIN data
-    public Guid InstrumentTypeId { get; set; }
-    public Guid PlatformId { get; set; }
+    public string? CurrencyCode { get; set; }
+    public string? QuoteUnit { get; set; }
+    public int InstrumentId { get; set; } // Fallback if no ticker data
+    public int InstrumentTypeId { get; set; }
+    public int PlatformId { get; set; }
     public decimal Units { get; set; }
     public decimal BookValue { get; set; }
     public decimal MarketValue { get; set; }

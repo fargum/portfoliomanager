@@ -14,11 +14,11 @@ public class InstrumentPriceRepository : Repository<InstrumentPrice>, IInstrumen
     {
     }
 
-    public async Task<InstrumentPrice?> GetByIsinAndDateAsync(string isin, DateOnly valuationDate, CancellationToken cancellationToken = default)
+    public async Task<InstrumentPrice?> GetByInstrumentAndDateAsync(int instrumentId, DateOnly valuationDate, CancellationToken cancellationToken = default)
     {
         return await _context.Set<InstrumentPrice>()
             .Include(ip => ip.Instrument)
-            .FirstOrDefaultAsync(ip => ip.ISIN == isin && ip.ValuationDate == valuationDate, cancellationToken);
+            .FirstOrDefaultAsync(ip => ip.InstrumentId == instrumentId && ip.ValuationDate == valuationDate, cancellationToken);
     }
 
     public async Task<IEnumerable<InstrumentPrice>> GetByValuationDateAsync(DateOnly valuationDate, CancellationToken cancellationToken = default)
@@ -26,15 +26,15 @@ public class InstrumentPriceRepository : Repository<InstrumentPrice>, IInstrumen
         return await _context.Set<InstrumentPrice>()
             .Include(ip => ip.Instrument)
             .Where(ip => ip.ValuationDate == valuationDate)
-            .OrderBy(ip => ip.ISIN)
+            .OrderBy(ip => ip.InstrumentId)
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<IEnumerable<InstrumentPrice>> GetByIsinAsync(string isin, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<InstrumentPrice>> GetByInstrumentAsync(int instrumentId, CancellationToken cancellationToken = default)
     {
         return await _context.Set<InstrumentPrice>()
             .Include(ip => ip.Instrument)
-            .Where(ip => ip.ISIN == isin)
+            .Where(ip => ip.InstrumentId == instrumentId)
             .OrderByDescending(ip => ip.ValuationDate)
             .ToListAsync(cancellationToken);
     }

@@ -3,7 +3,7 @@ using System.ComponentModel.DataAnnotations;
 namespace FtoConsulting.PortfolioManager.Api.Models.Responses;
 
 /// <summary>
-/// Response containing market prices for ISINs fetched from EOD Historical Data
+/// Response containing market prices for tickers fetched from EOD Historical Data
 /// </summary>
 public class PricesResponse
 {
@@ -14,19 +14,19 @@ public class PricesResponse
     public DateOnly ValuationDate { get; set; }
 
     /// <summary>
-    /// Total number of distinct ISINs found in holdings
+    /// Total number of distinct tickers found in holdings
     /// </summary>
     [Required]
-    public int TotalIsins { get; set; }
+    public int TotalTickers { get; set; }
 
     /// <summary>
-    /// Number of ISINs for which prices were successfully fetched
+    /// Number of tickers for which prices were successfully fetched
     /// </summary>
     [Required]
     public int SuccessfulPrices { get; set; }
 
     /// <summary>
-    /// Number of ISINs for which price fetching failed
+    /// Number of tickers for which price fetching failed
     /// </summary>
     [Required]
     public int FailedPrices { get; set; }
@@ -38,9 +38,9 @@ public class PricesResponse
     public ICollection<InstrumentPrice> Prices { get; set; } = new List<InstrumentPrice>();
 
     /// <summary>
-    /// Collection of ISINs for which price fetching failed
+    /// Collection of tickers for which price fetching failed
     /// </summary>
-    public ICollection<FailedPrice> FailedIsins { get; set; } = new List<FailedPrice>();
+    public ICollection<FailedPrice> FailedTickers { get; set; } = new List<FailedPrice>();
 
     /// <summary>
     /// Timestamp when the prices were fetched
@@ -60,15 +60,15 @@ public class PricesResponse
 public class InstrumentPrice
 {
     /// <summary>
-    /// ISIN of the instrument
+    /// Instrument ID
     /// </summary>
     [Required]
-    public string ISIN { get; set; } = string.Empty;
+    public int InstrumentId { get; set; }
 
     /// <summary>
-    /// Trading symbol/ticker
+    /// Trading ticker
     /// </summary>
-    public string? Symbol { get; set; }
+    public string? Ticker { get; set; }
 
     /// <summary>
     /// Instrument name
@@ -139,15 +139,15 @@ public class InstrumentPrice
 }
 
 /// <summary>
-/// Information about ISINs for which price fetching failed
+/// Information about tickers for which price fetching failed
 /// </summary>
 public class FailedPrice
 {
     /// <summary>
-    /// ISIN for which price fetching failed
+    /// Ticker for which price fetching failed
     /// </summary>
     [Required]
-    public string ISIN { get; set; } = string.Empty;
+    public string Ticker { get; set; } = string.Empty;
 
     /// <summary>
     /// Error message describing why the price fetch failed

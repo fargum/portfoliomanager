@@ -10,8 +10,8 @@ public class FlattenedHoldingResponse
     /// <summary>
     /// Unique identifier for the holding
     /// </summary>
-    /// <example>f47ac10b-58cc-4372-a567-0e02b2c3d479</example>
-    public Guid HoldingId { get; set; }
+    /// <example>12345</example>
+    public int HoldingId { get; set; }
 
     /// <summary>
     /// Date of the valuation
@@ -54,7 +54,7 @@ public class FlattenedHoldingResponse
     /// Unique identifier for the portfolio
     /// </summary>
     /// <example>a1b2c3d4-e5f6-7890-abcd-ef1234567890</example>
-    public Guid PortfolioId { get; set; }
+    public int PortfolioId { get; set; }
 
     /// <summary>
     /// Name of the portfolio
@@ -66,7 +66,7 @@ public class FlattenedHoldingResponse
     /// Account identifier that owns the portfolio
     /// </summary>
     /// <example>12345678-1234-5678-9012-123456789012</example>
-    public Guid AccountId { get; set; }
+    public int AccountId { get; set; }
 
     /// <summary>
     /// Name of the account that owns the portfolio
@@ -79,19 +79,9 @@ public class FlattenedHoldingResponse
     /// Unique identifier for the instrument
     /// </summary>
     /// <example>b2c3d4e5-f6g7-8901-bcde-f23456789012</example>
-    public Guid InstrumentId { get; set; }
+    public int InstrumentId { get; set; }
 
-    /// <summary>
-    /// International Securities Identification Number
-    /// </summary>
-    /// <example>US0378331005</example>
-    public string ISIN { get; set; } = string.Empty;
 
-    /// <summary>
-    /// Stock Exchange Daily Official List (optional)
-    /// </summary>
-    /// <example>2046251</example>
-    public string? SEDOL { get; set; }
 
     /// <summary>
     /// Trading ticker symbol
@@ -122,7 +112,7 @@ public class FlattenedHoldingResponse
     /// Unique identifier for the platform where the holding is held
     /// </summary>
     /// <example>c3d4e5f6-g7h8-9012-cdef-345678901234</example>
-    public Guid PlatformId { get; set; }
+    public int PlatformId { get; set; }
 
     /// <summary>
     /// Name of the platform

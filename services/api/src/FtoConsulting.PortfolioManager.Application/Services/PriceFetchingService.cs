@@ -53,7 +53,7 @@ public class PriceFetchingService : IPriceFetching
             var instruments = await _holdingRepository.GetAllDistinctInstrumentsAsync(cancellationToken);
             var instrumentList = instruments.ToList();
 
-            result.TotalIsins = instrumentList.Count;
+            result.TotalTickers= instrumentList.Count;
 
             if (!instrumentList.Any())
             {
@@ -71,16 +71,15 @@ public class PriceFetchingService : IPriceFetching
                 try
                 {
                     // Use the EOD Historical Data client to fetch real-time price
-                    var priceData = await FetchPriceForInstrument(instrument.ISIN, instrument.Ticker, valuationDate, cancellationToken);
+                    var priceData = await FetchPriceForInstrument(instrument.Ticker, instrument.Ticker, valuationDate, cancellationToken);
                     
                     if (priceData != null)
                     {
                         // Convert to InstrumentPrice entity for persistence
                         var instrumentPrice = new InstrumentPrice
                         {
-                            ISIN = priceData.ISIN,
+                            Ticker = priceData.Ticker,
                             ValuationDate = valuationDate,
-                            Symbol = priceData.Symbol,
                             Name = priceData.Name,
                             Price = priceData.Price,
                             Currency = priceData.Currency,
@@ -106,14 +105,14 @@ public class PriceFetchingService : IPriceFetching
                             pricesToPersist.Add(instrumentPrice);
                         }
                         
-                        _logger.LogDebug("Successfully fetched price for ISIN {ISIN} (Ticker: {Ticker}): {Price} {Currency}", 
-                            instrument.ISIN, instrument.Ticker, priceData.Price, priceData.Currency);
+                        _logger.LogDebug("Successfully fetched price for (Ticker: {Ticker}): {Price} {Currency}", 
+                            instrument.Ticker, priceData.Price, priceData.Currency);
                     }
                     else
                     {
-                        result.FailedIsins.Add(new FailedPriceData
+                        result.FailedTickers.Add(new FailedPriceData
                         {
-                            ISIN = instrument.ISIN,
+                            Ticker = instrument.Ticker,
                             ErrorMessage = "No price data available",
                             ErrorCode = "NO_DATA"
                         });
@@ -121,10 +120,10 @@ public class PriceFetchingService : IPriceFetching
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to fetch price for ISIN {ISIN} (Ticker: {Ticker})", instrument.ISIN, instrument.Ticker);
-                    result.FailedIsins.Add(new FailedPriceData
+                    _logger.LogWarning(ex, "Failed to fetch price for (Ticker: {Ticker})", instrument.Ticker);
+                    result.FailedTickers.Add(new FailedPriceData
                     {
-                        ISIN = instrument.ISIN,
+
                         ErrorMessage = ex.Message,
                         ErrorCode = "FETCH_ERROR"
                     });
@@ -229,11 +228,11 @@ public class PriceFetchingService : IPriceFetching
                 // Map the EOD data to our InstrumentPriceData
                 return new InstrumentPriceData
                 {
-                    ISIN = isin,
+                    Ticker = ticker,
                     Price = latestPrice.Close,
                     Currency = "USD", // EOD typically returns USD for most stocks
                     Symbol = ticker,
-                    Name = $"Instrument {isin}",
+                    Name = $"Instrument {ticker}",
                     Change = latestPrice.Close - latestPrice.Open,
                     ChangePercent = latestPrice.Open != 0 ? ((latestPrice.Close - latestPrice.Open) / latestPrice.Open) * 100 : null,
                     PreviousClose = latestPrice.Open,

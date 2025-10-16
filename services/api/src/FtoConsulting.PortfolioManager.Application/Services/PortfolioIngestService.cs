@@ -133,10 +133,10 @@ public class PortfolioIngestService : IPortfolioIngest
 
     private async Task ProcessInstrumentsAsync(IEnumerable<Holding> holdings, CancellationToken cancellationToken)
     {
-        // Get unique instruments by ISIN
+        // Get unique instruments by ticker
         var uniqueInstruments = holdings
-            .Where(h => h.Instrument != null && !string.IsNullOrEmpty(h.Instrument.ISIN))
-            .GroupBy(h => h.Instrument!.ISIN)
+            .Where(h => h.Instrument != null && !string.IsNullOrEmpty(h.Instrument.Ticker))
+            .GroupBy(h => h.Instrument!.Ticker)
             .Select(g => g.First().Instrument!)
             .ToList();
 
@@ -146,28 +146,28 @@ public class PortfolioIngestService : IPortfolioIngest
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            // Check if instrument already exists by ISIN
-            var existingInstrument = await _instrumentRepository.GetByISINAsync(instrument.ISIN);
+            // Check if instrument already exists by ticker
+            var existingInstrument = await _instrumentRepository.GetByTickerAsync(instrument.Ticker);
             
             if (existingInstrument == null)
             {
                 // Create new instrument
                 await _instrumentRepository.AddAsync(instrument);
-                _logger.LogDebug("Created new instrument {ISIN} - {Name}", instrument.ISIN, instrument.Name);
+                _logger.LogDebug("Created new instrument {Ticker} - {Name}", instrument.Ticker, instrument.Name);
             }
             else
             {
                 // Update existing instrument if needed
                 if (ShouldUpdateInstrument(existingInstrument, instrument))
                 {
-                    existingInstrument.UpdateDetails(instrument.ISIN, instrument.Name, instrument.SEDOL, instrument.Description, instrument.Ticker, instrument.CurrencyCode, instrument.QuoteUnit);
+                    existingInstrument.UpdateDetails(instrument.Name, instrument.Ticker, instrument.Description, instrument.CurrencyCode, instrument.QuoteUnit);
                     if (existingInstrument.InstrumentTypeId != instrument.InstrumentTypeId)
                     {
                         existingInstrument.UpdateInstrumentType(instrument.InstrumentTypeId);
                     }
                     
                     await _instrumentRepository.UpdateAsync(existingInstrument);
-                    _logger.LogDebug("Updated existing instrument {ISIN}", instrument.ISIN);
+                    _logger.LogDebug("Updated existing instrument {Ticker}", instrument.Ticker);
                 }
             }
         }
@@ -176,10 +176,10 @@ public class PortfolioIngestService : IPortfolioIngest
         await _unitOfWork.SaveChangesAsync();
     }
 
-    private async Task ProcessHoldingsAsync(IEnumerable<Holding> holdings, Guid portfolioId, CancellationToken cancellationToken)
+    private async Task ProcessHoldingsAsync(IEnumerable<Holding> holdings, int portfolioId, CancellationToken cancellationToken)
     {
         // Create a mapping from the temporary instrument IDs used in holdings to the actual database IDs
-        var instrumentMapping = new Dictionary<Guid, Guid>();
+        var instrumentMapping = new Dictionary<int, int>();
         
         // Get all unique temporary instrument IDs from holdings and resolve them
         var tempInstrumentIds = holdings.Select(h => h.InstrumentId).Distinct().ToList();
@@ -190,17 +190,17 @@ public class PortfolioIngestService : IPortfolioIngest
             
             // Find the original holding to get the instrument data
             var holdingWithInstrument = holdings.FirstOrDefault(h => h.InstrumentId == tempId);
-            if (holdingWithInstrument?.Instrument != null && !string.IsNullOrEmpty(holdingWithInstrument.Instrument.ISIN))
+            if (holdingWithInstrument?.Instrument != null && !string.IsNullOrEmpty(holdingWithInstrument.Instrument.Ticker))
             {
-                // Look up the actual instrument by ISIN
-                var actualInstrument = await _instrumentRepository.GetByISINAsync(holdingWithInstrument.Instrument.ISIN);
+                // Look up the actual instrument by Ticker
+                var actualInstrument = await _instrumentRepository.GetByTickerAsync(holdingWithInstrument.Instrument.Ticker);
                 if (actualInstrument != null)
                 {
                     instrumentMapping[tempId] = actualInstrument.Id;
                 }
                 else
                 {
-                    _logger.LogError("Could not find instrument with ISIN {ISIN} in database", holdingWithInstrument.Instrument.ISIN);
+                    _logger.LogError("Could not find instrument with Ticker {Ticker} in database", holdingWithInstrument.Instrument.Ticker);
                 }
             }
         }
@@ -233,8 +233,8 @@ public class PortfolioIngestService : IPortfolioIngest
             }
 
             await _holdingRepository.AddAsync(newHolding);
-            _logger.LogDebug("Added holding for instrument {ISIN} to portfolio {PortfolioId}", 
-                holding.Instrument?.ISIN, portfolioId);
+            _logger.LogDebug("Added holding for instrument {Ticker} to portfolio {PortfolioId}", 
+                holding.Instrument?.Ticker, portfolioId);
         }
     }
 
@@ -269,7 +269,6 @@ public class PortfolioIngestService : IPortfolioIngest
     {
         return existing.Name != incoming.Name ||
                existing.Description != incoming.Description ||
-               existing.SEDOL != incoming.SEDOL ||
                existing.Ticker != incoming.Ticker ||
                existing.CurrencyCode != incoming.CurrencyCode ||
                existing.QuoteUnit != incoming.QuoteUnit ||

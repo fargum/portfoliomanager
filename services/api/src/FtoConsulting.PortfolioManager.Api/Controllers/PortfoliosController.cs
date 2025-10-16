@@ -198,9 +198,9 @@ public class PortfoliosController : ControllerBase
                 {
                     validationErrors[$"requests[{i}].portfolioName"] = new[] { "Portfolio name is required" };
                 }
-                if (request.AccountId == Guid.Empty)
+                if (request.AccountId <= 0)
                 {
-                    validationErrors[$"requests[{i}].accountId"] = new[] { "Account ID is required" };
+                    validationErrors[$"requests[{i}].accountId"] = new[] { "Account ID must be a positive integer" };
                 }
                 if (request.Holdings == null || request.Holdings.Count == 0)
                 {

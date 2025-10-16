@@ -11,7 +11,7 @@ public class PortfolioRepository : Repository<Portfolio>, IPortfolioRepository
     {
     }
 
-    public async Task<IEnumerable<Portfolio>> GetByAccountIdAsync(Guid accountId)
+    public async Task<IEnumerable<Portfolio>> GetByAccountIdAsync(int accountId)
     {
         return await _dbSet
             .Where(p => p.AccountId == accountId)
@@ -22,13 +22,13 @@ public class PortfolioRepository : Repository<Portfolio>, IPortfolioRepository
             .ToListAsync();
     }
 
-    public async Task<Portfolio?> GetByAccountAndNameAsync(Guid accountId, string name)
+    public async Task<Portfolio?> GetByAccountAndNameAsync(int accountId, string name)
     {
         return await _dbSet
             .FirstOrDefaultAsync(p => p.AccountId == accountId && p.Name == name);
     }
 
-    public async Task<Portfolio?> GetWithHoldingsAsync(Guid portfolioId)
+    public async Task<Portfolio?> GetWithHoldingsAsync(int portfolioId)
     {
         return await _dbSet
             .Include(p => p.Holdings)

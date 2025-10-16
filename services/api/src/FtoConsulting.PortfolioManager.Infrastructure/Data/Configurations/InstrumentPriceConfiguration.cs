@@ -15,12 +15,11 @@ public class InstrumentPriceConfiguration : IEntityTypeConfiguration<InstrumentP
         builder.ToTable("instrument_prices", "app");
 
         // Composite primary key
-        builder.HasKey(ip => new { ip.ISIN, ip.ValuationDate });
+        builder.HasKey(ip => new { ip.InstrumentId, ip.ValuationDate });
 
         // Configure properties with snake_case column names
-        builder.Property(ip => ip.ISIN)
-            .HasColumnName("isin")
-            .HasMaxLength(12)
+        builder.Property(ip => ip.InstrumentId)
+            .HasColumnName("instrument_id")
             .IsRequired();
 
         builder.Property(ip => ip.ValuationDate)
@@ -28,8 +27,8 @@ public class InstrumentPriceConfiguration : IEntityTypeConfiguration<InstrumentP
             .HasColumnType("date")
             .IsRequired();
 
-        builder.Property(ip => ip.Symbol)
-            .HasColumnName("symbol")
+        builder.Property(ip => ip.Ticker)
+            .HasColumnName("ticker")
             .HasMaxLength(50);
 
         builder.Property(ip => ip.Name)
@@ -107,18 +106,17 @@ public class InstrumentPriceConfiguration : IEntityTypeConfiguration<InstrumentP
         // Foreign key relationship to Instrument
         builder.HasOne(ip => ip.Instrument)
             .WithMany()
-            .HasForeignKey(ip => ip.ISIN)
-            .HasPrincipalKey(i => i.ISIN)
+            .HasForeignKey(ip => ip.InstrumentId)
             .OnDelete(DeleteBehavior.Cascade);
 
         // Indexes for performance
         builder.HasIndex(ip => ip.ValuationDate)
             .HasDatabaseName("ix_instrument_prices_valuation_date");
 
-        builder.HasIndex(ip => ip.ISIN)
-            .HasDatabaseName("ix_instrument_prices_isin");
+        builder.HasIndex(ip => ip.InstrumentId)
+            .HasDatabaseName("ix_instrument_prices_instrument_id");
 
-        builder.HasIndex(ip => ip.Symbol)
-            .HasDatabaseName("ix_instrument_prices_symbol");
+        builder.HasIndex(ip => ip.Ticker)
+            .HasDatabaseName("ix_instrument_prices_ticker");
     }
 }

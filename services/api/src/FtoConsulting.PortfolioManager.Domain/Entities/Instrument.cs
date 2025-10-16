@@ -4,14 +4,12 @@ namespace FtoConsulting.PortfolioManager.Domain.Entities;
 
 public class Instrument : BaseEntity
 {
-    public string ISIN { get; private set; } = string.Empty;
-    public string? SEDOL { get; private set; }
     public string Name { get; private set; } = string.Empty;
     public string? Description { get; private set; }
-    public string? Ticker { get; private set; }
+    public string Ticker { get; private set; } = string.Empty;
     public string? CurrencyCode { get; private set; }
     public string? QuoteUnit { get; private set; }
-    public Guid InstrumentTypeId { get; private set; }
+    public int InstrumentTypeId { get; private set; }
 
     // Navigation properties
     public virtual InstrumentType InstrumentType { get; private set; } = null!;
@@ -20,31 +18,27 @@ public class Instrument : BaseEntity
     // Private constructor for EF Core
     private Instrument() { }
 
-    public Instrument(string isin, string name, Guid instrumentTypeId, string? sedol = null, string? description = null, string? ticker = null, string? currencyCode = null, string? quoteUnit = null)
+    public Instrument(string name, string ticker, int instrumentTypeId, string? description = null, string? currencyCode = null, string? quoteUnit = null)
     {
-        ISIN = isin ?? throw new ArgumentNullException(nameof(isin));
         Name = name ?? throw new ArgumentNullException(nameof(name));
+        Ticker = ticker ?? throw new ArgumentNullException(nameof(ticker));
         InstrumentTypeId = instrumentTypeId;
-        SEDOL = sedol;
         Description = description;
-        Ticker = ticker;
         CurrencyCode = currencyCode;
         QuoteUnit = quoteUnit;
     }
 
-    public void UpdateDetails(string isin, string name, string? sedol = null, string? description = null, string? ticker = null, string? currencyCode = null, string? quoteUnit = null)
+    public void UpdateDetails(string name, string ticker, string? description = null, string? currencyCode = null, string? quoteUnit = null)
     {
-        ISIN = isin ?? throw new ArgumentNullException(nameof(isin));
         Name = name ?? throw new ArgumentNullException(nameof(name));
-        SEDOL = sedol;
+        Ticker = ticker ?? throw new ArgumentNullException(nameof(ticker));
         Description = description;
-        Ticker = ticker;
         CurrencyCode = currencyCode;
         QuoteUnit = quoteUnit;
         SetUpdatedAt();
     }
 
-    public void UpdateInstrumentType(Guid instrumentTypeId)
+    public void UpdateInstrumentType(int instrumentTypeId)
     {
         InstrumentTypeId = instrumentTypeId;
         SetUpdatedAt();

@@ -6,25 +6,25 @@ namespace FtoConsulting.PortfolioManager.Application.Models;
 public class PriceFetchResult
 {
     /// <summary>
-    /// Total number of distinct ISINs that were processed
+    /// Total number of distinct tickers that were processed
     /// </summary>
-    public int TotalIsins { get; set; }
+    public int TotalTickers { get; set; }
 
     /// <summary>
-    /// Number of ISINs for which prices were successfully fetched and persisted
+    /// Number of tickers for which prices were successfully fetched and persisted
     /// </summary>
     public int SuccessfulPrices { get; set; }
 
     /// <summary>
     /// Number of ISINs for which price fetching failed
     /// </summary>
-    public int FailedPrices => FailedIsins.Count;
+    public int FailedPrices => FailedTickers.Count;
 
     /// <summary>
     /// Collection of ISINs for which price fetching failed
     /// Note: Successful price data is now persisted to the database instead of being returned here
     /// </summary>
-    public List<FailedPriceData> FailedIsins { get; set; } = new();
+    public List<FailedPriceData> FailedTickers { get; set; } = new();
 
     /// <summary>
     /// Time taken to complete the price fetching operation
@@ -42,7 +42,7 @@ public class PriceFetchResult
 /// </summary>
 public class InstrumentPriceData
 {
-    public string ISIN { get; set; } = string.Empty;
+    public string Ticker { get; set; } = string.Empty;
     public string? Symbol { get; set; }
     public string? Name { get; set; }
     public decimal Price { get; set; }
@@ -64,7 +64,7 @@ public class InstrumentPriceData
 /// </summary>
 public class FailedPriceData
 {
-    public string ISIN { get; set; } = string.Empty;
+    public string Ticker { get; set; } = string.Empty;
     public string ErrorMessage { get; set; } = string.Empty;
     public string? ErrorCode { get; set; }
 }

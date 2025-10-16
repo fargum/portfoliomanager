@@ -11,7 +11,7 @@ public class HoldingRepository : Repository<Holding>, IHoldingRepository
     {
     }
 
-    public async Task<IEnumerable<Holding>> GetByPortfolioIdAsync(Guid portfolioId)
+    public async Task<IEnumerable<Holding>> GetByPortfolioIdAsync(int portfolioId)
     {
         return await _dbSet
             .Where(h => h.PortfolioId == portfolioId)
@@ -22,7 +22,7 @@ public class HoldingRepository : Repository<Holding>, IHoldingRepository
             .ToListAsync();
     }
 
-    public async Task<IEnumerable<Holding>> GetByInstrumentIdAsync(Guid instrumentId)
+    public async Task<IEnumerable<Holding>> GetByInstrumentIdAsync(int instrumentId)
     {
         return await _dbSet
             .Where(h => h.InstrumentId == instrumentId)
@@ -42,7 +42,7 @@ public class HoldingRepository : Repository<Holding>, IHoldingRepository
             .ToListAsync();
     }
 
-    public async Task<IEnumerable<Holding>> GetByPortfolioAndDateRangeAsync(Guid portfolioId, DateTime fromDate, DateTime toDate)
+    public async Task<IEnumerable<Holding>> GetByPortfolioAndDateRangeAsync(int portfolioId, DateTime fromDate, DateTime toDate)
     {
         return await _dbSet
             .Where(h => h.PortfolioId == portfolioId 
@@ -55,7 +55,7 @@ public class HoldingRepository : Repository<Holding>, IHoldingRepository
             .ToListAsync();
     }
 
-    public async Task<IEnumerable<Holding>> GetHoldingsByAccountAndDateAsync(Guid accountId, DateTime valuationDate, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<Holding>> GetHoldingsByAccountAndDateAsync(int accountId, DateTime valuationDate, CancellationToken cancellationToken = default)
     {
         return await _dbSet
             .Where(h => h.Portfolio.AccountId == accountId && h.ValuationDate.Date == valuationDate.Date)
@@ -69,37 +69,37 @@ public class HoldingRepository : Repository<Holding>, IHoldingRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<IEnumerable<string>> GetDistinctIsinsByDateAsync(DateTime valuationDate, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<string>> GetDistinctTickersByDateAsync(DateTime valuationDate, CancellationToken cancellationToken = default)
     {
         return await _dbSet
             .Where(h => h.ValuationDate.Date == valuationDate.Date)
             .Include(h => h.Instrument)
-            .Select(h => h.Instrument.ISIN)
+            .Select(h => h.Instrument.Ticker)
             .Distinct()
-            .OrderBy(isin => isin)
+            .OrderBy(ticker => ticker)
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<IEnumerable<(string ISIN, string? Ticker)>> GetDistinctInstrumentsByDateAsync(DateTime valuationDate, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<(string Ticker, string Name)>> GetDistinctInstrumentsByDateAsync(DateTime valuationDate, CancellationToken cancellationToken = default)
     {
         return await _dbSet
             .Where(h => h.ValuationDate.Date == valuationDate.Date)
             .Include(h => h.Instrument)
-            .Select(h => new { h.Instrument.ISIN, h.Instrument.Ticker })
+            .Select(h => new { h.Instrument.Ticker, h.Instrument.Name })
             .Distinct()
-            .OrderBy(x => x.ISIN)
-            .Select(x => new ValueTuple<string, string?>(x.ISIN, x.Ticker))
+            .OrderBy(x => x.Ticker)
+            .Select(x => new ValueTuple<string, string>(x.Ticker, x.Name))
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<IEnumerable<(string ISIN, string? Ticker)>> GetAllDistinctInstrumentsAsync(CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<(string Ticker, string Name)>> GetAllDistinctInstrumentsAsync(CancellationToken cancellationToken = default)
     {
         return await _dbSet
             .Include(h => h.Instrument)
-            .Select(h => new { h.Instrument.ISIN, h.Instrument.Ticker })
+            .Select(h => new { h.Instrument.Ticker, h.Instrument.Name })
             .Distinct()
-            .OrderBy(x => x.ISIN)
-            .Select(x => new ValueTuple<string, string?>(x.ISIN, x.Ticker))
+            .OrderBy(x => x.Ticker)
+            .Select(x => new ValueTuple<string, string>(x.Ticker, x.Name))
             .ToListAsync(cancellationToken);
     }
 
@@ -122,7 +122,7 @@ public class HoldingRepository : Repository<Holding>, IHoldingRepository
             .Include(h => h.Instrument)
             .Include(h => h.Portfolio)
             .Include(h => h.Platform)
-            .OrderBy(h => h.Instrument.ISIN)
+            .OrderBy(h => h.Instrument.Ticker)
             .ToListAsync(cancellationToken);
     }
 

@@ -16,7 +16,7 @@ public class Repository<T> : IRepository<T> where T : class
         _dbSet = context.Set<T>();
     }
 
-    public virtual async Task<T?> GetByIdAsync(Guid id)
+    public virtual async Task<T?> GetByIdAsync(int id)
     {
         return await _dbSet.FindAsync(id);
     }
@@ -49,7 +49,7 @@ public class Repository<T> : IRepository<T> where T : class
         return Task.CompletedTask;
     }
 
-    public virtual async Task<bool> ExistsAsync(Guid id)
+    public virtual async Task<bool> ExistsAsync(int id)
     {
         return await _dbSet.FindAsync(id) != null;
     }

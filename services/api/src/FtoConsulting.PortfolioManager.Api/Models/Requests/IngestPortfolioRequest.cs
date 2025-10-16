@@ -18,7 +18,7 @@ public class IngestPortfolioRequest
     /// ID of the account that owns this portfolio
     /// </summary>
     [Required]
-    public Guid AccountId { get; set; }
+    public int AccountId { get; set; }
 
     /// <summary>
     /// Collection of holdings to ingest
@@ -42,7 +42,7 @@ public class HoldingDto
     /// Platform/broker where the holding is held
     /// </summary>
     [Required]
-    public Guid PlatformId { get; set; }
+    public int PlatformId { get; set; }
 
     /// <summary>
     /// Number of units held
@@ -88,13 +88,6 @@ public class HoldingDto
 public class InstrumentDto
 {
     /// <summary>
-    /// ISIN (International Securities Identification Number) - primary identifier
-    /// </summary>
-    [Required]
-    [StringLength(12, MinimumLength = 12, ErrorMessage = "ISIN must be exactly 12 characters")]
-    public string ISIN { get; set; } = string.Empty;
-
-    /// <summary>
     /// Display name of the instrument
     /// </summary>
     [Required]
@@ -108,16 +101,11 @@ public class InstrumentDto
     public string? Description { get; set; }
 
     /// <summary>
-    /// SEDOL code (optional alternative identifier)
+    /// Trading ticker symbol - primary identifier for the instrument
     /// </summary>
-    [StringLength(7, MinimumLength = 7, ErrorMessage = "SEDOL must be exactly 7 characters")]
-    public string? SEDOL { get; set; }
-
-    /// <summary>
-    /// Trading ticker symbol
-    /// </summary>
+    [Required]
     [StringLength(50)]
-    public string? Ticker { get; set; }
+    public string Ticker { get; set; } = string.Empty;
 
     /// <summary>
     /// ISO 4217 currency code (3 characters)
@@ -135,5 +123,5 @@ public class InstrumentDto
     /// Type/category of the instrument (equity, bond, etc.)
     /// </summary>
     [Required]
-    public Guid InstrumentTypeId { get; set; }
+    public int InstrumentTypeId { get; set; }
 }

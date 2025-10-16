@@ -10,11 +10,11 @@ public interface IInstrumentPriceRepository : IRepository<InstrumentPrice>
     /// <summary>
     /// Gets price data for a specific instrument and valuation date
     /// </summary>
-    /// <param name="isin">ISIN of the instrument</param>
+    /// <param name="instrumentId">ID of the instrument</param>
     /// <param name="valuationDate">Valuation date</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Instrument price data if found, null otherwise</returns>
-    Task<InstrumentPrice?> GetByIsinAndDateAsync(string isin, DateOnly valuationDate, CancellationToken cancellationToken = default);
+    Task<InstrumentPrice?> GetByInstrumentAndDateAsync(int instrumentId, DateOnly valuationDate, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Gets all price data for a specific valuation date
@@ -27,10 +27,10 @@ public interface IInstrumentPriceRepository : IRepository<InstrumentPrice>
     /// <summary>
     /// Gets all price data for a specific instrument across all dates
     /// </summary>
-    /// <param name="isin">ISIN of the instrument</param>
+    /// <param name="instrumentId">ID of the instrument</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Collection of instrument prices</returns>
-    Task<IEnumerable<InstrumentPrice>> GetByIsinAsync(string isin, CancellationToken cancellationToken = default);
+    Task<IEnumerable<InstrumentPrice>> GetByInstrumentAsync(int instrumentId, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Deletes all price data for a specific valuation date

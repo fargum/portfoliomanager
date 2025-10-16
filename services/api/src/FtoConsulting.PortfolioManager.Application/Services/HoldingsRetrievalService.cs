@@ -21,7 +21,7 @@ public class HoldingsRetrievalService : IHoldingsRetrieval
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task<IEnumerable<Holding>> GetHoldingsByAccountAndDateAsync(Guid accountId, DateOnly valuationDate, CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<Holding>> GetHoldingsByAccountAndDateAsync(int accountId, DateOnly valuationDate, CancellationToken cancellationToken = default)
     {
         _logger.LogInformation("Retrieving holdings for account {AccountId} on date {ValuationDate}", accountId, valuationDate);
 

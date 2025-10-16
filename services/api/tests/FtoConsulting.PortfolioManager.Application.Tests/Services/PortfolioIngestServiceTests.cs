@@ -37,14 +37,14 @@ public class PortfolioIngestServiceTests
     public async Task IngestPortfolioAsync_WithNewInstrument_CreatesInstrumentAndHolding()
     {
         // Arrange
-        var instrumentId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
-        var accountId = Guid.NewGuid();
-        var holdingId = Guid.NewGuid();
-        var platformId = Guid.NewGuid();
-        var instrumentTypeId = Guid.NewGuid();
+        var instrumentId = 1;
+        var portfolioId = 1;
+        var accountId = 1;
+        var holdingId = 1;
+        var platformId = 1;
+        var instrumentTypeId = 1;
 
-        var instrument = new Instrument("US0378331005", "Apple Inc", instrumentTypeId, null, "Technology company", "AAPL", "USD", "USD");
+        var instrument = new Instrument("Apple Inc", "AAPL", instrumentTypeId, "Technology company", "USD", "USD");
         // Use reflection to set the Id for testing purposes
         typeof(BaseEntity).GetProperty("Id")!.SetValue(instrument, instrumentId);
 
@@ -61,7 +61,7 @@ public class PortfolioIngestServiceTests
         _mockPortfolioRepository.Setup(x => x.GetByIdAsync(portfolioId))
             .ReturnsAsync((Portfolio?)null);
         
-        _mockInstrumentRepository.SetupSequence(x => x.GetByISINAsync("US0378331005"))
+        _mockInstrumentRepository.SetupSequence(x => x.GetByTickerAsync("AAPL"))
             .ReturnsAsync((Instrument?)null)  // First call - instrument doesn't exist
             .ReturnsAsync(instrument);        // Second call - return the instrument after it's been "added"
 
@@ -90,18 +90,18 @@ public class PortfolioIngestServiceTests
     public async Task IngestPortfolioAsync_WithExistingInstrument_UsesExistingInstrument()
     {
         // Arrange
-        var instrumentId = Guid.NewGuid();
-        var portfolioId = Guid.NewGuid();
-        var accountId = Guid.NewGuid();
-        var holdingId = Guid.NewGuid();
-        var platformId = Guid.NewGuid();
-        var instrumentTypeId = Guid.NewGuid();
+        var instrumentId = 2;
+        var portfolioId = 2;
+        var accountId = 2;
+        var holdingId = 2;
+        var platformId = 2;
+        var instrumentTypeId = 2;
 
-        var existingInstrument = new Instrument("US0378331005", "Apple Inc", instrumentTypeId, null, "Technology company", "AAPL", "USD", "USD");
+        var existingInstrument = new Instrument("Apple Inc", "AAPL", instrumentTypeId, "Technology company", "USD", "USD");
         typeof(BaseEntity).GetProperty("Id")!.SetValue(existingInstrument, instrumentId);
 
-        var newInstrument = new Instrument("US0378331005", "Apple Inc Updated", instrumentTypeId, null, "Updated description", "AAPL", "USD", "GBP");
-        typeof(BaseEntity).GetProperty("Id")!.SetValue(newInstrument, Guid.NewGuid());
+        var newInstrument = new Instrument("Apple Inc Updated", "AAPL", instrumentTypeId, "Updated description", "USD", "GBP");
+        typeof(BaseEntity).GetProperty("Id")!.SetValue(newInstrument, 3);
 
         var holding = new Holding(DateTime.Today, newInstrument.Id, platformId, portfolioId, 100, 15000m, 18000m);
         typeof(BaseEntity).GetProperty("Id")!.SetValue(holding, holdingId);
@@ -114,7 +114,7 @@ public class PortfolioIngestServiceTests
         _mockPortfolioRepository.Setup(x => x.GetByIdAsync(portfolioId))
             .ReturnsAsync((Portfolio?)null);
         
-        _mockInstrumentRepository.Setup(x => x.GetByISINAsync("US0378331005"))
+        _mockInstrumentRepository.Setup(x => x.GetByTickerAsync("AAPL"))
             .ReturnsAsync(existingInstrument);
 
         _mockPortfolioRepository.Setup(x => x.AddAsync(It.IsAny<Portfolio>()))
@@ -147,10 +147,10 @@ public class PortfolioIngestServiceTests
     public async Task IngestPortfolioAsync_WhenExceptionOccurs_RollsBackTransaction()
     {
         // Arrange
-        var portfolio = new Portfolio("Test Portfolio", Guid.NewGuid());
-        typeof(BaseEntity).GetProperty("Id")!.SetValue(portfolio, Guid.NewGuid());
+        var portfolio = new Portfolio("Test Portfolio", 1);
+        typeof(BaseEntity).GetProperty("Id")!.SetValue(portfolio, 1);
 
-        _mockPortfolioRepository.Setup(x => x.GetByIdAsync(It.IsAny<Guid>()))
+        _mockPortfolioRepository.Setup(x => x.GetByIdAsync(It.IsAny<int>()))
             .ThrowsAsync(new Exception("Database error"));
 
         // Act & Assert

@@ -23,7 +23,7 @@ public interface IPortfolioMappingService
     /// <summary>
     /// Maps a collection of holdings to flattened holding responses
     /// </summary>
-    AccountHoldingsResponse MapToAccountHoldingsResponse(IEnumerable<Holding> holdings, Guid accountId, DateOnly valuationDate);
+    AccountHoldingsResponse MapToAccountHoldingsResponse(IEnumerable<Holding> holdings, int accountId, DateOnly valuationDate);
 
     /// <summary>
     /// Maps a single holding to a flattened holding response
@@ -53,12 +53,10 @@ public class PortfolioMappingService : IPortfolioMappingService
         {
             // Create instrument entity
             var instrument = new Instrument(
-                holdingDto.Instrument.ISIN,
                 holdingDto.Instrument.Name,
-                holdingDto.Instrument.InstrumentTypeId,
-                holdingDto.Instrument.SEDOL,
-                holdingDto.Instrument.Description,
                 holdingDto.Instrument.Ticker,
+                holdingDto.Instrument.InstrumentTypeId,
+                holdingDto.Instrument.Description,
                 holdingDto.Instrument.CurrencyCode,
                 holdingDto.Instrument.QuoteUnit
             );
@@ -117,7 +115,7 @@ public class PortfolioMappingService : IPortfolioMappingService
             Holdings = holdings.Select(h => new HoldingSummaryDto
             {
                 HoldingId = h.Id,
-                InstrumentISIN = h.Instrument?.ISIN ?? "Unknown",
+                InstrumentId = h.InstrumentId,
                 InstrumentName = h.Instrument?.Name ?? "Unknown",
                 UnitAmount = h.UnitAmount,
                 CurrentValue = h.CurrentValue,
@@ -126,7 +124,7 @@ public class PortfolioMappingService : IPortfolioMappingService
         };
     }
 
-    public AccountHoldingsResponse MapToAccountHoldingsResponse(IEnumerable<Holding> holdings, Guid accountId, DateOnly valuationDate)
+    public AccountHoldingsResponse MapToAccountHoldingsResponse(IEnumerable<Holding> holdings, int accountId, DateOnly valuationDate)
     {
         if (holdings == null) throw new ArgumentNullException(nameof(holdings));
 
@@ -171,13 +169,11 @@ public class PortfolioMappingService : IPortfolioMappingService
             // Portfolio Information
             PortfolioId = holding.PortfolioId,
             PortfolioName = holding.Portfolio?.Name ?? "Unknown Portfolio",
-            AccountId = holding.Portfolio?.AccountId ?? Guid.Empty,
+            AccountId = holding.Portfolio?.AccountId ?? 0,
             AccountName = holding.Portfolio?.Account?.UserName ?? "Unknown Account",
 
             // Instrument Information
             InstrumentId = holding.InstrumentId,
-            ISIN = holding.Instrument?.ISIN ?? "Unknown",
-            SEDOL = holding.Instrument?.SEDOL,
             Ticker = holding.Instrument?.Ticker,
             InstrumentName = holding.Instrument?.Name ?? "Unknown Instrument",
             InstrumentDescription = holding.Instrument?.Description,
@@ -196,11 +192,11 @@ public class PortfolioMappingService : IPortfolioMappingService
         return new PricesResponse
         {
             ValuationDate = valuationDate,
-            TotalIsins = priceFetchResult.TotalIsins,
+            TotalTickers = priceFetchResult.TotalTickers,
             SuccessfulPrices = priceFetchResult.SuccessfulPrices,
             FailedPrices = priceFetchResult.FailedPrices,
             Prices = new List<Api.Models.Responses.InstrumentPrice>(), // Prices are now persisted to database
-            FailedIsins = priceFetchResult.FailedIsins.Select(MapToFailedPrice).ToList(),
+            FailedTickers = priceFetchResult.FailedTickers.Select(MapToFailedPrice).ToList(),
             FetchedAt = priceFetchResult.FetchedAt,
             FetchDurationMs = (long)priceFetchResult.FetchDuration.TotalMilliseconds
         };
@@ -210,8 +206,7 @@ public class PortfolioMappingService : IPortfolioMappingService
     {
         return new Api.Models.Responses.InstrumentPrice
         {
-            ISIN = priceData.ISIN,
-            Symbol = priceData.Symbol,
+            Ticker = priceData.Ticker,
             Name = priceData.Name,
             Price = priceData.Price,
             Currency = priceData.Currency,
@@ -232,7 +227,7 @@ public class PortfolioMappingService : IPortfolioMappingService
     {
         return new FailedPrice
         {
-            ISIN = failedData.ISIN,
+            Ticker = failedData.Ticker,
             ErrorMessage = failedData.ErrorMessage,
             ErrorCode = failedData.ErrorCode
         };

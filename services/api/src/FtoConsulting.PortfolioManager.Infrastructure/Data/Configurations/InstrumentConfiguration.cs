@@ -15,16 +15,7 @@ public class InstrumentConfiguration : IEntityTypeConfiguration<Instrument>
         builder.Property(x => x.Id)
             .HasColumnName("id")
             .IsRequired()
-            .ValueGeneratedNever();
-
-        builder.Property(x => x.ISIN)
-            .HasColumnName("isin")
-            .IsRequired()
-            .HasMaxLength(12); // ISIN is always 12 characters
-
-        builder.Property(x => x.SEDOL)
-            .HasColumnName("sedol")
-            .HasMaxLength(7); // SEDOL is 7 characters
+            .ValueGeneratedOnAdd();
 
         builder.Property(x => x.Name)
             .HasColumnName("name")
@@ -37,6 +28,7 @@ public class InstrumentConfiguration : IEntityTypeConfiguration<Instrument>
 
         builder.Property(x => x.Ticker)
             .HasColumnName("ticker")
+            .IsRequired()
             .HasMaxLength(50);
 
         builder.Property(x => x.CurrencyCode)
@@ -59,17 +51,11 @@ public class InstrumentConfiguration : IEntityTypeConfiguration<Instrument>
             .HasColumnName("updated_at");
 
         // Indexes for quick lookups
-        builder.HasIndex(x => x.ISIN)
-            .IsUnique()
-            .HasDatabaseName("ix_instruments_isin");
-
-        builder.HasIndex(x => x.SEDOL)
-            .HasDatabaseName("ix_instruments_sedol");
-
         builder.HasIndex(x => x.Name)
             .HasDatabaseName("ix_instruments_name");
 
         builder.HasIndex(x => x.Ticker)
+            .IsUnique()
             .HasDatabaseName("ix_instruments_ticker");
 
         builder.HasIndex(x => x.CurrencyCode)

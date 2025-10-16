@@ -57,9 +57,9 @@ public class HoldingRevaluationResult
 public class FailedRevaluationData
 {
     /// <summary>
-    /// ISIN of the instrument
+    /// Ticker of the instrument
     /// </summary>
-    public string ISIN { get; set; } = string.Empty;
+    public string Ticker { get; set; } = string.Empty;
 
     /// <summary>
     /// Name of the instrument

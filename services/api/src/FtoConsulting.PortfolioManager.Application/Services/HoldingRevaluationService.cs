@@ -131,7 +131,9 @@ public class HoldingRevaluationService : IHoldingRevaluationService
     private async Task<Dictionary<string, InstrumentPrice>> GetPriceDataAsync(DateOnly valuationDate, CancellationToken cancellationToken)
     {
         var priceData = await _instrumentPriceRepository.GetByValuationDateAsync(valuationDate, cancellationToken);
-        var priceDict = priceData.ToDictionary(p => p.ISIN, p => p);
+        var priceDict = priceData
+            .Where(p => !string.IsNullOrEmpty(p.Ticker))
+            .ToDictionary(p => p.Ticker!, p => p);
 
         _logger.LogInformation("Found price data for {PriceCount} instruments on {ValuationDate}", 
             priceDict.Count, valuationDate);
@@ -160,12 +162,12 @@ public class HoldingRevaluationService : IHoldingRevaluationService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error revaluing holding for instrument {ISIN} ({Name})", 
-                    sourceHolding.Instrument.ISIN, sourceHolding.Instrument.Name);
+                _logger.LogError(ex, "Error revaluing holding for instrument {Ticker} ({Name})", 
+                    sourceHolding.Instrument.Ticker, sourceHolding.Instrument.Name);
                 
                 result.FailedInstruments.Add(new FailedRevaluationData
                 {
-                    ISIN = sourceHolding.Instrument.ISIN,
+                    Ticker = sourceHolding.Instrument.Ticker,
                     InstrumentName = sourceHolding.Instrument.Name,
                     ErrorMessage = ex.Message,
                     ErrorCode = "CALCULATION_ERROR"
@@ -184,14 +186,14 @@ public class HoldingRevaluationService : IHoldingRevaluationService
         HoldingRevaluationResult result)
     {
         // Get price for this instrument
-        if (!priceDict.TryGetValue(sourceHolding.Instrument.ISIN, out var instrumentPrice))
+        if (!priceDict.TryGetValue(sourceHolding.Instrument.Ticker, out var instrumentPrice))
         {
-            _logger.LogWarning("No price data found for instrument {ISIN} ({Name}) on {ValuationDate}", 
-                sourceHolding.Instrument.ISIN, sourceHolding.Instrument.Name, valuationDate);
+            _logger.LogWarning("No price data found for instrument {Ticker} ({Name}) on {ValuationDate}", 
+                sourceHolding.Instrument.Ticker, sourceHolding.Instrument.Name, valuationDate);
             
             result.FailedInstruments.Add(new FailedRevaluationData
             {
-                ISIN = sourceHolding.Instrument.ISIN,
+                Ticker  = sourceHolding.Instrument.Ticker,
                 InstrumentName = sourceHolding.Instrument.Name,
                 ErrorMessage = "No price data available",
                 ErrorCode = "NO_PRICE_DATA"
@@ -211,8 +213,8 @@ public class HoldingRevaluationService : IHoldingRevaluationService
         // Create new holding for the target valuation date
         var revaluedHolding = CreateRevaluedHolding(sourceHolding, valuationDate, currentValue, dailyChange, dailyChangePercentage);
 
-        _logger.LogDebug("Revalued holding for {ISIN}: UnitAmount={UnitAmount}, Price={Price}, CurrentValue={CurrentValue}, DailyChange={DailyChange}", 
-            sourceHolding.Instrument.ISIN, sourceHolding.UnitAmount, instrumentPrice.Price, currentValue, dailyChange);
+        _logger.LogDebug("Revalued holding for {Ticker}: UnitAmount={UnitAmount}, Price={Price}, CurrentValue={CurrentValue}, DailyChange={DailyChange}", 
+            sourceHolding.Instrument.Ticker, sourceHolding.UnitAmount, instrumentPrice.Price, currentValue, dailyChange);
 
         return revaluedHolding;
     }

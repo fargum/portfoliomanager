@@ -14,5 +14,5 @@ public interface IHoldingsRetrieval
     /// <param name="valuationDate">The valuation date to filter holdings</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Collection of holdings with their related instrument and portfolio data</returns>
-    Task<IEnumerable<Holding>> GetHoldingsByAccountAndDateAsync(Guid accountId, DateOnly valuationDate, CancellationToken cancellationToken = default);
+    Task<IEnumerable<Holding>> GetHoldingsByAccountAndDateAsync(int accountId, DateOnly valuationDate, CancellationToken cancellationToken = default);
 }

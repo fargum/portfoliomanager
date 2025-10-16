@@ -5,9 +5,9 @@ namespace FtoConsulting.PortfolioManager.Domain.Entities;
 public class Holding : BaseEntity
 {
     public DateTime ValuationDate { get; private set; }
-    public Guid InstrumentId { get; private set; }
-    public Guid PlatformId { get; private set; }
-    public Guid PortfolioId { get; private set; }
+    public int InstrumentId { get; private set; }
+    public int PlatformId { get; private set; }
+    public int PortfolioId { get; private set; }
     public decimal UnitAmount { get; private set; }
     public decimal BoughtValue { get; private set; }
     public decimal CurrentValue { get; private set; }
@@ -20,7 +20,7 @@ public class Holding : BaseEntity
     // Private constructor for EF Core
     private Holding() { }
 
-    public Holding(DateTime valuationDate, Guid instrumentId, Guid platformId, Guid portfolioId, 
+    public Holding(DateTime valuationDate, int instrumentId, int platformId, int portfolioId, 
                    decimal unitAmount, decimal boughtValue, decimal currentValue)
     {
         ValuationDate = valuationDate;

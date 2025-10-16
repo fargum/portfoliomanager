@@ -15,7 +15,7 @@ public class HoldingConfiguration : IEntityTypeConfiguration<Holding>
         builder.Property(x => x.Id)
             .HasColumnName("id")
             .IsRequired()
-            .ValueGeneratedNever();
+            .ValueGeneratedOnAdd();
 
         builder.Property(x => x.ValuationDate)
             .HasColumnName("valuation_date")

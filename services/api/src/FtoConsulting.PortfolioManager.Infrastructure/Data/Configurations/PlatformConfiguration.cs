@@ -15,7 +15,7 @@ public class PlatformConfiguration : IEntityTypeConfiguration<Platform>
         builder.Property(x => x.Id)
             .HasColumnName("id")
             .IsRequired()
-            .ValueGeneratedNever();
+            .ValueGeneratedOnAdd();
 
         builder.Property(x => x.Name)
             .HasColumnName("name")

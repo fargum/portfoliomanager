@@ -8,9 +8,9 @@ namespace FtoConsulting.PortfolioManager.Domain.Entities;
 public class InstrumentPrice : BaseEntity
 {
     /// <summary>
-    /// ISIN of the instrument (part of composite primary key)
+    /// ID of the instrument (part of composite primary key)
     /// </summary>
-    public string ISIN { get; set; } = string.Empty;
+    public int InstrumentId { get; set; }
 
     /// <summary>
     /// Valuation date for the price data (part of composite primary key)
@@ -18,9 +18,9 @@ public class InstrumentPrice : BaseEntity
     public DateOnly ValuationDate { get; set; }
 
     /// <summary>
-    /// Trading symbol/ticker for the instrument
+    /// Trading ticker for the instrument
     /// </summary>
-    public string? Symbol { get; set; }
+    public string? Ticker { get; set; }
 
     /// <summary>
     /// Name of the instrument

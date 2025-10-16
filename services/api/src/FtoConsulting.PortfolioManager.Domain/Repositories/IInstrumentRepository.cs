@@ -5,8 +5,8 @@ namespace FtoConsulting.PortfolioManager.Domain.Repositories;
 
 public interface IInstrumentRepository : IRepository<Instrument>
 {
-    Task<Instrument?> GetByISINAsync(string isin);
-    Task<Instrument?> GetBySEDOLAsync(string sedol);
-    Task<IEnumerable<Instrument>> GetByInstrumentTypeAsync(Guid instrumentTypeId);
+    Task<IEnumerable<Instrument>> GetByInstrumentTypeAsync(int instrumentTypeId);
     Task<IEnumerable<Instrument>> SearchByNameAsync(string name);
+    Task<Instrument?> GetByNameAsync(string name);
+    Task<Instrument?> GetByTickerAsync(string ticker);
 }

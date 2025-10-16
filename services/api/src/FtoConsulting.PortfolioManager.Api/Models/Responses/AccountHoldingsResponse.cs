@@ -10,8 +10,8 @@ public class AccountHoldingsResponse
     /// <summary>
     /// Account identifier
     /// </summary>
-    /// <example>12345678-1234-5678-9012-123456789012</example>
-    public Guid AccountId { get; set; }
+    /// <example>12345</example>
+    public int AccountId { get; set; }
 
     /// <summary>
     /// Valuation date for the holdings

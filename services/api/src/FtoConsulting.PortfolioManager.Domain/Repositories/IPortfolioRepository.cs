@@ -5,7 +5,7 @@ namespace FtoConsulting.PortfolioManager.Domain.Repositories;
 
 public interface IPortfolioRepository : IRepository<Portfolio>
 {
-    Task<IEnumerable<Portfolio>> GetByAccountIdAsync(Guid accountId);
-    Task<Portfolio?> GetByAccountAndNameAsync(Guid accountId, string name);
-    Task<Portfolio?> GetWithHoldingsAsync(Guid portfolioId);
+    Task<IEnumerable<Portfolio>> GetByAccountIdAsync(int accountId);
+    Task<Portfolio?> GetByAccountAndNameAsync(int accountId, string name);
+    Task<Portfolio?> GetWithHoldingsAsync(int portfolioId);
 }

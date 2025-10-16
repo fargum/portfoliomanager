@@ -15,7 +15,7 @@ public class AccountConfiguration : IEntityTypeConfiguration<Account>
         builder.Property(x => x.Id)
             .HasColumnName("id")
             .IsRequired()
-            .ValueGeneratedNever();
+            .ValueGeneratedOnAdd();
 
         builder.Property(x => x.UserName)
             .HasColumnName("user_name")
