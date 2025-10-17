@@ -1,7 +1,7 @@
 // API Response Types - These match the flattened DTO from your .NET API
 
 export interface HoldingResponse {
-  holdingId: string;
+  holdingId: number;
   valuationDate: string;
   unitAmount: number;
   boughtValue: number;
@@ -10,22 +10,20 @@ export interface HoldingResponse {
   gainLossPercentage: number;
   
   // Portfolio info
-  portfolioId: string;
+  portfolioId: number;
   portfolioName: string;
-  accountId: string;
+  accountId: number;
   accountName: string;
   
   // Instrument info
-  instrumentId: string;
-  isin: string;
-  sedol: string;
+  instrumentId: number;
   ticker: string;
   instrumentName: string;
   instrumentDescription: string;
   instrumentType: string;
   
   // Platform info
-  platformId: string;
+  platformId: number;
   platformName: string;
 }
 
@@ -51,7 +49,7 @@ export interface HoldingGridRow extends HoldingResponse {
 }
 
 export interface SearchFilters {
-  accountId: string;
+  accountId: number;
   valuationDate: string;
 }
 

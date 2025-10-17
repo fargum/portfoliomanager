@@ -37,7 +37,7 @@ public class PortfolioManagerDbContext : DbContext
             // Use environment variable or safer fallback for design-time operations
             var connectionString = Environment.GetEnvironmentVariable("PORTFOLIO_DB_CONNECTION") 
                 ?? "Host=localhost;Port=5432;Database=portfolio_manager;Username=postgres;Password=design_time_placeholder";
-            optionsBuilder.UseNpgsql(connectionString);
+            optionsBuilder.UseNpgsql(connectionString, options => options.MigrationsHistoryTable("__EFMigrationsHistory", "app"));
                         // .UseSnakeCaseNamingConvention();
         }
     }

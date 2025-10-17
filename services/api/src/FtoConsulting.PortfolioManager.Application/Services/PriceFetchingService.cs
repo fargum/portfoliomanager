@@ -78,6 +78,7 @@ public class PriceFetchingService : IPriceFetching
                         // Convert to InstrumentPrice entity for persistence
                         var instrumentPrice = new InstrumentPrice
                         {
+                            InstrumentId = instrument.InstrumentId,
                             Ticker = priceData.Ticker,
                             ValuationDate = valuationDate,
                             Name = priceData.Name,
@@ -97,8 +98,8 @@ public class PriceFetchingService : IPriceFetching
                                 : priceData.Timestamp?.ToUniversalTime()
                         };
                         
-                        // Explicitly ensure base entity timestamps are UTC
-                        instrumentPrice.GetType().GetProperty("CreatedAt")?.SetValue(instrumentPrice, DateTime.UtcNow);
+                        // Set audit timestamps
+                        instrumentPrice.CreatedAt = DateTime.UtcNow;
                         
                         lock (pricesToPersist)
                         {
@@ -123,7 +124,7 @@ public class PriceFetchingService : IPriceFetching
                     _logger.LogWarning(ex, "Failed to fetch price for (Ticker: {Ticker})", instrument.Ticker);
                     result.FailedTickers.Add(new FailedPriceData
                     {
-
+                        Ticker = instrument.Ticker,
                         ErrorMessage = ex.Message,
                         ErrorCode = "FETCH_ERROR"
                     });

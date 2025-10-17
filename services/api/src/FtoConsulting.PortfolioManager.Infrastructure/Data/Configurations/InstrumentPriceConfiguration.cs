@@ -87,7 +87,7 @@ public class InstrumentPriceConfiguration : IEntityTypeConfiguration<InstrumentP
                 v => v.HasValue ? DateTime.SpecifyKind(v.Value, DateTimeKind.Utc) : v,
                 v => v);
 
-        // Inherited properties from BaseEntity with UTC conversion
+        // Audit properties with UTC conversion
         builder.Property(ip => ip.CreatedAt)
             .HasColumnName("created_at")
             .HasColumnType("timestamp with time zone")

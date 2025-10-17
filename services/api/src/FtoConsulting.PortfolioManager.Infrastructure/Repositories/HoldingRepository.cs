@@ -92,14 +92,14 @@ public class HoldingRepository : Repository<Holding>, IHoldingRepository
             .ToListAsync(cancellationToken);
     }
 
-    public async Task<IEnumerable<(string Ticker, string Name)>> GetAllDistinctInstrumentsAsync(CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<(int InstrumentId, string Ticker, string Name)>> GetAllDistinctInstrumentsAsync(CancellationToken cancellationToken = default)
     {
         return await _dbSet
             .Include(h => h.Instrument)
-            .Select(h => new { h.Instrument.Ticker, h.Instrument.Name })
+            .Select(h => new { h.Instrument.Id, h.Instrument.Ticker, h.Instrument.Name })
             .Distinct()
             .OrderBy(x => x.Ticker)
-            .Select(x => new ValueTuple<string, string>(x.Ticker, x.Name))
+            .Select(x => new ValueTuple<int, string, string>(x.Id, x.Ticker, x.Name))
             .ToListAsync(cancellationToken);
     }
 

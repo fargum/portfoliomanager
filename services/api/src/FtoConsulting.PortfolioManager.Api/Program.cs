@@ -17,7 +17,8 @@ builder.Services.AddDbContext<PortfolioManagerDbContext>(options =>
 {
     var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
         ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
-    options.UseNpgsql(connectionString)
+    options.UseNpgsql(connectionString, npgsqlOptions => 
+               npgsqlOptions.MigrationsHistoryTable("__EFMigrationsHistory", "app"))
            .EnableSensitiveDataLogging()
            .LogTo(Console.WriteLine, LogLevel.Information);
 });

@@ -236,9 +236,6 @@ namespace FtoConsulting.PortfolioManager.Infrastructure.Migrations
                         .HasColumnType("decimal(18,4)")
                         .HasColumnName("high");
 
-                    b.Property<int>("Id")
-                        .HasColumnType("integer");
-
                     b.Property<decimal?>("Low")
                         .HasColumnType("decimal(18,4)")
                         .HasColumnName("low");

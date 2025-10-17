@@ -1,0 +1,296 @@
+[
+  {
+    "portfolioName": "My Investment Portfolio",
+    "accountId": "49bc4123-5312-43d9-81bd-6c6f81e80bac",
+    "holdings": [
+    {
+      "valuationDate": "2025-10-10T00:00:00Z",
+      "platformId": "d43b68a0-2ef7-48f4-9a3a-a5f36b439f65",
+      "unitAmount": 6247.397,
+      "boughtValue": 5987.17,
+      "currentValue": 6663.47,
+      "dailyProfitLoss": 11.25,
+      "dailyProfitLossPercentage": 0.17,
+      "instrument": {
+        "isin": "GB00BJFLR106",
+        "name": "Aegon Diversified Monthly Income Class B - Income (GBP)",
+        "description": "Aegon Diversified Monthly Income Class B - Income (GBP)",
+        "sedol": "1234567",
+        "instrumentTypeId": "5ffc7996-c477-4a70-9d43-6db9b6a1d957"
+      }
+    },
+    {
+      "valuationDate": "2025-10-10T00:00:00Z",
+      "platformId": "d43b68a0-2ef7-48f4-9a3a-a5f36b439f65",
+      "unitAmount": 8797.654,
+      "boughtValue": 5985.83,
+      "currentValue": 6641.35,
+      "dailyProfitLoss": -3.52,
+      "dailyProfitLossPercentage": -0.05,
+      "instrument": {
+        "isin": "GB00BJT0KR04",
+        "name": "Artemis High Income Class I - Monthly Income (GBP)",
+        "description": "Artemis High Income Class I - Monthly Income (GBP)",
+        "sedol": "1234567",
+        "instrumentTypeId": "5ffc7996-c477-4a70-9d43-6db9b6a1d957"
+      }
+    },
+    {
+      "valuationDate": "2025-10-10T00:00:00Z",
+      "platformId": "d43b68a0-2ef7-48f4-9a3a-a5f36b439f65",
+      "unitAmount": 805.0,
+      "boughtValue": 3052.95,
+      "currentValue": 5427.31,
+      "dailyProfitLoss": -49.91,
+      "dailyProfitLossPercentage": -0.91,
+      "instrument": {
+        "isin": "GB00BPQY8M80",
+        "name": "Aviva Plc Ordinary Shares 32 17/19 pence",
+        "description": "Aviva Plc Ordinary Shares 32 17/19 pence",
+        "sedol": "1234567",
+        "instrumentTypeId": "5ffc7996-c477-4a70-9d43-6db9b6a1d957"
+      }
+    },
+    {
+      "valuationDate": "2025-10-10T00:00:00Z",
+      "platformId": "d43b68a0-2ef7-48f4-9a3a-a5f36b439f65",
+      "unitAmount": 178.0,
+      "boughtValue": 3002.98,
+      "currentValue": 3697.06,
+      "dailyProfitLoss": -62.3,
+      "dailyProfitLossPercentage": -1.66,
+      "instrument": {
+        "isin": "123456789012",
+        "name": "BHP Group Ltd NPV (DI)",
+        "description": "BHP Group Ltd NPV (DI)",
+        "sedol": "1234567",
+        "instrumentTypeId": "5ffc7996-c477-4a70-9d43-6db9b6a1d957"
+      }
+    },
+    {
+      "valuationDate": "2025-10-10T00:00:00Z",
+      "platformId": "d43b68a0-2ef7-48f4-9a3a-a5f36b439f65",
+      "unitAmount": 546.0,
+      "boughtValue": 1517.12,
+      "currentValue": 1960.14,
+      "dailyProfitLoss": -5.19,
+      "dailyProfitLossPercentage": -2.57,
+      "instrument": {
+        "isin": "123456789012",
+        "name": "Genuit Group plc Ordinary Shares 0.1p",
+        "description": "Genuit Group plc Ordinary Shares 0.1p",
+        "sedol": "1234567",
+        "instrumentTypeId": "5ffc7996-c477-4a70-9d43-6db9b6a1d957"
+      }
+    },
+    {
+      "valuationDate": "2025-10-10T00:00:00Z",
+      "platformId": "d43b68a0-2ef7-48f4-9a3a-a5f36b439f65",
+      "unitAmount": 1440.0,
+      "boughtValue": 2021.87,
+      "currentValue": 1548.0,
+      "dailyProfitLoss": 8.64,
+      "dailyProfitLossPercentage": 0.56,
+      "instrument": {
+        "isin": "GB00B8SC6K54",
+        "name": "Greencoat UK Wind plc Ordinary 1p",
+        "description": "Greencoat UK Wind plc Ordinary 1p",
+        "sedol": "1234567",
+        "instrumentTypeId": "5ffc7996-c477-4a70-9d43-6db9b6a1d957"
+      }
+    },
+    {
+      "valuationDate": "2025-10-10T00:00:00Z",
+      "platformId": "d43b68a0-2ef7-48f4-9a3a-a5f36b439f65",
+      "unitAmount": 900.0,
+      "boughtValue": 1519.1,
+      "currentValue": 1152.0,
+      "dailyProfitLoss": -5.04,
+      "dailyProfitLossPercentage": -4.19,
+      "instrument": {
+        "isin": "123456789012",
+        "name": "Ibstock plc Ordinary 1p",
+        "description": "Ibstock plc Ordinary 1p",
+        "sedol": "1234567",
+        "instrumentTypeId": "5ffc7996-c477-4a70-9d43-6db9b6a1d957"
+      }
+    },
+    {
+      "valuationDate": "2025-10-10T00:00:00Z",
+      "platformId": "d43b68a0-2ef7-48f4-9a3a-a5f36b439f65",
+      "unitAmount": 871.0,
+      "boughtValue": 34887.96,
+      "currentValue": 34661.45,
+      "dailyProfitLoss": 36.97,
+      "dailyProfitLossPercentage": 0.11,
+      "instrument": {
+        "isin": "123456789012",
+        "name": "Invesco Markets II Plc US Treasury Bond 0-1 Year UCITS ETF Hedge - Dist *1",
+        "description": "Invesco Markets II Plc US Treasury Bond 0-1 Year UCITS ETF Hedge - Dist *1",
+        "sedol": "1234567",
+        "instrumentTypeId": "5ffc7996-c477-4a70-9d43-6db9b6a1d957"
+      }
+    },
+    {
+      "valuationDate": "2025-10-10T00:00:00Z",
+      "platformId": "d43b68a0-2ef7-48f4-9a3a-a5f36b439f65",
+      "unitAmount": 2612.07,
+      "boughtValue": 3177.77,
+      "currentValue": 7141.92,
+      "dailyProfitLoss": 47.27,
+      "dailyProfitLossPercentage": 0.67,
+      "instrument": {
+        "isin": "GB00BD08NQ14",
+        "name": "Jupiter India Class X - Accumulation (GBP)",
+        "description": "Jupiter India Class X - Accumulation (GBP)",
+        "sedol": "1234567",
+        "instrumentTypeId": "5ffc7996-c477-4a70-9d43-6db9b6a1d957"
+      }
+    },
+    {
+      "valuationDate": "2025-10-10T00:00:00Z",
+      "platformId": "d43b68a0-2ef7-48f4-9a3a-a5f36b439f65",
+      "unitAmount": 1273.204,
+      "boughtValue": 2082.63,
+      "currentValue": 4086.98,
+      "dailyProfitLoss": 25.46,
+      "dailyProfitLossPercentage": 0.63,
+      "instrument": {
+        "isin": "123456789012",
+        "name": "Legal & General International Index Trust Class C - Accumulation (GBP)",
+        "description": "Legal & General International Index Trust Class C - Accumulation (GBP)",
+        "sedol": "1234567",
+        "instrumentTypeId": "5ffc7996-c477-4a70-9d43-6db9b6a1d957"
+      }
+    },
+    {
+      "valuationDate": "2025-10-10T00:00:00Z",
+      "platformId": "d43b68a0-2ef7-48f4-9a3a-a5f36b439f65",
+      "unitAmount": 7316.0,
+      "boughtValue": 4557.29,
+      "currentValue": 6100.08,
+      "dailyProfitLoss": -7.32,
+      "dailyProfitLossPercentage": -0.12,
+      "instrument": {
+        "isin": "123456789012",
+        "name": "Lloyds Banking Group plc Ordinary 10p",
+        "description": "Lloyds Banking Group plc Ordinary 10p",
+        "sedol": "1234567",
+        "instrumentTypeId": "5ffc7996-c477-4a70-9d43-6db9b6a1d957"
+      }
+    },
+    {
+      "valuationDate": "2025-10-10T00:00:00Z",
+      "platformId": "d43b68a0-2ef7-48f4-9a3a-a5f36b439f65",
+      "unitAmount": 2097.0,
+      "boughtValue": 2974.22,
+      "currentValue": 874.45,
+      "dailyProfitLoss": -28.31,
+      "dailyProfitLossPercentage": -3.12,
+      "instrument": {
+        "isin": "123456789012",
+        "name": "Marstons plc Ordinary 7.375p",
+        "description": "Marstons plc Ordinary 7.375p",
+        "sedol": "1234567",
+        "instrumentTypeId": "5ffc7996-c477-4a70-9d43-6db9b6a1d957"
+      }
+    },
+    {
+      "valuationDate": "2025-10-10T00:00:00Z",
+      "platformId": "d43b68a0-2ef7-48f4-9a3a-a5f36b439f65",
+      "unitAmount": 94.0,
+      "boughtValue": 2386.9,
+      "currentValue": 4715.04,
+      "dailyProfitLoss": -28.2,
+      "dailyProfitLossPercentage": -0.59,
+      "instrument": {
+        "isin": "123456789012",
+        "name": "Rio Tinto plc Ordinary 10p",
+        "description": "Rio Tinto plc Ordinary 10p",
+        "sedol": "1234567",
+        "instrumentTypeId": "5ffc7996-c477-4a70-9d43-6db9b6a1d957"
+      }
+    },
+    {
+      "valuationDate": "2025-10-10T00:00:00Z",
+      "platformId": "d43b68a0-2ef7-48f4-9a3a-a5f36b439f65",
+      "unitAmount": 180.0,
+      "boughtValue": 8458.96,
+      "currentValue": 8782.2,
+      "dailyProfitLoss": 5.4,
+      "dailyProfitLossPercentage": 0.06,
+      "instrument": {
+        "isin": "IE00B6YX5K17",
+        "name": "SPDR Bloomberg 1-5 Year Gilt UCITS ETF",
+        "description": "SPDR Bloomberg 1-5 Year Gilt UCITS ETF",
+        "sedol": "1234567",
+        "instrumentTypeId": "5ffc7996-c477-4a70-9d43-6db9b6a1d957"
+      }
+    },
+    {
+      "valuationDate": "2025-10-10T00:00:00Z",
+      "platformId": "d43b68a0-2ef7-48f4-9a3a-a5f36b439f65",
+      "unitAmount": 1560.0,
+      "boughtValue": 2011.86,
+      "currentValue": 1177.8,
+      "dailyProfitLoss": -6.24,
+      "dailyProfitLossPercentage": -0.53,
+      "instrument": {
+        "isin": "GG00BBHX2H91",
+        "name": "The Renewables Infrastructure Group Limited Ordinary Shares NPV",
+        "description": "The Renewables Infrastructure Group Limited Ordinary Shares NPV",
+        "sedol": "1234567",
+        "instrumentTypeId": "5ffc7996-c477-4a70-9d43-6db9b6a1d957"
+      }
+    },
+    {
+      "valuationDate": "2025-10-10T00:00:00Z",
+      "platformId": "d43b68a0-2ef7-48f4-9a3a-a5f36b439f65",
+      "unitAmount": 5846.0,
+      "boughtValue": 4999.46,
+      "currentValue": 4802.49,
+      "dailyProfitLoss": 0.0,
+      "dailyProfitLossPercentage": 0.0,
+      "instrument": {
+        "isin": "123456789012",
+        "name": "Treasury 4.25% 07/12/2055 Gilt *4",
+        "description": "Treasury 4.25% 07/12/2055 Gilt *4",
+        "sedol": "1234567",
+        "instrumentTypeId": "5ffc7996-c477-4a70-9d43-6db9b6a1d957"
+      }
+    },
+    {
+      "valuationDate": "2025-10-10T00:00:00Z",
+      "platformId": "d43b68a0-2ef7-48f4-9a3a-a5f36b439f65",
+      "unitAmount": 185.0,
+      "boughtValue": 3992.53,
+      "currentValue": 5839.53,
+      "dailyProfitLoss": -129.5,
+      "dailyProfitLossPercentage": -2.15,
+      "instrument": {
+        "isin": "123456789012",
+        "name": "Vanguard Funds Plc FTSE Japan Equity UCITS ETF",
+        "description": "Vanguard Funds Plc FTSE Japan Equity UCITS ETF",
+        "sedol": "1234567",
+        "instrumentTypeId": "5ffc7996-c477-4a70-9d43-6db9b6a1d957"
+      }
+    },
+    {
+      "valuationDate": "2025-10-10T00:00:00Z",
+      "platformId": "d43b68a0-2ef7-48f4-9a3a-a5f36b439f65",
+      "unitAmount": 37.0,
+      "boughtValue": 1429.11,
+      "currentValue": 3517.04,
+      "dailyProfitLoss": -27.93,
+      "dailyProfitLossPercentage": -0.79,
+      "instrument": {
+        "isin": "123456789012",
+        "name": "Vanguard Funds Plc S&P 500 UCITS ETF USD(GBP)",
+        "description": "Vanguard Funds Plc S&P 500 UCITS ETF USD(GBP)",
+        "sedol": "1234567",
+        "instrumentTypeId": "5ffc7996-c477-4a70-9d43-6db9b6a1d957"
+      }
+    }
+    ]
+  }
+]

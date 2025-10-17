@@ -18,7 +18,7 @@ export class PortfolioApiClient {
   /**
    * Fetch holdings for a specific account and date
    */
-  async getHoldings(accountId: string, valuationDate: string): Promise<ApiResponse<HoldingResponse[]>> {
+  async getHoldings(accountId: number, valuationDate: string): Promise<ApiResponse<HoldingResponse[]>> {
     try {
       const formattedDate = this.formatDate(valuationDate);
       const url = `${this.baseUrl}/api/holdings/account/${accountId}/date/${formattedDate}`;

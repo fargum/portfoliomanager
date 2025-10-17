@@ -5,7 +5,7 @@ namespace FtoConsulting.PortfolioManager.Domain.Entities;
 /// <summary>
 /// Represents market price data for an instrument at a specific valuation date
 /// </summary>
-public class InstrumentPrice : BaseEntity
+public class InstrumentPrice
 {
     /// <summary>
     /// ID of the instrument (part of composite primary key)
@@ -91,4 +91,14 @@ public class InstrumentPrice : BaseEntity
     /// Navigation property to the related instrument
     /// </summary>
     public virtual Instrument? Instrument { get; set; }
+
+    /// <summary>
+    /// Timestamp when this entity was created (UTC)
+    /// </summary>
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// Timestamp when this entity was last updated (UTC)
+    /// </summary>
+    public DateTime? UpdatedAt { get; set; }
 }

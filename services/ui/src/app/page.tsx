@@ -5,7 +5,7 @@ import { useState, useEffect } from 'react';
 import { apiClient } from '@/lib/api-client';
 import { Building2, AlertCircle, CheckCircle } from 'lucide-react';
 
-const HARDCODED_ACCOUNT_ID = '49bc4123-5312-43d9-81bd-6c6f81e80bac';
+const HARDCODED_ACCOUNT_ID = 1;
 
 export default function HomePage() {
   const [apiStatus, setApiStatus] = useState<'checking' | 'online' | 'offline'>('checking');

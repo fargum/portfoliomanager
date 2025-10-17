@@ -12,8 +12,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FtoConsulting.PortfolioManager.Infrastructure.Migrations
 {
     [DbContext(typeof(PortfolioManagerDbContext))]
-    [Migration("20251006152059_AddQuoteUnitToInstrument")]
-    partial class AddQuoteUnitToInstrument
+    [Migration("20251017151416_RemoveIdFromInstrumentPrices")]
+    partial class RemoveIdFromInstrumentPrices
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -27,9 +27,12 @@ namespace FtoConsulting.PortfolioManager.Infrastructure.Migrations
 
             modelBuilder.Entity("FtoConsulting.PortfolioManager.Domain.Entities.Account", b =>
                 {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
                         .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -57,14 +60,17 @@ namespace FtoConsulting.PortfolioManager.Infrastructure.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_accounts_user_name");
 
-                    b.ToTable("accounts", (string)null);
+                    b.ToTable("accounts", "app");
                 });
 
             modelBuilder.Entity("FtoConsulting.PortfolioManager.Domain.Entities.Holding", b =>
                 {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
                         .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<decimal>("BoughtValue")
                         .HasPrecision(18, 2)
@@ -90,16 +96,16 @@ namespace FtoConsulting.PortfolioManager.Infrastructure.Migrations
                         .HasColumnType("numeric(18,4)")
                         .HasColumnName("daily_profit_loss_percentage");
 
-                    b.Property<Guid>("InstrumentId")
-                        .HasColumnType("uuid")
+                    b.Property<int>("InstrumentId")
+                        .HasColumnType("integer")
                         .HasColumnName("instrument_id");
 
-                    b.Property<Guid>("PlatformId")
-                        .HasColumnType("uuid")
+                    b.Property<int>("PlatformId")
+                        .HasColumnType("integer")
                         .HasColumnName("platform_id");
 
-                    b.Property<Guid>("PortfolioId")
-                        .HasColumnType("uuid")
+                    b.Property<int>("PortfolioId")
+                        .HasColumnType("integer")
                         .HasColumnName("portfolio_id");
 
                     b.Property<decimal>("UnitAmount")
@@ -130,14 +136,17 @@ namespace FtoConsulting.PortfolioManager.Infrastructure.Migrations
                     b.HasIndex("PortfolioId", "InstrumentId", "ValuationDate")
                         .HasDatabaseName("ix_holdings_portfolio_instrument_date");
 
-                    b.ToTable("holdings", (string)null);
+                    b.ToTable("holdings", "app");
                 });
 
             modelBuilder.Entity("FtoConsulting.PortfolioManager.Domain.Entities.Instrument", b =>
                 {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
                         .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -153,14 +162,8 @@ namespace FtoConsulting.PortfolioManager.Infrastructure.Migrations
                         .HasColumnType("character varying(1000)")
                         .HasColumnName("description");
 
-                    b.Property<string>("ISIN")
-                        .IsRequired()
-                        .HasMaxLength(12)
-                        .HasColumnType("character varying(12)")
-                        .HasColumnName("isin");
-
-                    b.Property<Guid>("InstrumentTypeId")
-                        .HasColumnType("uuid")
+                    b.Property<int>("InstrumentTypeId")
+                        .HasColumnType("integer")
                         .HasColumnName("instrument_type_id");
 
                     b.Property<string>("Name")
@@ -174,12 +177,8 @@ namespace FtoConsulting.PortfolioManager.Infrastructure.Migrations
                         .HasColumnType("character varying(3)")
                         .HasColumnName("quote_unit");
 
-                    b.Property<string>("SEDOL")
-                        .HasMaxLength(7)
-                        .HasColumnType("character varying(7)")
-                        .HasColumnName("sedol");
-
                     b.Property<string>("Ticker")
+                        .IsRequired()
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
                         .HasColumnName("ticker");
@@ -193,10 +192,6 @@ namespace FtoConsulting.PortfolioManager.Infrastructure.Migrations
                     b.HasIndex("CurrencyCode")
                         .HasDatabaseName("ix_instruments_currency_code");
 
-                    b.HasIndex("ISIN")
-                        .IsUnique()
-                        .HasDatabaseName("ix_instruments_isin");
-
                     b.HasIndex("InstrumentTypeId");
 
                     b.HasIndex("Name")
@@ -205,21 +200,18 @@ namespace FtoConsulting.PortfolioManager.Infrastructure.Migrations
                     b.HasIndex("QuoteUnit")
                         .HasDatabaseName("ix_instruments_quote_unit");
 
-                    b.HasIndex("SEDOL")
-                        .HasDatabaseName("ix_instruments_sedol");
-
                     b.HasIndex("Ticker")
+                        .IsUnique()
                         .HasDatabaseName("ix_instruments_ticker");
 
-                    b.ToTable("instruments", (string)null);
+                    b.ToTable("instruments", "app");
                 });
 
             modelBuilder.Entity("FtoConsulting.PortfolioManager.Domain.Entities.InstrumentPrice", b =>
                 {
-                    b.Property<string>("ISIN")
-                        .HasMaxLength(12)
-                        .HasColumnType("character varying(12)")
-                        .HasColumnName("isin");
+                    b.Property<int>("InstrumentId")
+                        .HasColumnType("integer")
+                        .HasColumnName("instrument_id");
 
                     b.Property<DateOnly>("ValuationDate")
                         .HasColumnType("date")
@@ -246,9 +238,6 @@ namespace FtoConsulting.PortfolioManager.Infrastructure.Migrations
                     b.Property<decimal?>("High")
                         .HasColumnType("decimal(18,4)")
                         .HasColumnName("high");
-
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
 
                     b.Property<decimal?>("Low")
                         .HasColumnType("decimal(18,4)")
@@ -285,10 +274,10 @@ namespace FtoConsulting.PortfolioManager.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("price_timestamp");
 
-                    b.Property<string>("Symbol")
+                    b.Property<string>("Ticker")
                         .HasMaxLength(50)
                         .HasColumnType("character varying(50)")
-                        .HasColumnName("symbol");
+                        .HasColumnName("ticker");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -298,25 +287,28 @@ namespace FtoConsulting.PortfolioManager.Infrastructure.Migrations
                         .HasColumnType("bigint")
                         .HasColumnName("volume");
 
-                    b.HasKey("ISIN", "ValuationDate");
+                    b.HasKey("InstrumentId", "ValuationDate");
 
-                    b.HasIndex("ISIN")
-                        .HasDatabaseName("ix_instrument_prices_isin");
+                    b.HasIndex("InstrumentId")
+                        .HasDatabaseName("ix_instrument_prices_instrument_id");
 
-                    b.HasIndex("Symbol")
-                        .HasDatabaseName("ix_instrument_prices_symbol");
+                    b.HasIndex("Ticker")
+                        .HasDatabaseName("ix_instrument_prices_ticker");
 
                     b.HasIndex("ValuationDate")
                         .HasDatabaseName("ix_instrument_prices_valuation_date");
 
-                    b.ToTable("instrument_prices", (string)null);
+                    b.ToTable("instrument_prices", "app");
                 });
 
             modelBuilder.Entity("FtoConsulting.PortfolioManager.Domain.Entities.InstrumentType", b =>
                 {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
                         .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -343,14 +335,17 @@ namespace FtoConsulting.PortfolioManager.Infrastructure.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_instrument_types_name");
 
-                    b.ToTable("instrument_types", (string)null);
+                    b.ToTable("instrument_types", "app");
                 });
 
             modelBuilder.Entity("FtoConsulting.PortfolioManager.Domain.Entities.Platform", b =>
                 {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
                         .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
@@ -372,17 +367,20 @@ namespace FtoConsulting.PortfolioManager.Infrastructure.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_platforms_name");
 
-                    b.ToTable("platforms", (string)null);
+                    b.ToTable("platforms", "app");
                 });
 
             modelBuilder.Entity("FtoConsulting.PortfolioManager.Domain.Entities.Portfolio", b =>
                 {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid")
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
                         .HasColumnName("id");
 
-                    b.Property<Guid>("AccountId")
-                        .HasColumnType("uuid")
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("AccountId")
+                        .HasColumnType("integer")
                         .HasColumnName("account_id");
 
                     b.Property<DateTime>("CreatedAt")
@@ -405,7 +403,7 @@ namespace FtoConsulting.PortfolioManager.Infrastructure.Migrations
                         .IsUnique()
                         .HasDatabaseName("ix_portfolios_account_id_name");
 
-                    b.ToTable("portfolios", (string)null);
+                    b.ToTable("portfolios", "app");
                 });
 
             modelBuilder.Entity("FtoConsulting.PortfolioManager.Domain.Entities.Holding", b =>
@@ -450,8 +448,7 @@ namespace FtoConsulting.PortfolioManager.Infrastructure.Migrations
                 {
                     b.HasOne("FtoConsulting.PortfolioManager.Domain.Entities.Instrument", "Instrument")
                         .WithMany()
-                        .HasForeignKey("ISIN")
-                        .HasPrincipalKey("ISIN")
+                        .HasForeignKey("InstrumentId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 

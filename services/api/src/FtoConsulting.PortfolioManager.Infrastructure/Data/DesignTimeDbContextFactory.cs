@@ -20,7 +20,8 @@ public class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<PortfolioM
         var connectionString = configuration.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
-        optionsBuilder.UseNpgsql(connectionString);
+        optionsBuilder.UseNpgsql(connectionString, npgsqlOptions => 
+            npgsqlOptions.MigrationsHistoryTable("__EFMigrationsHistory", "app"));
 
         return new PortfolioManagerDbContext(optionsBuilder.Options);
     }

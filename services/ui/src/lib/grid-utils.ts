@@ -53,15 +53,6 @@ export const getHoldingsColumnDefs = (): ColDef<HoldingResponse>[] => [
     cellStyle: { fontFamily: 'monospace', fontWeight: 'bold' },
   },
   {
-    field: 'isin',
-    headerName: 'ISIN',
-    width: 120,
-    sortable: true,
-    filter: true,
-    cellStyle: { fontFamily: 'monospace', fontWeight: 'bold' },
-    hide: true,
-  },
-  {
     field: 'instrumentType',
     headerName: 'Type',
     width: 120,
