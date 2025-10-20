@@ -1,3 +1,4 @@
+using FtoConsulting.PortfolioManager.Api.Extensions;
 using FtoConsulting.PortfolioManager.Api.Services;
 using FtoConsulting.PortfolioManager.Application;
 using FtoConsulting.PortfolioManager.Application.Configuration;
@@ -35,6 +36,9 @@ builder.Services.Configure<EodApiOptions>(
 
 // Register API services
 builder.Services.AddScoped<IPortfolioMappingService, PortfolioMappingService>();
+
+// Register AI services
+builder.Services.AddAiServices();
 
 // Add CORS
 builder.Services.AddCors(options =>
@@ -104,5 +108,8 @@ app.UseAuthorization();
 app.MapHealthChecks("/health");
 
 app.MapControllers();
+
+// Initialize AI services
+await app.InitializeAiServicesAsync();
 
 app.Run();
