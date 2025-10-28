@@ -1,6 +1,16 @@
 using FtoConsulting.PortfolioManager.Application.DTOs.Ai;
 using FtoConsulting.PortfolioManager.Application.Services.Ai;
 using FtoConsulting.PortfolioManager.Application.Services;
+using FtoConsulting.PortfolioManager.Application.Configuration;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.AI;
+using System;
+using Azure;
+using Azure.AI.OpenAI;
+using Azure.Identity;
+using Microsoft.Agents.AI;
+using OpenAI;
+using System.Text.Json;
 
 namespace FtoConsulting.PortfolioManager.Api.Services.Ai;
 
@@ -13,17 +23,23 @@ public class AiOrchestrationService : IAiOrchestrationService
     private readonly IPortfolioAnalysisService _portfolioAnalysisService;
     private readonly IMarketIntelligenceService _marketIntelligenceService;
     private readonly ILogger<AiOrchestrationService> _logger;
+    private readonly AzureFoundryOptions _azureFoundryOptions;
+    private readonly IMcpServerService _mcpServerService;
 
     public AiOrchestrationService(
         IHoldingsRetrieval holdingsRetrieval,
         IPortfolioAnalysisService portfolioAnalysisService,
         IMarketIntelligenceService marketIntelligenceService,
-        ILogger<AiOrchestrationService> logger)
+        ILogger<AiOrchestrationService> logger,
+        IOptions<AzureFoundryOptions> azureFoundryOptions,
+        IMcpServerService mcpServerService)
     {
         _holdingsRetrieval = holdingsRetrieval;
         _portfolioAnalysisService = portfolioAnalysisService;
         _marketIntelligenceService = marketIntelligenceService;
         _logger = logger;
+        _azureFoundryOptions = azureFoundryOptions.Value;
+        _mcpServerService = mcpServerService;
     }
 
     public async Task<ChatResponseDto> ProcessPortfolioQueryAsync(string query, int accountId, CancellationToken cancellationToken = default)
@@ -31,44 +47,71 @@ public class AiOrchestrationService : IAiOrchestrationService
         try
         {
             _logger.LogInformation("Processing portfolio query for account {AccountId}: {Query}", accountId, query);
+            
+            // Validate Azure Foundry configuration
+            if (string.IsNullOrEmpty(_azureFoundryOptions.Endpoint))
+            {
+                throw new InvalidOperationException("Azure Foundry endpoint is not configured. Please check your user secrets.");
+            }
+            
+            if (string.IsNullOrEmpty(_azureFoundryOptions.ApiKey))
+            {
+                throw new InvalidOperationException("Azure Foundry API key is not configured. Please check your user secrets.");
+            }
+            
+            _logger.LogInformation("Azure Foundry Configuration - Endpoint: {Endpoint}, API Key Length: {ApiKeyLength}", 
+                _azureFoundryOptions.Endpoint, _azureFoundryOptions.ApiKey.Length);
 
-            // Determine the analysis date based on query context
-            var analysisDate = DetermineAnalysisDate(query);
-            _logger.LogInformation("Using analysis date: {AnalysisDate} for account {AccountId}", analysisDate, accountId);
+            // Create Azure OpenAI client
+            var azureOpenAIClient = new AzureOpenAIClient(
+                new Uri(_azureFoundryOptions.Endpoint),
+                new AzureKeyCredential(_azureFoundryOptions.ApiKey));
 
-            // Get portfolio analysis for the determined date
-            var portfolioAnalysis = await _portfolioAnalysisService.AnalyzePortfolioPerformanceAsync(
-                accountId, analysisDate, cancellationToken);
+            // Get a chat client for the specific model
+            var chatClient = azureOpenAIClient.GetChatClient("gpt-4o-mini");
+            
+            _logger.LogInformation("Created Azure OpenAI client and chat client successfully");
+            
+            // Create AI functions from our MCP tools for the agent
+            var portfolioTools = CreatePortfolioMcpFunctions();
+            
+            // Create an AI agent with portfolio analysis instructions and MCP tools
+            var agent = chatClient.CreateAIAgent(
+                instructions: CreateAgentInstructions(accountId),
+                tools: portfolioTools.ToList());
 
-            // Generate response based on query type and context
-            var queryType = DetermineQueryType(query);
-            var response = await GenerateResponseAsync(query, queryType, portfolioAnalysis, analysisDate, cancellationToken);
+            // Process the query with the AI agent that has access to our MCP tools
+            var chatMessages = new[]
+            {
+                new ChatMessage(ChatRole.User, $"User Query: {query}\nAccount ID: {accountId}\nCurrent Date: {DateTime.Now:yyyy-MM-dd}")
+            };
+            
+            _logger.LogInformation("Sending request to Azure OpenAI with {MessageCount} messages", chatMessages.Length);
+            
+            var response = await agent.RunAsync(chatMessages, cancellationToken: cancellationToken);
+
+            _logger.LogInformation("Successfully processed portfolio query using AI agent with MCP tools");
 
             return new ChatResponseDto(
-                Response: response,
-                QueryType: queryType,
-                PortfolioSummary: new PortfolioSummaryDto(
-                    AccountId: portfolioAnalysis.AccountId,
-                    Date: portfolioAnalysis.AnalysisDate,
-                    TotalValue: portfolioAnalysis.TotalValue,
-                    DayChange: portfolioAnalysis.DayChange,
-                    DayChangePercentage: portfolioAnalysis.DayChangePercentage,
-                    HoldingsCount: portfolioAnalysis.HoldingPerformance.Count(),
-                    TopHoldings: portfolioAnalysis.HoldingPerformance
-                        .OrderByDescending(h => h.CurrentValue)
-                        .Take(3)
-                        .Select(h => h.Ticker)
-                ),
-                Insights: GenerateInsights(portfolioAnalysis)
+                Response: response.Text,
+                QueryType: DetermineQueryType(query)
+            );
+        }
+        catch (System.ClientModel.ClientResultException ex)
+        {
+            _logger.LogError(ex, "Azure OpenAI API error - Status: {Status}, Message: {Message}", ex.Status, ex.Message);
+            
+            return new ChatResponseDto(
+                Response: $"I apologize, but I'm having trouble connecting to the AI service. Error: {ex.Message}. Please check your Azure OpenAI configuration.",
+                QueryType: "Error"
             );
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error processing portfolio query for account {AccountId}: {Query}", accountId, query);
             
-            // Return a helpful error response
             return new ChatResponseDto(
-                Response: "I apologize, but I encountered an issue analyzing your portfolio. This might be because there's no data for the requested date. Please try asking about October 17th, 2025 (the main trading day with data available), or check if your account ID is correct.",
+                Response: "I apologize, but I encountered an issue analyzing your portfolio. Please ensure your account ID is correct and try again.",
                 QueryType: "Error"
             );
         }
@@ -76,23 +119,27 @@ public class AiOrchestrationService : IAiOrchestrationService
 
     public async Task<IEnumerable<AiToolDto>> GetAvailableToolsAsync()
     {
-        await Task.CompletedTask; // Placeholder for async pattern
+        // Tool definitions are now managed by the Microsoft Agent Framework MCP server
+        // This method provides a summary view for the AI orchestration service
+        _logger.LogInformation("Returning tool summary from unified MCP architecture");
+        
+        await Task.CompletedTask;
 
         return new[]
         {
             new AiToolDto(
-                Name: "get_portfolio_holdings",
-                Description: "Retrieve current portfolio holdings for an account",
+                Name: "GetPortfolioHoldings",
+                Description: "Retrieve portfolio holdings for a specific account and date",
                 Parameters: new Dictionary<string, object>
                 {
                     ["accountId"] = new { type = "integer", description = "Account ID" },
-                    ["date"] = new { type = "string", description = "Date in YYYY-MM-DD format", optional = true }
+                    ["date"] = new { type = "string", description = "Date in YYYY-MM-DD format" }
                 },
                 Category: "Portfolio Data"
             ),
             new AiToolDto(
-                Name: "analyze_portfolio_performance",
-                Description: "Analyze portfolio performance and generate insights",
+                Name: "AnalyzePortfolioPerformance",
+                Description: "Analyze portfolio performance and generate insights for a specific date",
                 Parameters: new Dictionary<string, object>
                 {
                     ["accountId"] = new { type = "integer", description = "Account ID" },
@@ -101,55 +148,47 @@ public class AiOrchestrationService : IAiOrchestrationService
                 Category: "Portfolio Analysis"
             ),
             new AiToolDto(
-                Name: "get_market_context",
-                Description: "Get market context and news for portfolio holdings",
+                Name: "ComparePortfolioPerformance",
+                Description: "Compare portfolio performance between two dates",
+                Parameters: new Dictionary<string, object>
+                {
+                    ["accountId"] = new { type = "integer", description = "Account ID" },
+                    ["startDate"] = new { type = "string", description = "Start date in YYYY-MM-DD format" },
+                    ["endDate"] = new { type = "string", description = "End date in YYYY-MM-DD format" }
+                },
+                Category: "Portfolio Analysis"
+            ),
+            new AiToolDto(
+                Name: "GetMarketContext",
+                Description: "Get market context and news for specific stock tickers",
                 Parameters: new Dictionary<string, object>
                 {
                     ["tickers"] = new { type = "array", description = "List of stock tickers" },
-                    ["date"] = new { type = "string", description = "Date for market analysis" }
+                    ["date"] = new { type = "string", description = "Date for market analysis in YYYY-MM-DD format" }
+                },
+                Category: "Market Intelligence"
+            ),
+            new AiToolDto(
+                Name: "SearchFinancialNews",
+                Description: "Search for financial news related to specific tickers within a date range",
+                Parameters: new Dictionary<string, object>
+                {
+                    ["tickers"] = new { type = "array", description = "List of stock tickers" },
+                    ["fromDate"] = new { type = "string", description = "Start date in YYYY-MM-DD format" },
+                    ["toDate"] = new { type = "string", description = "End date in YYYY-MM-DD format" }
+                },
+                Category: "Market Intelligence"
+            ),
+            new AiToolDto(
+                Name: "GetMarketSentiment",
+                Description: "Get overall market sentiment and indicators for a specific date",
+                Parameters: new Dictionary<string, object>
+                {
+                    ["date"] = new { type = "string", description = "Date for sentiment analysis in YYYY-MM-DD format" }
                 },
                 Category: "Market Intelligence"
             )
         };
-    }
-
-    private string DetermineQueryType(string query)
-    {
-        var lowerQuery = query.ToLowerInvariant();
-
-        if (lowerQuery.Contains("performance") || lowerQuery.Contains("doing") || lowerQuery.Contains("today"))
-            return "Performance";
-        if (lowerQuery.Contains("holdings") || lowerQuery.Contains("positions") || lowerQuery.Contains("stock"))
-            return "Holdings";
-        if (lowerQuery.Contains("market") || lowerQuery.Contains("news") || lowerQuery.Contains("sentiment"))
-            return "Market";
-        if (lowerQuery.Contains("risk") || lowerQuery.Contains("volatility") || lowerQuery.Contains("diversification"))
-            return "Risk";
-        if (lowerQuery.Contains("compare") || lowerQuery.Contains("between") || lowerQuery.Contains("vs"))
-            return "Comparison";
-
-        return "General";
-    }
-
-    private DateTime DetermineAnalysisDate(string query)
-    {
-        var lowerQuery = query.ToLowerInvariant();
-
-        // Check for specific dates mentioned in query
-        if (lowerQuery.Contains("october 17") || lowerQuery.Contains("17th october") || lowerQuery.Contains("oct 17"))
-            return new DateTime(2025, 10, 17);
-        
-        if (lowerQuery.Contains("october 18") || lowerQuery.Contains("18th october") || lowerQuery.Contains("oct 18"))
-            return new DateTime(2025, 10, 18);
-        
-        if (lowerQuery.Contains("yesterday"))
-            return DateTime.UtcNow.AddDays(-1);
-        
-        if (lowerQuery.Contains("today"))
-            return DateTime.UtcNow;
-
-        // Default to October 17, 2025 since that's a trading day when you have data
-        return new DateTime(2025, 10, 17);
     }
 
     private async Task<string> GenerateResponseAsync(string query, string queryType, PortfolioAnalysisDto analysis, DateTime analysisDate, CancellationToken cancellationToken)
@@ -352,5 +391,143 @@ public class AiOrchestrationService : IAiOrchestrationService
         }
 
         return insights;
+    }
+
+    /// <summary>
+    /// Create AI functions that connect to our MCP server tools
+    /// </summary>
+    private IEnumerable<AITool> CreatePortfolioMcpFunctions()
+    {
+        // Create AI functions that map to our MCP server endpoints
+        // These will be used by the AI agent to call our MCP tools
+        var functions = new List<AITool>
+        {
+            AIFunctionFactory.Create(
+                method: (int accountId, string date) => CallMcpTool("GetPortfolioHoldings", new { accountId, date }),
+                name: "GetPortfolioHoldings",
+                description: "Retrieve portfolio holdings for a specific account and date"),
+
+            AIFunctionFactory.Create(
+                method: (int accountId, string analysisDate) => CallMcpTool("AnalyzePortfolioPerformance", new { accountId, analysisDate }),
+                name: "AnalyzePortfolioPerformance", 
+                description: "Analyze portfolio performance and generate insights for a specific date"),
+
+            AIFunctionFactory.Create(
+                method: (int accountId, string startDate, string endDate) => CallMcpTool("ComparePortfolioPerformance", new { accountId, startDate, endDate }),
+                name: "ComparePortfolioPerformance",
+                description: "Compare portfolio performance between two dates"),
+
+            AIFunctionFactory.Create(
+                method: (string[] tickers, string date) => CallMcpTool("GetMarketContext", new { tickers, date }),
+                name: "GetMarketContext",
+                description: "Get market context and news for specific stock tickers"),
+
+            AIFunctionFactory.Create(
+                method: (string[] tickers, string fromDate, string toDate) => CallMcpTool("SearchFinancialNews", new { tickers, fromDate, toDate }),
+                name: "SearchFinancialNews",
+                description: "Search for financial news related to specific tickers within a date range"),
+
+            AIFunctionFactory.Create(
+                method: (string date) => CallMcpTool("GetMarketSentiment", new { date }),
+                name: "GetMarketSentiment",
+                description: "Get overall market sentiment and indicators for a specific date")
+        };
+
+        return functions;
+    }
+
+    /// <summary>
+    /// Create agent instructions tailored for portfolio analysis
+    /// </summary>
+    private string CreateAgentInstructions(int accountId)
+    {
+        return $@"You are an expert portfolio analyst AI assistant helping with portfolio management for Account ID {accountId}.
+
+Your capabilities include:
+- Retrieving portfolio holdings for specific dates
+- Analyzing portfolio performance and generating insights  
+- Comparing portfolio performance between different dates
+- Getting market context and financial news for holdings
+- Analyzing market sentiment
+
+Guidelines:
+- Always use the current date ({DateTime.Now:yyyy-MM-dd}) unless the user specifies otherwise
+- For historical analysis, try 2025-10-17 which has data available
+- Present financial information clearly with proper formatting
+- Include relevant market context when analyzing performance
+- Provide actionable insights and recommendations
+- Use emojis and formatting to make responses engaging
+- Always specify which date you're analyzing
+
+When users ask about their portfolio, use the appropriate tools to get real data rather than making assumptions.";
+    }
+
+    /// <summary>
+    /// Call an MCP tool through our local MCP server
+    /// </summary>
+    private async Task<object> CallMcpTool(string toolName, object parameters)
+    {
+        try
+        {
+            _logger.LogInformation("Calling MCP tool: {ToolName} with parameters: {@Parameters}", toolName, parameters);
+            
+            // Convert parameters object to dictionary format expected by MCP server
+            var parameterDict = ConvertParametersToDict(parameters);
+            
+            // Call our MCP server service directly (more efficient than HTTP calls)
+            var result = await _mcpServerService.ExecuteToolAsync(toolName, parameterDict);
+            
+            _logger.LogInformation("Successfully executed MCP tool: {ToolName}", toolName);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error calling MCP tool: {ToolName}", toolName);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Convert anonymous object parameters to dictionary format
+    /// </summary>
+    private Dictionary<string, object> ConvertParametersToDict(object parameters)
+    {
+        if (parameters is Dictionary<string, object> dict)
+        {
+            return dict;
+        }
+
+        // Use reflection to convert anonymous object to dictionary
+        var paramDict = new Dictionary<string, object>();
+        var properties = parameters.GetType().GetProperties();
+        
+        foreach (var prop in properties)
+        {
+            var value = prop.GetValue(parameters);
+            if (value != null)
+            {
+                paramDict[prop.Name] = value;
+            }
+        }
+        
+        return paramDict;
+    }
+
+    /// <summary>
+    /// Determine the type of query being asked
+    /// </summary>
+    private string DetermineQueryType(string query)
+    {
+        var queryLower = query.ToLowerInvariant();
+
+        return queryLower switch
+        {
+            var q when q.Contains("performance") || q.Contains("return") || q.Contains("gain") || q.Contains("loss") => "Performance",
+            var q when q.Contains("holding") || q.Contains("position") || q.Contains("stock") || q.Contains("what do i own") => "Holdings",
+            var q when q.Contains("market") || q.Contains("news") || q.Contains("sentiment") => "Market",
+            var q when q.Contains("risk") || q.Contains("diversification") || q.Contains("concentration") => "Risk", 
+            var q when q.Contains("compare") || q.Contains("vs") || q.Contains("versus") || q.Contains("between") => "Comparison",
+            _ => "General"
+        };
     }
 }

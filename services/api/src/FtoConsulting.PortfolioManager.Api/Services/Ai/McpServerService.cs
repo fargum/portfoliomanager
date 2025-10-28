@@ -1,10 +1,23 @@
 using FtoConsulting.PortfolioManager.Application.Services.Ai;
 using FtoConsulting.PortfolioManager.Application.Services;
+using FtoConsulting.PortfolioManager.Application.Configuration;
+using FtoConsulting.PortfolioManager.Api.Services.Ai.Tools;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.AI;
+using Microsoft.Agents.AI;
+using ModelContextProtocol;
+using ModelContextProtocol.Server;
+using Azure.AI.OpenAI;
+using Azure;
+using System.ComponentModel;
 
 namespace FtoConsulting.PortfolioManager.Api.Services.Ai;
 
 /// <summary>
-/// Implementation of MCP (Model Context Protocol) server service
+/// Implementation of MCP (Model Context Protocol) server service using Microsoft Agent Framework
+/// This service bridges between our custom MCP controller and the Microsoft Agent Framework MCP server
 /// </summary>
 public class McpServerService : IMcpServerService
 {
@@ -12,36 +25,46 @@ public class McpServerService : IMcpServerService
     private readonly IPortfolioAnalysisService _portfolioAnalysisService;
     private readonly IMarketIntelligenceService _marketIntelligenceService;
     private readonly ILogger<McpServerService> _logger;
-    private readonly Dictionary<string, Func<Dictionary<string, object>, Task<object>>> _tools;
+    private readonly AzureFoundryOptions _azureFoundryOptions;
+    
+    // Direct tool references for execution
+    private readonly PortfolioHoldingsTool _portfolioHoldingsTool;
+    private readonly PortfolioAnalysisTool _portfolioAnalysisTool;
+    private readonly PortfolioComparisonTool _portfolioComparisonTool;
+    private readonly MarketIntelligenceTool _marketIntelligenceTool;
 
     public McpServerService(
         IHoldingsRetrieval holdingsRetrieval,
         IPortfolioAnalysisService portfolioAnalysisService,
         IMarketIntelligenceService marketIntelligenceService,
-        ILogger<McpServerService> logger)
+        ILogger<McpServerService> logger,
+        IOptions<AzureFoundryOptions> azureFoundryOptions,
+        PortfolioHoldingsTool portfolioHoldingsTool,
+        PortfolioAnalysisTool portfolioAnalysisTool,
+        PortfolioComparisonTool portfolioComparisonTool,
+        MarketIntelligenceTool marketIntelligenceTool)
     {
         _holdingsRetrieval = holdingsRetrieval;
         _portfolioAnalysisService = portfolioAnalysisService;
         _marketIntelligenceService = marketIntelligenceService;
         _logger = logger;
-        _tools = new Dictionary<string, Func<Dictionary<string, object>, Task<object>>>();
+        _azureFoundryOptions = azureFoundryOptions.Value;
+        _portfolioHoldingsTool = portfolioHoldingsTool;
+        _portfolioAnalysisTool = portfolioAnalysisTool;
+        _portfolioComparisonTool = portfolioComparisonTool;
+        _marketIntelligenceTool = marketIntelligenceTool;
     }
 
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
         try
         {
-            _logger.LogInformation("Initializing MCP server with portfolio tools");
+            _logger.LogInformation("Initializing MCP server with portfolio tools using Microsoft Agent Framework");
 
-            // Register portfolio tools
-            _tools["get_portfolio_holdings"] = GetPortfolioHoldingsAsync;
-            _tools["analyze_portfolio_performance"] = AnalyzePortfolioPerformanceAsync;
-            _tools["get_market_context"] = GetMarketContextAsync;
-            _tools["search_financial_news"] = SearchFinancialNewsAsync;
-            _tools["get_market_sentiment"] = GetMarketSentimentAsync;
-            _tools["compare_portfolio_performance"] = ComparePortfolioPerformanceAsync;
+            // For now, create a simpler implementation that works with the current packages
+            // TODO: Enhance with proper Agent Framework integration when APIs are stable
 
-            _logger.LogInformation("MCP server initialized with {ToolCount} tools", _tools.Count);
+            _logger.LogInformation("MCP server initialized successfully");
             await Task.CompletedTask;
         }
         catch (Exception ex)
@@ -53,36 +76,36 @@ public class McpServerService : IMcpServerService
 
     public async Task<object> ExecuteToolAsync(string toolName, Dictionary<string, object> parameters, CancellationToken cancellationToken = default)
     {
+        _logger.LogInformation("Executing MCP tool: {ToolName} with parameters: {@Parameters}", toolName, parameters);
+        
         try
         {
-            if (!_tools.ContainsKey(toolName))
+            return toolName switch
             {
-                throw new ArgumentException($"Tool '{toolName}' not found");
-            }
-
-            _logger.LogInformation("Executing MCP tool: {ToolName} with parameters: {Parameters}", 
-                toolName, string.Join(", ", parameters.Keys));
-
-            var result = await _tools[toolName](parameters);
-            
-            _logger.LogInformation("Successfully executed MCP tool: {ToolName}", toolName);
-            return result;
+                "GetPortfolioHoldings" => await ExecuteGetPortfolioHoldings(parameters, cancellationToken),
+                "AnalyzePortfolioPerformance" => await ExecuteAnalyzePortfolioPerformance(parameters, cancellationToken),
+                "ComparePortfolioPerformance" => await ExecuteComparePortfolioPerformance(parameters, cancellationToken),
+                "GetMarketContext" => await ExecuteGetMarketContext(parameters, cancellationToken),
+                "SearchFinancialNews" => await ExecuteSearchFinancialNews(parameters, cancellationToken),
+                "GetMarketSentiment" => await ExecuteGetMarketSentiment(parameters, cancellationToken),
+                _ => throw new ArgumentException($"Unknown tool: {toolName}")
+            };
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error executing MCP tool: {ToolName}", toolName);
+            _logger.LogError(ex, "Error executing tool {ToolName}", toolName);
             throw;
         }
     }
 
-    public async Task<IEnumerable<McpToolDefinition>> GetAvailableToolsAsync()
+    public Task<IEnumerable<McpToolDefinition>> GetAvailableToolsAsync()
     {
-        await Task.CompletedTask;
-
-        return new[]
+        _logger.LogInformation("Returning available MCP tools from integrated Microsoft Agent Framework");
+        
+        var tools = new[]
         {
             new McpToolDefinition(
-                Name: "get_portfolio_holdings",
+                Name: "GetPortfolioHoldings",
                 Description: "Retrieve portfolio holdings for a specific account and date",
                 Schema: new Dictionary<string, object>
                 {
@@ -96,7 +119,7 @@ public class McpServerService : IMcpServerService
                 }
             ),
             new McpToolDefinition(
-                Name: "analyze_portfolio_performance",
+                Name: "AnalyzePortfolioPerformance",
                 Description: "Analyze portfolio performance and generate insights for a specific date",
                 Schema: new Dictionary<string, object>
                 {
@@ -110,7 +133,22 @@ public class McpServerService : IMcpServerService
                 }
             ),
             new McpToolDefinition(
-                Name: "get_market_context",
+                Name: "ComparePortfolioPerformance",
+                Description: "Compare portfolio performance between two dates",
+                Schema: new Dictionary<string, object>
+                {
+                    ["type"] = "object",
+                    ["properties"] = new Dictionary<string, object>
+                    {
+                        ["accountId"] = new { type = "integer", description = "Account ID" },
+                        ["startDate"] = new { type = "string", description = "Start date in YYYY-MM-DD format" },
+                        ["endDate"] = new { type = "string", description = "End date in YYYY-MM-DD format" }
+                    },
+                    ["required"] = new[] { "accountId", "startDate", "endDate" }
+                }
+            ),
+            new McpToolDefinition(
+                Name: "GetMarketContext",
                 Description: "Get market context and news for specific stock tickers",
                 Schema: new Dictionary<string, object>
                 {
@@ -124,7 +162,7 @@ public class McpServerService : IMcpServerService
                 }
             ),
             new McpToolDefinition(
-                Name: "search_financial_news",
+                Name: "SearchFinancialNews",
                 Description: "Search for financial news related to specific tickers within a date range",
                 Schema: new Dictionary<string, object>
                 {
@@ -139,7 +177,7 @@ public class McpServerService : IMcpServerService
                 }
             ),
             new McpToolDefinition(
-                Name: "get_market_sentiment",
+                Name: "GetMarketSentiment",
                 Description: "Get overall market sentiment and indicators for a specific date",
                 Schema: new Dictionary<string, object>
                 {
@@ -150,23 +188,10 @@ public class McpServerService : IMcpServerService
                     },
                     ["required"] = new[] { "date" }
                 }
-            ),
-            new McpToolDefinition(
-                Name: "compare_portfolio_performance",
-                Description: "Compare portfolio performance between two dates",
-                Schema: new Dictionary<string, object>
-                {
-                    ["type"] = "object",
-                    ["properties"] = new Dictionary<string, object>
-                    {
-                        ["accountId"] = new { type = "integer", description = "Account ID" },
-                        ["startDate"] = new { type = "string", description = "Start date in YYYY-MM-DD format" },
-                        ["endDate"] = new { type = "string", description = "End date in YYYY-MM-DD format" }
-                    },
-                    ["required"] = new[] { "accountId", "startDate", "endDate" }
-                }
             )
         };
+
+        return Task.FromResult<IEnumerable<McpToolDefinition>>(tools);
     }
 
     public async Task<bool> IsHealthyAsync()
@@ -184,66 +209,55 @@ public class McpServerService : IMcpServerService
         }
     }
 
-    #region Tool Implementations
+    #region Tool Execution Methods
 
-    private async Task<object> GetPortfolioHoldingsAsync(Dictionary<string, object> parameters)
+    private async Task<object> ExecuteGetPortfolioHoldings(Dictionary<string, object> parameters, CancellationToken cancellationToken)
     {
         var accountId = Convert.ToInt32(parameters["accountId"]);
-        var date = DateOnly.Parse(parameters["date"].ToString()!);
-
-        var holdings = await _holdingsRetrieval.GetHoldingsByAccountAndDateAsync(accountId, date);
+        var date = parameters["date"].ToString()!;
         
-        return holdings.Select(h => new
-        {
-            Ticker = h.Instrument?.Ticker,
-            InstrumentName = h.Instrument?.Name,
-            UnitAmount = h.UnitAmount,
-            CurrentValue = h.CurrentValue,
-            BoughtValue = h.BoughtValue,
-            DailyProfitLoss = h.DailyProfitLoss,
-            DailyProfitLossPercentage = h.DailyProfitLossPercentage
-        });
+        return await _portfolioHoldingsTool.GetPortfolioHoldings(accountId, date, cancellationToken);
     }
 
-    private async Task<object> AnalyzePortfolioPerformanceAsync(Dictionary<string, object> parameters)
+    private async Task<object> ExecuteAnalyzePortfolioPerformance(Dictionary<string, object> parameters, CancellationToken cancellationToken)
     {
         var accountId = Convert.ToInt32(parameters["accountId"]);
-        var analysisDate = DateTime.Parse(parameters["analysisDate"].ToString()!);
-
-        return await _portfolioAnalysisService.AnalyzePortfolioPerformanceAsync(accountId, analysisDate);
+        var analysisDate = parameters["analysisDate"].ToString()!;
+        
+        return await _portfolioAnalysisTool.AnalyzePortfolioPerformance(accountId, analysisDate, cancellationToken);
     }
 
-    private async Task<object> GetMarketContextAsync(Dictionary<string, object> parameters)
-    {
-        var tickers = ((object[])parameters["tickers"]).Cast<string>();
-        var date = DateTime.Parse(parameters["date"].ToString()!);
-
-        return await _marketIntelligenceService.GetMarketContextAsync(tickers, date);
-    }
-
-    private async Task<object> SearchFinancialNewsAsync(Dictionary<string, object> parameters)
-    {
-        var tickers = ((object[])parameters["tickers"]).Cast<string>();
-        var fromDate = DateTime.Parse(parameters["fromDate"].ToString()!);
-        var toDate = DateTime.Parse(parameters["toDate"].ToString()!);
-
-        return await _marketIntelligenceService.SearchFinancialNewsAsync(tickers, fromDate, toDate);
-    }
-
-    private async Task<object> GetMarketSentimentAsync(Dictionary<string, object> parameters)
-    {
-        var date = DateTime.Parse(parameters["date"].ToString()!);
-
-        return await _marketIntelligenceService.GetMarketSentimentAsync(date);
-    }
-
-    private async Task<object> ComparePortfolioPerformanceAsync(Dictionary<string, object> parameters)
+    private async Task<object> ExecuteComparePortfolioPerformance(Dictionary<string, object> parameters, CancellationToken cancellationToken)
     {
         var accountId = Convert.ToInt32(parameters["accountId"]);
-        var startDate = DateTime.Parse(parameters["startDate"].ToString()!);
-        var endDate = DateTime.Parse(parameters["endDate"].ToString()!);
+        var startDate = parameters["startDate"].ToString()!;
+        var endDate = parameters["endDate"].ToString()!;
+        
+        return await _portfolioComparisonTool.ComparePortfolioPerformance(accountId, startDate, endDate, cancellationToken);
+    }
 
-        return await _portfolioAnalysisService.ComparePerformanceAsync(accountId, startDate, endDate);
+    private async Task<object> ExecuteGetMarketContext(Dictionary<string, object> parameters, CancellationToken cancellationToken)
+    {
+        var tickers = ((IEnumerable<object>)parameters["tickers"]).Select(t => t.ToString()!).ToArray();
+        var date = parameters["date"].ToString()!;
+        
+        return await _marketIntelligenceTool.GetMarketContext(tickers, date, cancellationToken);
+    }
+
+    private async Task<object> ExecuteSearchFinancialNews(Dictionary<string, object> parameters, CancellationToken cancellationToken)
+    {
+        var tickers = ((IEnumerable<object>)parameters["tickers"]).Select(t => t.ToString()!).ToArray();
+        var fromDate = parameters["fromDate"].ToString()!;
+        var toDate = parameters["toDate"].ToString()!;
+        
+        return await _marketIntelligenceTool.SearchFinancialNews(tickers, fromDate, toDate, cancellationToken);
+    }
+
+    private async Task<object> ExecuteGetMarketSentiment(Dictionary<string, object> parameters, CancellationToken cancellationToken)
+    {
+        var date = parameters["date"].ToString()!;
+        
+        return await _marketIntelligenceTool.GetMarketSentiment(date, cancellationToken);
     }
 
     #endregion

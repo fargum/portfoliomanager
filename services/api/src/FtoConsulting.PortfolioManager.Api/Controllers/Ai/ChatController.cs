@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Options;
 using FtoConsulting.PortfolioManager.Application.Services.Ai;
 using FtoConsulting.PortfolioManager.Application.DTOs.Ai;
+using FtoConsulting.PortfolioManager.Application.Configuration;
+
 
 namespace FtoConsulting.PortfolioManager.Api.Controllers.Ai;
 
@@ -14,13 +17,16 @@ public class ChatController : ControllerBase
 {
     private readonly IAiOrchestrationService _aiOrchestrationService;
     private readonly ILogger<ChatController> _logger;
+    private readonly AzureFoundryOptions _azureFoundryOptions;
 
     public ChatController(
         IAiOrchestrationService aiOrchestrationService,
-        ILogger<ChatController> logger)
+        ILogger<ChatController> logger,
+        IOptions<AzureFoundryOptions> azureFoundryOptions)
     {
         _aiOrchestrationService = aiOrchestrationService;
         _logger = logger;
+        _azureFoundryOptions = azureFoundryOptions.Value;
     }
 
     /// <summary>
@@ -99,5 +105,23 @@ public class ChatController : ControllerBase
     public IActionResult GetHealth()
     {
         return Ok(new { Status = "Healthy", Timestamp = DateTime.UtcNow });
+    }
+
+    /// <summary>
+    /// Test endpoint to verify Azure Foundry configuration is loaded
+    /// </summary>
+    /// <returns>Configuration status (sensitive data masked)</returns>
+    [HttpGet("config-test")]
+    [ProducesResponseType(200)]
+    public IActionResult GetConfigTest()
+    {
+        return Ok(new 
+        { 
+            AzureFoundryConfigured = !string.IsNullOrEmpty(_azureFoundryOptions.Endpoint),
+            HasApiKey = !string.IsNullOrEmpty(_azureFoundryOptions.ApiKey),
+            Endpoint = string.IsNullOrEmpty(_azureFoundryOptions.Endpoint) ? "Not configured" : "***CONFIGURED***",
+            ApiKey = string.IsNullOrEmpty(_azureFoundryOptions.ApiKey) ? "Not configured" : "***CONFIGURED***",
+            TimeoutSeconds = _azureFoundryOptions.TimeoutSeconds
+        });
     }
 }

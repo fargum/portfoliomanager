@@ -34,11 +34,18 @@ builder.Services.AddInfrastructureServices();
 builder.Services.Configure<EodApiOptions>(
     builder.Configuration.GetSection(EodApiOptions.SectionName));
 
+// Configure Azure Foundry options
+builder.Services.Configure<AzureFoundryOptions>(
+    builder.Configuration.GetSection(AzureFoundryOptions.SectionName));
+
 // Register API services
 builder.Services.AddScoped<IPortfolioMappingService, PortfolioMappingService>();
 
 // Register AI services
 builder.Services.AddAiServices();
+
+// Register official MCP server with portfolio tools
+builder.Services.AddMcpPortfolioServer();
 
 // Add CORS
 builder.Services.AddCors(options =>
@@ -108,6 +115,9 @@ app.UseAuthorization();
 app.MapHealthChecks("/health");
 
 app.MapControllers();
+
+// Map MCP server endpoint
+app.MapMcp("/api/mcp");
 
 // Initialize AI services
 await app.InitializeAiServicesAsync();

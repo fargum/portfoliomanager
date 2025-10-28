@@ -38,6 +38,10 @@ services:
       # EOD Historical Data API Configuration
       - EodApi__Token=${EOD_API_TOKEN}
       
+      # Azure Foundry Inference Endpoint Configuration
+      - AzureFoundry__Endpoint=${AZURE_FOUNDRY_ENDPOINT}
+      - AzureFoundry__ApiKey=${AZURE_FOUNDRY_API_KEY}
+      
       # Logging Configuration
       - Logging__LogLevel__Default=Information
       - Logging__LogLevel__Microsoft.AspNetCore=Warning
