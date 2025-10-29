@@ -117,6 +117,75 @@ public class AiOrchestrationService : IAiOrchestrationService
         }
     }
 
+    public async Task ProcessPortfolioQueryStreamAsync(string query, int accountId, Func<string, Task> onTokenReceived, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            _logger.LogInformation("Processing streaming portfolio query for account {AccountId}: {Query}", accountId, query);
+            
+            // Validate Azure Foundry configuration
+            if (string.IsNullOrEmpty(_azureFoundryOptions.Endpoint))
+            {
+                throw new InvalidOperationException("Azure Foundry endpoint is not configured. Please check your user secrets.");
+            }
+            
+            if (string.IsNullOrEmpty(_azureFoundryOptions.ApiKey))
+            {
+                throw new InvalidOperationException("Azure Foundry API key is not configured. Please check your user secrets.");
+            }
+
+            // Create Azure OpenAI client
+            var azureOpenAIClient = new AzureOpenAIClient(
+                new Uri(_azureFoundryOptions.Endpoint),
+                new AzureKeyCredential(_azureFoundryOptions.ApiKey));
+
+            // Get a chat client for the specific model
+            var chatClient = azureOpenAIClient.GetChatClient("gpt-4o-mini");
+            
+            _logger.LogInformation("Created Azure OpenAI client and chat client successfully for streaming");
+            
+            // Create AI functions from our MCP tools for the agent
+            var portfolioTools = CreatePortfolioMcpFunctions();
+            
+            // Create an AI agent with portfolio analysis instructions and MCP tools
+            var agent = chatClient.CreateAIAgent(
+                instructions: CreateAgentInstructions(accountId),
+                tools: portfolioTools.ToList());
+
+            // Process the query with streaming using the AI agent
+            var chatMessages = new[]
+            {
+                new ChatMessage(ChatRole.User, $"User Query: {query}\nAccount ID: {accountId}\nCurrent Date: {DateTime.Now:yyyy-MM-dd}")
+            };
+            
+            _logger.LogInformation("Sending streaming request to Azure OpenAI with {MessageCount} messages", chatMessages.Length);
+            
+            // Use streaming response from the agent
+            await foreach (var streamingUpdate in agent.RunStreamingAsync(chatMessages, cancellationToken: cancellationToken))
+            {
+                if (cancellationToken.IsCancellationRequested)
+                    break;
+
+                if (!string.IsNullOrEmpty(streamingUpdate.Text))
+                {
+                    await onTokenReceived(streamingUpdate.Text);
+                }
+            }
+
+            _logger.LogInformation("Successfully completed streaming portfolio query using AI agent with MCP tools");
+        }
+        catch (System.ClientModel.ClientResultException ex)
+        {
+            _logger.LogError(ex, "Azure OpenAI API error in streaming - Status: {Status}, Message: {Message}", ex.Status, ex.Message);
+            await onTokenReceived($"I apologize, but I'm having trouble connecting to the AI service. Error: {ex.Message}. Please check your Azure OpenAI configuration.");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing streaming portfolio query for account {AccountId}: {Query}", accountId, query);
+            await onTokenReceived("I apologize, but I encountered an issue analyzing your portfolio. Please ensure your account ID is correct and try again.");
+        }
+    }
+
     public async Task<IEnumerable<AiToolDto>> GetAvailableToolsAsync()
     {
         // Tool definitions are now managed by the Microsoft Agent Framework MCP server

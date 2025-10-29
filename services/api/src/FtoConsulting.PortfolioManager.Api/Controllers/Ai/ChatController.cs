@@ -30,6 +30,72 @@ public class ChatController : ControllerBase
     }
 
     /// <summary>
+    /// Process a natural language query about portfolio data with streaming response
+    /// </summary>
+    /// <param name="request">Chat request containing query and account information</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Streaming AI-generated response based on portfolio data</returns>
+    [HttpPost("stream")]
+    [ProducesResponseType(200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(500)]
+    public async Task<IActionResult> StreamPortfolioQuery(
+        [FromBody] ChatRequestDto request,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(request.Query))
+            {
+                return BadRequest("Query cannot be empty");
+            }
+
+            if (request.AccountId <= 0)
+            {
+                return BadRequest("Valid account ID is required");
+            }
+
+            _logger.LogInformation("Processing streaming AI chat query for account {AccountId}: {Query}", 
+                request.AccountId, request.Query);
+
+            // Set up Server-Sent Events headers
+            Response.Headers["Content-Type"] = "text/plain; charset=utf-8";
+            Response.Headers["Cache-Control"] = "no-cache";
+            Response.Headers["Connection"] = "keep-alive";
+
+            // Use real streaming from the AI service
+            await _aiOrchestrationService.ProcessPortfolioQueryStreamAsync(
+                request.Query, 
+                request.AccountId,
+                async (token) =>
+                {
+                    if (!cancellationToken.IsCancellationRequested)
+                    {
+                        await Response.WriteAsync(token, cancellationToken);
+                        await Response.Body.FlushAsync(cancellationToken);
+                    }
+                },
+                cancellationToken);
+
+            _logger.LogInformation("Successfully completed streaming AI chat query for account {AccountId}", 
+                request.AccountId);
+
+            return new EmptyResult();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing streaming AI chat query for account {AccountId}: {Query}", 
+                request.AccountId, request.Query);
+            
+            if (!Response.HasStarted)
+            {
+                await Response.WriteAsync($"Error: {ex.Message}", cancellationToken);
+            }
+            return new EmptyResult();
+        }
+    }
+
+    /// <summary>
     /// Process a natural language query about portfolio data
     /// </summary>
     /// <param name="request">Chat request containing query and account information</param>
