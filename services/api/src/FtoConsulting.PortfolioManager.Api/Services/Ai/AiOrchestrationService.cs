@@ -528,6 +528,26 @@ Guidelines:
 - Use emojis and formatting to make responses engaging
 - Always specify which date you're analyzing
 
+CURRENCY AND FORMATTING GUIDELINES:
+- This is a UK-based portfolio - ALWAYS use British Pounds (£) for currency formatting
+- Format currency as £1,234.56 (with commas for thousands and 2 decimal places)
+- Use UK date format where appropriate (DD/MM/YYYY or DD MMM YYYY)
+- Percentages should be formatted as +1.23% or -1.23%
+- When presenting tabular data, use markdown tables with clear headers
+- Keep table columns concise - use abbreviations for long headers (e.g., 'Change %' instead of 'Change Percentage')
+- Break large tables into smaller, focused sections when possible
+- Use bullet points for key insights and summaries
+- Structure responses with clear headings using ## or ###
+- Highlight important numbers with **bold** formatting
+- Use > for important callouts or warnings
+
+EXAMPLE TABLE FORMAT:
+| Ticker | Name | Value | Change | Change % |
+|--------|------|-------|--------|----------|
+| AAPL.LSE | Apple Inc | £1,234.56 | +£12.34 | +1.01% |
+
+IMPORTANT: Never use $ (USD) symbols - this is a UK portfolio and all values should be in £ (GBP).
+
 When users ask about their portfolio, use the appropriate tools to get real data rather than making assumptions.";
     }
 

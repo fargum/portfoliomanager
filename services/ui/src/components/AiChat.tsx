@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Send, Bot, User, AlertCircle, TrendingUp, TrendingDown, Activity, Clock, Lightbulb } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { ChatMessage, ChatState, InsightDto } from '@/types/chat';
@@ -8,9 +10,10 @@ import { ChatMessage, ChatState, InsightDto } from '@/types/chat';
 interface AiChatProps {
   accountId: number;
   className?: string;
+  isVisible?: boolean;
 }
 
-export function AiChat({ accountId, className = '' }: AiChatProps) {
+export function AiChat({ accountId, className = '', isVisible = true }: AiChatProps) {
   const [chatState, setChatState] = useState<ChatState>({
     messages: [
       {
@@ -41,6 +44,13 @@ I can analyze your holdings, market conditions, and provide insights to help you
   useEffect(() => {
     scrollToBottom();
   }, [chatState.messages]);
+
+  // Scroll to bottom when component becomes visible
+  useEffect(() => {
+    if (isVisible) {
+      setTimeout(() => scrollToBottom(), 100);
+    }
+  }, [isVisible]);
 
   const generateMessageId = () => `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -181,9 +191,9 @@ I can analyze your holdings, market conditions, and provide insights to help you
   };
 
   const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
+    return new Intl.NumberFormat('en-GB', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'GBP',
       minimumFractionDigits: 2,
     }).format(value);
   };
@@ -264,7 +274,7 @@ I can analyze your holdings, market conditions, and provide insights to help you
     
     return (
       <div key={message.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
-        <div className={`flex items-start space-x-2 max-w-[80%] ${isUser ? 'flex-row-reverse space-x-reverse' : ''}`}>
+        <div className={`flex items-start space-x-2 max-w-[95%] ${isUser ? 'flex-row-reverse space-x-reverse' : ''}`}>
           {/* Avatar */}
           <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
             isUser ? 'bg-blue-600 text-white' : 
@@ -295,7 +305,110 @@ I can analyze your holdings, market conditions, and provide insights to help you
                   </div>
                 )}
                 
-                <div className="whitespace-pre-wrap">{message.content}</div>
+                {/* Render content with markdown support */}
+                <div className="prose prose-sm max-w-none">
+                  {isUser ? (
+                    <div className="whitespace-pre-wrap text-white">{message.content}</div>
+                  ) : (
+                    <ReactMarkdown 
+                      remarkPlugins={[remarkGfm]}
+                      components={{
+                        table: ({ children }) => (
+                          <div className="chat-table-container">
+                            <table className="chat-table">
+                              {children}
+                            </table>
+                          </div>
+                        ),
+                        thead: ({ children }) => (
+                          <thead>
+                            {children}
+                          </thead>
+                        ),
+                        tbody: ({ children }) => (
+                          <tbody>
+                            {children}
+                          </tbody>
+                        ),
+                        tr: ({ children }) => (
+                          <tr>
+                            {children}
+                          </tr>
+                        ),
+                        th: ({ children }) => (
+                          <th>
+                            {children}
+                          </th>
+                        ),
+                        td: ({ children }) => (
+                          <td>
+                            {children}
+                          </td>
+                        ),
+                        h1: ({ children }) => (
+                          <h1 className="text-xl font-bold text-gray-900 mb-3">
+                            {children}
+                          </h1>
+                        ),
+                        h2: ({ children }) => (
+                          <h2 className="text-lg font-semibold text-gray-900 mb-2">
+                            {children}
+                          </h2>
+                        ),
+                        h3: ({ children }) => (
+                          <h3 className="text-md font-medium text-gray-900 mb-2">
+                            {children}
+                          </h3>
+                        ),
+                        p: ({ children }) => (
+                          <p className="mb-2 text-gray-800">
+                            {children}
+                          </p>
+                        ),
+                        strong: ({ children }) => (
+                          <strong className="font-semibold text-gray-900">
+                            {children}
+                          </strong>
+                        ),
+                        ul: ({ children }) => (
+                          <ul className="list-disc list-inside mb-2 space-y-1">
+                            {children}
+                          </ul>
+                        ),
+                        ol: ({ children }) => (
+                          <ol className="list-decimal list-inside mb-2 space-y-1">
+                            {children}
+                          </ol>
+                        ),
+                        li: ({ children }) => (
+                          <li className="text-gray-800">
+                            {children}
+                          </li>
+                        ),
+                        code: ({ children, ...props }) => (
+                          props.className?.includes('inline') || !props.className ? (
+                            <code className="bg-gray-100 text-gray-800 px-1 py-0.5 rounded text-sm font-mono">
+                              {children}
+                            </code>
+                          ) : (
+                            <pre className="bg-gray-100 text-gray-800 p-3 rounded-lg overflow-x-auto">
+                              <code className="text-sm font-mono">
+                                {children}
+                              </code>
+                            </pre>
+                          )
+                        ),
+                        blockquote: ({ children }) => (
+                          <blockquote className="border-l-4 border-blue-500 pl-4 italic text-gray-700 my-2">
+                            {children}
+                          </blockquote>
+                        ),
+                      }}
+                    >
+                      {message.content}
+                    </ReactMarkdown>
+                  )}
+                </div>
                 
                 {message.portfolioSummary && renderPortfolioSummary(message.portfolioSummary)}
                 

@@ -101,6 +101,47 @@ body {
   @apply bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors;
 }
 
+/* Chat markdown table styling */
+.chat-table-container {
+  @apply overflow-x-auto my-4 rounded-lg border border-gray-200;
+}
+
+.chat-table {
+  @apply min-w-full border-collapse bg-white text-sm;
+}
+
+.chat-table thead {
+  @apply bg-gray-50;
+}
+
+.chat-table thead th {
+  @apply px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200;
+}
+
+.chat-table tbody {
+  @apply divide-y divide-gray-100;
+}
+
+.chat-table tbody tr {
+  @apply hover:bg-gray-50 transition-colors;
+}
+
+.chat-table tbody td {
+  @apply px-3 py-2 text-gray-900 border-b border-gray-100;
+}
+
+/* Responsive table behavior */
+@media (max-width: 768px) {
+  .chat-table-container {
+    @apply text-xs;
+  }
+  
+  .chat-table thead th,
+  .chat-table tbody td {
+    @apply px-2 py-1;
+  }
+}
+
 /* Financial styling utilities */
 .financial-positive {
   color: #10b981;
