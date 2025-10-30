@@ -1,4 +1,4 @@
-// Chat API Types - These match the DTOs from your .NET API
+// Chat API Types - These match the DTOs from the.NET API
 
 export interface ChatRequestDto {
   query: string;

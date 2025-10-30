@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using FtoConsulting.PortfolioManager.Application.Services.Ai;
 
-namespace FtoConsulting.PortfolioManager.Api.Services.Ai.Tools;
+namespace FtoConsulting.PortfolioManager.Application.Services.Ai.Tools;
 
 /// <summary>
 /// MCP tool for portfolio performance comparison

@@ -31,6 +31,16 @@ public interface IMcpServerService
     /// </summary>
     /// <returns>True if healthy, false otherwise</returns>
     Task<bool> IsHealthyAsync();
+    
+    /// <summary>
+    /// Call a tool on an external MCP server
+    /// </summary>
+    /// <param name="serverId">External MCP server identifier</param>
+    /// <param name="toolName">Name of the tool to execute</param>
+    /// <param name="parameters">Tool parameters</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Tool execution result</returns>
+    Task<object> CallMcpToolAsync(string serverId, string toolName, Dictionary<string, object> parameters, CancellationToken cancellationToken = default);
 }
 
 /// <summary>

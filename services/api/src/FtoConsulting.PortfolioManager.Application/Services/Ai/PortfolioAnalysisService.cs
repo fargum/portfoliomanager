@@ -1,8 +1,9 @@
 using FtoConsulting.PortfolioManager.Application.DTOs.Ai;
 using FtoConsulting.PortfolioManager.Application.Services.Ai;
 using FtoConsulting.PortfolioManager.Application.Services;
+using Microsoft.Extensions.Logging;
 
-namespace FtoConsulting.PortfolioManager.Api.Services.Ai;
+namespace FtoConsulting.PortfolioManager.Application.Services.Ai;
 
 /// <summary>
 /// Implementation of portfolio analysis service for AI-powered insights

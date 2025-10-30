@@ -21,6 +21,11 @@ public class EodApiOptions
     public string BaseUrl { get; set; } = "https://eodhd.com/api";
     
     /// <summary>
+    /// URL for EOD MCP (Model Context Protocol) server
+    /// </summary>
+    public string McpServerUrl { get; set; } = "https://mcp.eodhd.dev/mcp";
+    
+    /// <summary>
     /// Timeout for API requests in seconds
     /// </summary>
     public int TimeoutSeconds { get; set; } = 30;

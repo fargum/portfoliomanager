@@ -33,4 +33,20 @@ public interface IMarketIntelligenceService
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Market sentiment data</returns>
     Task<MarketSentimentDto> GetMarketSentimentAsync(DateTime date, CancellationToken cancellationToken = default);
+    
+    /// <summary>
+    /// Generate an intelligent market summary using AI based on market context
+    /// </summary>
+    /// <param name="tickers">Portfolio tickers to analyze</param>
+    /// <param name="news">Relevant news items</param>
+    /// <param name="sentiment">Market sentiment data</param>
+    /// <param name="indices">Market indices performance</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>AI-generated market summary</returns>
+    Task<string> GenerateMarketSummaryAsync(
+        IEnumerable<string> tickers,
+        IEnumerable<NewsItemDto> news,
+        MarketSentimentDto sentiment,
+        IEnumerable<MarketIndexDto> indices,
+        CancellationToken cancellationToken = default);
 }

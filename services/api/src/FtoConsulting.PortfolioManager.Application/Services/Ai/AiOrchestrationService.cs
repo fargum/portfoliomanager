@@ -11,8 +11,9 @@ using Azure.Identity;
 using Microsoft.Agents.AI;
 using OpenAI;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 
-namespace FtoConsulting.PortfolioManager.Api.Services.Ai;
+namespace FtoConsulting.PortfolioManager.Application.Services.Ai;
 
 /// <summary>
 /// Implementation of AI orchestration service for portfolio queries

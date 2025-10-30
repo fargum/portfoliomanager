@@ -37,6 +37,7 @@ services:
       
       # EOD Historical Data API Configuration
       - EodApi__Token=${EOD_API_TOKEN}
+      - EodApi__McpServerUrl=${EOD_MCP_SERVER_URL:-https://mcp.eodhd.dev/mcp}
       
       # Azure Foundry Inference Endpoint Configuration
       - AzureFoundry__Endpoint=${AZURE_FOUNDRY_ENDPOINT}

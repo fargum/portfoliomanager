@@ -1,4 +1,4 @@
-// API Response Types - These match the flattened DTO from your .NET API
+// API Response Types - These match the flattened DTO from the .NET API
 
 export interface HoldingResponse {
   holdingId: number;
