@@ -86,8 +86,19 @@ public class MarketIntelligenceService : IMarketIntelligenceService
         {
             _logger.LogInformation("Getting market sentiment for {Date}", date);
 
-            // Use the internal method that calls EOD service
-            var sentiment = await GetSentimentAsync(date, Array.Empty<string>());
+            // Use default market tickers for UK/European and US sentiment analysis
+            var defaultTickers = new[] { 
+                // US Market Indices
+                "SPY.US", "QQQ.US", "IWM.US", "VIX.US",
+                // UK Market Indices  
+                "UKX.INDX", "FTSE.INDX", "ISF.LSE", // FTSE 100, FTSE All-Share, iShares Core FTSE 100
+                // European Market Indices
+                "SX5E.INDX", "DAX.INDX", "CAC.INDX", "AEX.INDX", // STOXX 50, DAX, CAC 40, AEX
+                // Major UK/European Stocks
+                "HSBA.LSE", "BP.LSE", "SHEL.LSE", "AZN.LSE", // HSBC, BP, Shell, AstraZeneca
+                "ASML.AS", "NESN.SW", "SAP.DE" // ASML (Netherlands), Nestle (Switzerland), SAP (Germany)
+            };
+            var sentiment = await GetSentimentAsync(date, defaultTickers);
             return sentiment;
         }
         catch (Exception ex)
@@ -187,14 +198,14 @@ Keep the response professional, concise, and actionable for portfolio management
     }
 
     /// <summary>
-    /// Get news data from EOD - throws exception if unavailable
+    /// Get news data from EOD - returns empty collection if unavailable
     /// </summary>
     private async Task<IEnumerable<NewsItemDto>> GetNewsAsync(IEnumerable<string> tickers, DateTime date)
     {
         if (_eodMarketDataToolFactory == null)
         {
-            _logger.LogError("EOD market data tool not configured");
-            throw new InvalidOperationException("News data unavailable: EOD market data service not configured");
+            _logger.LogWarning("EOD market data tool not configured, returning empty news");
+            return Array.Empty<NewsItemDto>();
         }
 
         try
@@ -209,13 +220,13 @@ Keep the response professional, concise, and actionable for portfolio management
             else
             {
                 _logger.LogWarning("No news data returned from EOD for tickers: {Tickers}", string.Join(", ", tickers));
-                throw new InvalidOperationException($"No news data available for tickers: {string.Join(", ", tickers)}");
+                return Array.Empty<NewsItemDto>();
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to retrieve news data from EOD");
-            throw new InvalidOperationException($"News data retrieval failed: {ex.Message}", ex);
+            _logger.LogWarning(ex, "Failed to retrieve news data from EOD (possibly rate limited), returning empty news");
+            return Array.Empty<NewsItemDto>();
         }
     }
 
@@ -226,8 +237,8 @@ Keep the response professional, concise, and actionable for portfolio management
     {
         if (_eodMarketDataToolFactory == null)
         {
-            _logger.LogError("EOD market data tool not configured");
-            throw new InvalidOperationException("Sentiment data unavailable: EOD market data service not configured");
+            _logger.LogWarning("EOD market data tool not configured, using neutral sentiment");
+            return CreateFallbackSentiment();
         }
 
         try
@@ -241,15 +252,30 @@ Keep the response professional, concise, and actionable for portfolio management
             }
             else
             {
-                _logger.LogWarning("No sentiment data returned from EOD for date: {Date}", date);
-                throw new InvalidOperationException($"No sentiment data available for date: {date:yyyy-MM-dd}");
+                _logger.LogWarning("No sentiment data returned from EOD for date: {Date}, using fallback", date);
+                return CreateFallbackSentiment();
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to retrieve sentiment data from EOD");
-            throw new InvalidOperationException($"Sentiment data retrieval failed: {ex.Message}", ex);
+            _logger.LogWarning(ex, "Failed to retrieve sentiment data from EOD (possibly rate limited), using fallback");
+            return CreateFallbackSentiment();
         }
+    }
+
+    /// <summary>
+    /// Create a fallback sentiment when EOD data is unavailable
+    /// </summary>
+    private MarketSentimentDto CreateFallbackSentiment()
+    {
+        return new MarketSentimentDto(
+            Date: DateTime.Now,
+            OverallSentimentScore: 0.5m,
+            SentimentLabel: "Neutral (EOD unavailable)",
+            FearGreedIndex: 50,
+            SectorSentiments: Array.Empty<SectorSentimentDto>(),
+            Indicators: Array.Empty<MarketIndicatorDto>()
+        );
     }
 
     /// <summary>
@@ -259,8 +285,8 @@ Keep the response professional, concise, and actionable for portfolio management
     {
         if (_eodMarketDataToolFactory == null)
         {
-            _logger.LogError("EOD market data tool not configured");
-            throw new InvalidOperationException("Market indices data unavailable: EOD market data service not configured");
+            _logger.LogWarning("EOD market data tool not configured, returning empty indices");
+            return Array.Empty<MarketIndexDto>();
         }
 
         try
@@ -276,13 +302,13 @@ Keep the response professional, concise, and actionable for portfolio management
             else
             {
                 _logger.LogWarning("No indices data returned from EOD for date: {Date}", date);
-                throw new InvalidOperationException($"No market indices data available for date: {date:yyyy-MM-dd}");
+                return Array.Empty<MarketIndexDto>(); // Return empty instead of throwing
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to retrieve indices data from EOD");
-            throw new InvalidOperationException($"Market indices data retrieval failed: {ex.Message}", ex);
+            _logger.LogError(ex, "Failed to retrieve indices data from EOD, returning empty indices");
+            return Array.Empty<MarketIndexDto>(); // Return empty instead of throwing
         }
     }
 }

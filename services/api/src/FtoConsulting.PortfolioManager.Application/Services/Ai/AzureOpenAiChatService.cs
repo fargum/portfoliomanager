@@ -24,7 +24,7 @@ public class AzureOpenAiChatService : IAiChatService
     {
         try
         {
-            var chatClient = _azureOpenAIClient.GetChatClient("gpt-4o");
+            var chatClient = _azureOpenAIClient.GetChatClient("gpt-4o-mini");
             var response = await chatClient.CompleteChatAsync(messages, cancellationToken: cancellationToken);
             return response.Value.Content[0].Text;
         }

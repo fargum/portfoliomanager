@@ -276,8 +276,6 @@ public class AiOrchestrationService : IAiOrchestrationService
 
     private async Task<string> GeneratePerformanceResponse(string query, PortfolioAnalysisDto analysis, DateTime analysisDate)
     {
-        await Task.CompletedTask;
-
         var dateDisplay = analysisDate.ToString("MMMM dd, yyyy");
         var changeIcon = analysis.DayChangePercentage >= 0 ? "📈" : "📉";
         var changeColor = analysis.DayChangePercentage >= 0 ? "positive" : "negative";
@@ -295,9 +293,66 @@ public class AiOrchestrationService : IAiOrchestrationService
         if (analysis.Metrics.BottomPerformers.Any())
         {
             response += $"⚠️ **Underperformers:** {string.Join(", ", analysis.Metrics.BottomPerformers)}\n";
+            
+            // If user is asking specifically about underperformers, provide detailed analysis
+            if (query.ToLower().Contains("lowest") || query.ToLower().Contains("worst") || 
+                query.ToLower().Contains("underperform") || query.ToLower().Contains("poor") ||
+                analysis.Metrics.BottomPerformers.Any(ticker => query.ToUpper().Contains(ticker)))
+            {
+                response += "\n📊 **Detailed Analysis of Underperformers:**\n\n";
+                
+                foreach (var ticker in analysis.Metrics.BottomPerformers)
+                {
+                    var holding = analysis.HoldingPerformance.FirstOrDefault(h => h.Ticker == ticker);
+                    if (holding != null)
+                    {
+                        response += $"**{holding.InstrumentName} ({ticker})**\n";
+                        response += $"💵 Current Value: ${holding.CurrentValue:N2}\n";
+                        response += $"📉 Daily Change: ${holding.DayChange:N2} ({holding.DayChangePercentage:P2})\n";
+                        response += $"📊 Total Return: ${holding.TotalReturn:N2} ({holding.TotalReturnPercentage:P2})\n";
+                        
+                        // Get detailed market context for this specific ticker
+                        try
+                        {
+                            var tickerArray = ConvertTickersForEodCompatibility(new List<string> { ticker });
+                            var marketContext = await _marketIntelligenceService.GetMarketContextAsync(tickerArray, analysisDate);
+                            
+                            if (marketContext.RelevantNews.Any())
+                            {
+                                response += $"\n📰 **Recent News & Analysis:**\n";
+                                foreach (var news in marketContext.RelevantNews.Take(2))
+                                {
+                                    response += $"• **{news.Title}**\n";
+                                    if (news.SentimentScore != 0.5m)
+                                    {
+                                        var sentimentEmoji = news.SentimentScore > 0.7m ? "😊" : 
+                                                           news.SentimentScore < 0.3m ? "😟" : "😐";
+                                        response += $"  {sentimentEmoji} Sentiment: {news.SentimentScore:N2}\n";
+                                    }
+                                    
+                                    if (!string.IsNullOrEmpty(news.Summary) && news.Summary.Length > 50)
+                                    {
+                                        var excerpt = news.Summary.Length > 300 ? 
+                                            news.Summary.Substring(0, 300) + "..." : 
+                                            news.Summary;
+                                        response += $"  {excerpt}\n";
+                                    }
+                                    response += "\n";
+                                }
+                            }
+                        }
+                        catch
+                        {
+                            response += "📊 Market analysis temporarily unavailable for this ticker.\n";
+                        }
+                        
+                        response += "\n---\n\n";
+                    }
+                }
+            }
         }
 
-        response += $"\n🎯 **Risk Profile:** {analysis.Metrics.RiskProfile}";
+        response += $"🎯 **Risk Profile:** {analysis.Metrics.RiskProfile}";
 
         return response;
     }
@@ -325,7 +380,10 @@ public class AiOrchestrationService : IAiOrchestrationService
         await Task.CompletedTask;
 
         // Get tickers for market analysis
-        var tickers = analysis.HoldingPerformance.Select(h => h.Ticker).ToList();
+        var portfolioTickers = analysis.HoldingPerformance.Select(h => h.Ticker).ToList();
+        
+        // Convert tickers to EOD-compatible format and add fallbacks
+        var tickers = ConvertTickersForEodCompatibility(portfolioTickers);
         
         try
         {
@@ -338,10 +396,47 @@ public class AiOrchestrationService : IAiOrchestrationService
 
             if (marketContext.RelevantNews.Any())
             {
-                response += "📰 **Recent News:**\n";
-                foreach (var news in marketContext.RelevantNews.Take(3))
+                response += "📰 **Recent News & Analysis:**\n\n";
+                foreach (var news in marketContext.RelevantNews.Take(5))
                 {
-                    response += $"• {news.Title} ({news.Source})\n";
+                    response += $"**{news.Title}**\n";
+                    response += $"*Source: {news.Source} | {news.PublishedDate:MMM dd, yyyy}*\n";
+                    
+                    // Show sentiment if available
+                    if (news.SentimentScore != 0.5m) // Not neutral
+                    {
+                        var sentimentEmoji = news.SentimentScore > 0.7m ? "😊" : 
+                                           news.SentimentScore < 0.3m ? "😟" : "😐";
+                        response += $"{sentimentEmoji} Sentiment: {news.SentimentScore:N2}\n";
+                    }
+                    
+                    // Show key excerpt from content
+                    if (!string.IsNullOrEmpty(news.Summary))
+                    {
+                        var excerpt = news.Summary.Length > 400 ? 
+                            news.Summary.Substring(0, 400) + "..." : 
+                            news.Summary;
+                        response += $"{excerpt}\n";
+                    }
+                    
+                    // Show related tickers if any
+                    if (news.RelatedTickers.Any())
+                    {
+                        response += $"🎯 Related: {string.Join(", ", news.RelatedTickers.Take(3))}\n";
+                    }
+                    
+                    if (!string.IsNullOrEmpty(news.Url))
+                    {
+                        response += $"🔗 [Read more]({news.Url})\n";
+                    }
+                    
+                    response += "\n---\n\n";
+                }
+                
+                // Remove the last separator
+                if (response.EndsWith("---\n\n"))
+                {
+                    response = response.Substring(0, response.Length - 5);
                 }
             }
 
@@ -522,25 +617,63 @@ Your capabilities include:
 
 Guidelines:
 - Always use the current date ({DateTime.Now:yyyy-MM-dd}) unless the user specifies otherwise
-- For historical analysis, try 2025-10-17 which has data available
 - Present financial information clearly with proper formatting
 - Include relevant market context when analyzing performance
 - Provide actionable insights and recommendations
 - Use emojis and formatting to make responses engaging
 - Always specify which date you're analyzing
 
+DETAILED ANALYSIS REQUIREMENTS:
+When analyzing individual instruments or discussing underperformers:
+1. ALWAYS use GetMarketContext to retrieve detailed news and analysis
+2. Include key findings from recent news articles (headlines, sentiment scores, key excerpts)
+3. Highlight important financial metrics mentioned in news (valuations, analyst targets, earnings)
+4. Explain WHY a instruments might be performing poorly based on the news context
+5. Include sentiment analysis and market conditions affecting the instrument
+6. Reference specific events, announcements, or concerns from recent articles
+7. Provide forward-looking insights based on the news analysis
+
+For example, when discussing DGE.LSE performance issues, include details like:
+- DCF analysis and valuation assessments from recent reports
+- Management changes and their impact
+- Regulatory issues or settlements
+- Analyst price target changes
+- Industry trends affecting the company
+
 CURRENCY AND FORMATTING GUIDELINES:
 - This is a UK-based portfolio - ALWAYS use British Pounds (£) for currency formatting
 - Format currency as £1,234.56 (with commas for thousands and 2 decimal places)
 - Use UK date format where appropriate (DD/MM/YYYY or DD MMM YYYY)
 - Percentages should be formatted as +1.23% or -1.23%
-- When presenting tabular data, use markdown tables with clear headers
-- Keep table columns concise - use abbreviations for long headers (e.g., 'Change %' instead of 'Change Percentage')
-- Break large tables into smaller, focused sections when possible
-- Use bullet points for key insights and summaries
+
+MARKDOWN FORMATTING REQUIREMENTS:
+- ALWAYS use proper markdown bullet points with `- ` (dash + space) at the start of each line
+- For sub-bullets, use `  - ` (two spaces + dash + space)
 - Structure responses with clear headings using ## or ###
 - Highlight important numbers with **bold** formatting
 - Use > for important callouts or warnings
+- Leave blank lines between sections for better readability
+- When listing items, each bullet point should be on its own line
+- For numbered lists, use `1. `, `2. `, etc.
+
+RESPONSE STRUCTURE:
+## Main Heading
+Brief introduction paragraph.
+
+### Key Points:
+- First key point with **important numbers** in bold
+- Second key point with relevant details
+- Third key point
+
+### Analysis:
+- Detailed analysis point one
+- Detailed analysis point two
+  - Sub-point if needed
+  - Another sub-point
+
+### Recommendations:
+- Specific actionable recommendation
+- Another recommendation
 
 EXAMPLE TABLE FORMAT:
 | Ticker | Name | Value | Change | Change % |
@@ -619,5 +752,34 @@ When users ask about their portfolio, use the appropriate tools to get real data
             var q when q.Contains("compare") || q.Contains("vs") || q.Contains("versus") || q.Contains("between") => "Comparison",
             _ => "General"
         };
+    }
+
+    /// <summary>
+    /// Convert portfolio tickers to EOD-compatible format with fallbacks
+    /// </summary>
+    private List<string> ConvertTickersForEodCompatibility(List<string> portfolioTickers)
+    {
+        var validTickers = portfolioTickers
+            .Where(t => !string.IsNullOrEmpty(t))
+            .Select(t => t.Trim().ToUpperInvariant())
+            .Where(t => !string.IsNullOrEmpty(t))
+            .ToList();
+
+        // If we have no tickers, provide some default market representatives
+        if (!validTickers.Any())
+        {
+            return new List<string> { "AAPL.US", "MSFT.US", "GOOGL.US", "BP.LSE", "HSBA.LSE", "AZN.LSE" };
+        }
+
+        return validTickers;
+    }
+
+    /// <summary>
+    /// Convert a single ticker to EOD format (removed - using tickers as-is)
+    /// </summary>
+    private string ConvertSingleTickerToEodFormat(string ticker)
+    {
+        // Simply return the ticker as-is after basic cleanup
+        return string.IsNullOrEmpty(ticker) ? string.Empty : ticker.Trim().ToUpperInvariant();
     }
 }

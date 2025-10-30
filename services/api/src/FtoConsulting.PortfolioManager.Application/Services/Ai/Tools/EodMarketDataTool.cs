@@ -52,9 +52,9 @@ public class EodMarketDataTool
 
             var parameters = new Dictionary<string, object>
             {
-                ["symbols"] = string.Join(",", tickers),
-                ["from"] = fromDate.ToString("yyyy-MM-dd"),
-                ["to"] = toDate.ToString("yyyy-MM-dd"),
+                ["ticker"] = string.Join(",", tickers), // Use ticker parameter name from schema
+                ["start_date"] = fromDate.ToString("yyyy-MM-dd"), // Use start_date parameter name
+                ["end_date"] = toDate.ToString("yyyy-MM-dd"), // Use end_date parameter name  
                 ["limit"] = 50
             };
 
@@ -145,7 +145,8 @@ public class EodMarketDataTool
             var parameters = new Dictionary<string, object>
             {
                 ["symbols"] = string.Join(",", tickers),
-                ["date"] = date.ToString("yyyy-MM-dd")
+                ["start_date"] = date.AddDays(-7).ToString("yyyy-MM-dd"), // Get sentiment for past week
+                ["end_date"] = date.ToString("yyyy-MM-dd")
             };
 
             var result = await mcpServerService.CallMcpToolAsync(
@@ -218,25 +219,53 @@ public class EodMarketDataTool
                 {
                     if (item.TryGetProperty("title", out var titleProp) &&
                         item.TryGetProperty("content", out var contentProp) &&
-                        item.TryGetProperty("source", out var sourceProp) &&
                         item.TryGetProperty("date", out var dateProp))
                     {
-                        var sentiment = item.TryGetProperty("sentiment", out var sentimentProp) ? 
-                            sentimentProp.GetDecimal() : 0.5m;
+                        // Get sentiment score from nested sentiment object
+                        var sentimentScore = 0.5m; // Default neutral
+                        if (item.TryGetProperty("sentiment", out var sentimentProp) && 
+                            sentimentProp.ValueKind == JsonValueKind.Object &&
+                            sentimentProp.TryGetProperty("polarity", out var polarityProp))
+                        {
+                            sentimentScore = polarityProp.GetDecimal();
+                        }
 
-                        var symbols = item.TryGetProperty("symbols", out var symbolsProp) ?
-                            symbolsProp.GetString()?.Split(',') ?? Array.Empty<string>() :
-                            Array.Empty<string>();
+                        // Handle symbols array
+                        var symbols = Array.Empty<string>();
+                        if (item.TryGetProperty("symbols", out var symbolsProp) && 
+                            symbolsProp.ValueKind == JsonValueKind.Array)
+                        {
+                            symbols = symbolsProp.EnumerateArray()
+                                .Select(s => s.GetString() ?? "")
+                                .Where(s => !string.IsNullOrEmpty(s))
+                                .ToArray();
+                        }
+
+                        // Extract source from link or use default
+                        var source = "EOD Historical Data";
+                        var url = "";
+                        if (item.TryGetProperty("link", out var linkProp))
+                        {
+                            url = linkProp.GetString() ?? "";
+                            if (!string.IsNullOrEmpty(url) && Uri.TryCreate(url, UriKind.Absolute, out var uri))
+                            {
+                                source = uri.Host;
+                            }
+                        }
 
                         newsList.Add(new NewsItemDto(
                             Title: titleProp.GetString() ?? "",
                             Summary: contentProp.GetString() ?? "",
-                            Source: sourceProp.GetString() ?? "",
+                            Source: source,
                             PublishedDate: DateTime.TryParse(dateProp.GetString(), out var publishedDate) ? publishedDate : DateTime.Now,
-                            Url: item.TryGetProperty("url", out var urlProp) ? urlProp.GetString() ?? "" : "",
+                            Url: url,
                             RelatedTickers: symbols,
-                            SentimentScore: sentiment,
-                            Category: item.TryGetProperty("category", out var categoryProp) ? categoryProp.GetString() ?? "General" : "General"
+                            SentimentScore: sentimentScore,
+                            Category: item.TryGetProperty("tags", out var tagsProp) && 
+                                     tagsProp.ValueKind == JsonValueKind.Array &&
+                                     tagsProp.GetArrayLength() > 0 
+                                     ? tagsProp.EnumerateArray().First().GetString() ?? "General" 
+                                     : "General"
                         ));
                     }
                 }

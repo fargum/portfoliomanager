@@ -12,6 +12,7 @@ using ModelContextProtocol.Server;
 using Azure.AI.OpenAI;
 using Azure;
 using System.ComponentModel;
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 
 namespace FtoConsulting.PortfolioManager.Application.Services.Ai;
@@ -33,6 +34,20 @@ public class McpServerService : IMcpServerService
     private readonly PortfolioAnalysisTool _portfolioAnalysisTool;
     private readonly PortfolioComparisonTool _portfolioComparisonTool;
     private readonly MarketIntelligenceTool _marketIntelligenceTool;
+    
+    // Static session storage to persist across service instances (EOD requires session persistence)
+    private static readonly ConcurrentDictionary<string, string> _eodSessionCache = new();
+    private static readonly SemaphoreSlim _sessionSemaphore = new(1, 1);
+    
+    /// <summary>
+    /// Get the session ID for the EOD MCP server
+    /// </summary>
+    private string? GetEodSessionId() => _eodSessionCache.TryGetValue(_eodApiOptions.McpServerUrl, out var sessionId) ? sessionId : null;
+    
+    /// <summary>
+    /// Set the session ID for the EOD MCP server
+    /// </summary>
+    private void SetEodSessionId(string sessionId) => _eodSessionCache[_eodApiOptions.McpServerUrl] = sessionId;
 
     public McpServerService(
         IHoldingsRetrieval holdingsRetrieval,
@@ -278,13 +293,7 @@ public class McpServerService : IMcpServerService
             // Handle EOD Historical Data MCP server calls
             if (serverId == _eodApiOptions.McpServerUrl)
             {
-                // For now, return a graceful message indicating the service is being configured
-                _logger.LogWarning("EOD MCP server integration is currently being configured - returning graceful fallback");
-                return new { 
-                    message = "EOD Historical Data service is currently being configured. Please check back later.",
-                    status = "service_unavailable",
-                    timestamp = DateTime.UtcNow
-                };
+                return await CallEodMcpServerAsync(toolName, parameters, cancellationToken);
             }
 
             throw new NotSupportedException($"MCP server '{serverId}' is not supported");
@@ -297,7 +306,7 @@ public class McpServerService : IMcpServerService
     }
 
     /// <summary>
-    /// Make HTTP request to EOD Historical Data MCP server
+    /// Make HTTP request to EOD Historical Data MCP server with proper session management
     /// </summary>
     private async Task<object> CallEodMcpServerAsync(string toolName, Dictionary<string, object> parameters, CancellationToken cancellationToken)
     {
@@ -308,16 +317,31 @@ public class McpServerService : IMcpServerService
             throw new InvalidOperationException("Cannot call EOD MCP server: API token not configured");
         }
 
+        // Ensure we have a valid session
+        await EnsureEodSessionAsync(cancellationToken);
+
         try
         {
             using var httpClient = new HttpClient();
             httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
             
-            // Build the EOD MCP server URL with API key parameter as required by their documentation
+            // Build the EOD MCP server URL with API key parameter
             var eodServerUrl = $"{_eodApiOptions.McpServerUrl}?apikey={_eodApiOptions.Token}";
             
-            // Add Accept headers as required by EOD MCP server
+            // Add required headers as per EOD support instructions
             httpClient.DefaultRequestHeaders.Add("Accept", "application/json, text/event-stream");
+            
+            // Add session ID header as specified by EOD support
+            var sessionId = GetEodSessionId();
+            if (!string.IsNullOrEmpty(sessionId))
+            {
+                httpClient.DefaultRequestHeaders.Add("Mcp-Session-Id", sessionId);
+                _logger.LogInformation("Added EOD session ID header: {SessionId}", sessionId);
+            }
+            else
+            {
+                _logger.LogWarning("No session ID available for EOD MCP request");
+            }
 
             // Prepare MCP request payload in proper JSON-RPC 2.0 format
             var mcpRequest = new
@@ -335,8 +359,8 @@ public class McpServerService : IMcpServerService
             var jsonContent = System.Text.Json.JsonSerializer.Serialize(mcpRequest);
             var httpContent = new StringContent(jsonContent, System.Text.Encoding.UTF8, "application/json");
 
-            _logger.LogInformation("Calling EOD MCP server: {Url} with tool {ToolName}, request: {Request}", 
-                eodServerUrl, toolName, jsonContent);
+            _logger.LogInformation("Calling EOD MCP server: {Url} with tool {ToolName}", 
+                eodServerUrl, toolName);
 
             var response = await httpClient.PostAsync(eodServerUrl, httpContent, cancellationToken);
             
@@ -351,56 +375,45 @@ public class McpServerService : IMcpServerService
             var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
             _logger.LogInformation("EOD MCP server response for tool {ToolName}: {Response}", toolName, responseContent);
 
-            // Check if response is Server-Sent Events format
-            if (responseContent.TrimStart().StartsWith("event:", StringComparison.OrdinalIgnoreCase))
-            {
-                _logger.LogInformation("EOD MCP server returned SSE response for tool {ToolName}, parsing data", toolName);
-                
-                // Parse SSE format to extract actual data
-                var lines = responseContent.Split('\n', StringSplitOptions.RemoveEmptyEntries);
-                string? dataContent = null;
-                
-                foreach (var line in lines)
-                {
-                    if (line.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
-                    {
-                        dataContent = line.Substring(5).Trim(); // Remove "data:" prefix
-                        break;
-                    }
-                }
-                
-                if (string.IsNullOrEmpty(dataContent))
-                {
-                    _logger.LogWarning("No data found in SSE response for tool {ToolName}", toolName);
-                    throw new InvalidOperationException($"No data found in SSE response for tool '{toolName}'");
-                }
-                
-                // Try to parse the data content as JSON
-                try
-                {
-                    var sseDataResponse = System.Text.Json.JsonSerializer.Deserialize<object>(dataContent);
-                    return sseDataResponse ?? throw new InvalidOperationException($"Deserialized null response for tool '{toolName}'");
-                }
-                catch (System.Text.Json.JsonException ex)
-                {
-                    _logger.LogError(ex, "Failed to parse SSE data content as JSON for tool {ToolName}: {Data}", toolName, dataContent);
-                    return dataContent; // Return raw data if not JSON
-                }
-            }
-
-            // Handle regular JSON responses
+            // Parse MCP response - handle both SSE and JSON formats
             try
             {
-                // Parse MCP response
-                var mcpResponse = System.Text.Json.JsonSerializer.Deserialize<object>(responseContent);
-                
-                if (mcpResponse == null)
+                // Check if the response is Server-Sent Events format
+                if (responseContent.StartsWith("event: message"))
                 {
-                    _logger.LogError("EOD MCP server returned null response for tool {ToolName}", toolName);
-                    throw new InvalidOperationException($"EOD MCP server returned invalid response for tool '{toolName}'");
+                    // Extract JSON from SSE format
+                    var lines = responseContent.Split('\n');
+                    var dataLine = lines.FirstOrDefault(line => line.StartsWith("data: "));
+                    if (dataLine != null)
+                    {
+                        var jsonData = dataLine.Substring("data: ".Length);
+                        var mcpResponse = System.Text.Json.JsonSerializer.Deserialize<object>(jsonData);
+                        if (mcpResponse == null)
+                        {
+                            _logger.LogError("Failed to deserialize SSE JSON data for tool {ToolName}", toolName);
+                            throw new InvalidOperationException($"Invalid JSON in SSE response for tool '{toolName}'");
+                        }
+                        return mcpResponse;
+                    }
+                    else
+                    {
+                        _logger.LogError("No data line found in SSE response for tool {ToolName}", toolName);
+                        throw new InvalidOperationException($"Invalid SSE response format for tool '{toolName}'");
+                    }
                 }
-                
-                return mcpResponse;
+                else
+                {
+                    // Try to parse as regular JSON
+                    var mcpResponse = System.Text.Json.JsonSerializer.Deserialize<object>(responseContent);
+                    
+                    if (mcpResponse == null)
+                    {
+                        _logger.LogError("EOD MCP server returned null response for tool {ToolName}", toolName);
+                        throw new InvalidOperationException($"EOD MCP server returned invalid response for tool '{toolName}'");
+                    }
+                    
+                    return mcpResponse;
+                }
             }
             catch (System.Text.Json.JsonException ex)
             {
@@ -422,6 +435,109 @@ public class McpServerService : IMcpServerService
         {
             _logger.LogError(ex, "Error calling EOD MCP server for tool {ToolName}", toolName);
             throw new InvalidOperationException($"Failed to call EOD MCP server for tool '{toolName}': {ex.Message}", ex);
+        }
+    }
+
+    /// <summary>
+    /// Ensure we have a valid EOD session ID by sending InitializeRequest as per EOD support instructions
+    /// </summary>
+    private async Task EnsureEodSessionAsync(CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrEmpty(GetEodSessionId()))
+        {
+            return; // Session already exists
+        }
+
+        await _sessionSemaphore.WaitAsync(cancellationToken);
+        try
+        {
+            // Double-check after acquiring lock
+            if (!string.IsNullOrEmpty(GetEodSessionId()))
+            {
+                return;
+            }
+
+            _logger.LogInformation("Initializing EOD MCP session with InitializeRequest");
+
+            // Validate EOD API token is configured
+            if (string.IsNullOrEmpty(_eodApiOptions.Token))
+            {
+                _logger.LogError("EOD API token not configured - cannot initialize session");
+                throw new InvalidOperationException("Cannot initialize EOD MCP session: API token not configured");
+            }
+
+            using var httpClient = new HttpClient();
+            httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
+            
+            // Build the EOD MCP server URL with API key parameter
+            var eodServerUrl = $"{_eodApiOptions.McpServerUrl}?apikey={_eodApiOptions.Token}";
+            
+            httpClient.DefaultRequestHeaders.Add("Accept", "application/json, text/event-stream");
+
+            // Send InitializeRequest as per EOD support instructions
+            var initRequest = new
+            {
+                jsonrpc = "2.0",
+                id = Guid.NewGuid().ToString(),
+                method = "initialize",
+                @params = new
+                {
+                    protocolVersion = "2024-11-05",
+                    capabilities = new
+                    {
+                        tools = new { }
+                    },
+                    clientInfo = new
+                    {
+                        name = "PortfolioManager",
+                        version = "1.0"
+                    }
+                }
+            };
+
+            var jsonContent = System.Text.Json.JsonSerializer.Serialize(initRequest);
+            var httpContent = new StringContent(jsonContent, System.Text.Encoding.UTF8, "application/json");
+
+            _logger.LogInformation("Sending InitializeRequest to EOD MCP server");
+
+            var response = await httpClient.PostAsync(eodServerUrl, httpContent, cancellationToken);
+            
+            if (!response.IsSuccessStatusCode)
+            {
+                var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                _logger.LogError("Failed to initialize EOD MCP session: {StatusCode} - {Error}", 
+                    response.StatusCode, errorContent);
+                throw new InvalidOperationException($"Failed to initialize EOD MCP session: {response.StatusCode} - {errorContent}");
+            }
+
+            // Extract session ID from response header as per EOD support instructions
+            // Try both header name variations (Mcp-Session-Id and mcp-session-id)
+            var sessionId = response.Headers.TryGetValues("Mcp-Session-Id", out var sessionIdValues) 
+                ? sessionIdValues.FirstOrDefault()
+                : response.Headers.TryGetValues("mcp-session-id", out var lowerSessionIdValues)
+                    ? lowerSessionIdValues.FirstOrDefault()
+                    : null;
+
+            if (!string.IsNullOrEmpty(sessionId))
+            {
+                SetEodSessionId(sessionId);
+                _logger.LogInformation("Successfully initialized EOD MCP session with ID: {SessionId}", sessionId);
+                return;
+            }
+
+            // If no session ID in header, log error
+            var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
+            _logger.LogError("EOD MCP server did not return Mcp-Session-Id header. Response: {Response}", responseContent);
+            throw new InvalidOperationException("EOD MCP server did not return required Mcp-Session-Id header in InitializeRequest response");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to initialize EOD MCP session");
+            throw new InvalidOperationException($"Failed to initialize EOD MCP session: {ex.Message}", ex);
+        }
+        finally
+        {
+            _sessionSemaphore.Release();
         }
     }
 
