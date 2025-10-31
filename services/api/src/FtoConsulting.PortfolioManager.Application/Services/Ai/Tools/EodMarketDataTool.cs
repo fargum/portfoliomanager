@@ -75,6 +75,7 @@ public class EodMarketDataTool
 
     /// <summary>
     /// Get real market indices data from EOD Historical Data
+    /// NOTE: DISABLED - Requires upgraded EOD plan for live price data
     /// </summary>
     /// <param name="mcpServerService">MCP server service for making external calls</param>
     /// <param name="indices">Index symbols (e.g., SPY, QQQ, DIA)</param>
@@ -87,35 +88,11 @@ public class EodMarketDataTool
         DateTime date,
         CancellationToken cancellationToken = default)
     {
-        try
-        {
-            _logger.LogInformation("Fetching market indices from EOD: {Indices}", string.Join(", ", indices));
-
-            if (mcpServerService == null)
-            {
-                _logger.LogWarning("MCP server service not available, returning empty indices");
-                return Array.Empty<MarketIndexDto>();
-            }
-
-            var parameters = new Dictionary<string, object>
-            {
-                ["symbols"] = string.Join(",", indices),
-                ["date"] = date.ToString("yyyy-MM-dd")
-            };
-
-            var result = await mcpServerService.CallMcpToolAsync(
-                _eodApiOptions.McpServerUrl,
-                "get_live_price_data",
-                parameters,
-                cancellationToken);
-
-            return ParseIndicesResponse(result);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error fetching market indices from EOD: {Indices}", string.Join(", ", indices));
-            return Array.Empty<MarketIndexDto>();
-        }
+        // DISABLED: get_live_price_data requires upgraded EOD plan
+        _logger.LogInformation("Market indices data disabled - requires upgraded EOD plan for live price data. Indices requested: {Indices}", string.Join(", ", indices));
+        
+        // Return empty collection instead of making EOD call
+        return await Task.FromResult(Array.Empty<MarketIndexDto>());
     }
 
     /// <summary>
@@ -211,7 +188,46 @@ public class EodMarketDataTool
     {
         try
         {
-            if (result is JsonElement jsonElement && jsonElement.ValueKind == JsonValueKind.Array)
+            JsonElement jsonElement;
+            
+            // Handle the nested EOD MCP response structure
+            if (result is JsonElement resultElement && 
+                resultElement.TryGetProperty("content", out var contentArray) && 
+                contentArray.ValueKind == JsonValueKind.Array &&
+                contentArray.GetArrayLength() > 0)
+            {
+                var firstContent = contentArray.EnumerateArray().First();
+                if (firstContent.TryGetProperty("text", out var textProp))
+                {
+                    var newsJsonString = textProp.GetString();
+                    if (!string.IsNullOrEmpty(newsJsonString))
+                    {
+                        jsonElement = JsonSerializer.Deserialize<JsonElement>(newsJsonString);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("EOD news response text is empty");
+                        return Array.Empty<NewsItemDto>();
+                    }
+                }
+                else
+                {
+                    _logger.LogWarning("EOD news response missing text property");
+                    return Array.Empty<NewsItemDto>();
+                }
+            }
+            else if (result is JsonElement directElement && directElement.ValueKind == JsonValueKind.Array)
+            {
+                // Handle direct array response (fallback)
+                jsonElement = directElement;
+            }
+            else
+            {
+                _logger.LogWarning("EOD news response not in expected format: {ResultType}", result?.GetType().Name ?? "null");
+                return Array.Empty<NewsItemDto>();
+            }
+
+            if (jsonElement.ValueKind == JsonValueKind.Array)
             {
                 var newsList = new List<NewsItemDto>();
                 
@@ -270,6 +286,7 @@ public class EodMarketDataTool
                     }
                 }
 
+                _logger.LogInformation("Successfully parsed {NewsCount} news items from EOD", newsList.Count);
                 return newsList;
             }
         }

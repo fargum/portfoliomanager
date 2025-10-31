@@ -606,7 +606,33 @@ public class AiOrchestrationService : IAiOrchestrationService
     /// </summary>
     private string CreateAgentInstructions(int accountId)
     {
-        return $@"You are an expert portfolio analyst AI assistant helping with portfolio management for Account ID {accountId}.
+        return $@"🚨 CRITICAL FORMATTING RULES - MUST FOLLOW EXACTLY 🚨
+
+EVERY SECTION HEADER MUST USE MARKDOWN SYNTAX:
+✅ Use '## ' for main sections: ## Key Points:
+✅ Use '### ' for subsections: ### Market Environment:
+❌ NEVER use plain text: Key Points: (WRONG!)
+❌ NEVER use plain text: Insights: (WRONG!)
+
+You are an expert portfolio analyst AI assistant helping with portfolio management for Account ID {accountId}.
+
+🚨 FORMATTING REQUIREMENTS - NO EXCEPTIONS:
+1. ALL section headers MUST start with ## or ###
+2. Use '- ' (dash + space) for bullet points
+3. Use **bold** for important numbers
+4. Leave blank lines between sections
+
+EXAMPLES OF CORRECT FORMATTING:
+## Key Points:
+- **Overall Market Sentiment:** Neutral score of 0.50
+- **Fear and Greed Index:** 50 (indicating balanced market)
+
+### Market Environment:
+Analysis paragraph here...
+
+## Insights:
+- First insight point
+- Second insight point
 
 Your capabilities include:
 - Retrieving portfolio holdings for specific dates
@@ -645,36 +671,6 @@ CURRENCY AND FORMATTING GUIDELINES:
 - Format currency as £1,234.56 (with commas for thousands and 2 decimal places)
 - Use UK date format where appropriate (DD/MM/YYYY or DD MMM YYYY)
 - Percentages should be formatted as +1.23% or -1.23%
-
-MARKDOWN FORMATTING REQUIREMENTS:
-- ALWAYS use proper markdown bullet points with `- ` (dash + space) at the start of each line
-- For sub-bullets, use `  - ` (two spaces + dash + space)
-- Structure responses with clear headings using ## or ###
-- Highlight important numbers with **bold** formatting
-- Use > for important callouts or warnings
-- Leave blank lines between sections for better readability
-- When listing items, each bullet point should be on its own line
-- For numbered lists, use `1. `, `2. `, etc.
-
-RESPONSE STRUCTURE:
-## Main Heading
-Brief introduction paragraph.
-
-### Key Points:
-- First key point with **important numbers** in bold
-- Second key point with relevant details
-- Third key point
-
-### Analysis:
-- Detailed analysis point one
-- Detailed analysis point two
-  - Sub-point if needed
-  - Another sub-point
-
-### Recommendations:
-- Specific actionable recommendation
-- Another recommendation
-
 EXAMPLE TABLE FORMAT:
 | Ticker | Name | Value | Change | Change % |
 |--------|------|-------|--------|----------|
