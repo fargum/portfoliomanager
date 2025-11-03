@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Diagnostics;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 
 namespace FtoConsulting.PortfolioManager.Application.Services;
@@ -17,6 +18,7 @@ public class PriceFetchingService : IPriceFetching
 {
     private readonly IHoldingRepository _holdingRepository;
     private readonly IInstrumentPriceRepository _instrumentPriceRepository;
+    private readonly IExchangeRateRepository _exchangeRateRepository;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<PriceFetchingService> _logger;
     private readonly EodApiOptions _eodApiOptions;
@@ -24,12 +26,14 @@ public class PriceFetchingService : IPriceFetching
     public PriceFetchingService(
         IHoldingRepository holdingRepository,
         IInstrumentPriceRepository instrumentPriceRepository,
+        IExchangeRateRepository exchangeRateRepository,
         IUnitOfWork unitOfWork,
         ILogger<PriceFetchingService> logger,
         IOptions<EodApiOptions> eodApiOptions)
     {
         _holdingRepository = holdingRepository ?? throw new ArgumentNullException(nameof(holdingRepository));
         _instrumentPriceRepository = instrumentPriceRepository ?? throw new ArgumentNullException(nameof(instrumentPriceRepository));
+        _exchangeRateRepository = exchangeRateRepository ?? throw new ArgumentNullException(nameof(exchangeRateRepository));
         _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _eodApiOptions = eodApiOptions?.Value ?? throw new ArgumentNullException(nameof(eodApiOptions));
@@ -111,23 +115,119 @@ public class PriceFetchingService : IPriceFetching
                     }
                     else
                     {
-                        result.FailedTickers.Add(new FailedPriceData
+                        // No price data available from EOD - try to roll forward previous price
+                        _logger.LogInformation("No current price available for {Ticker}, attempting to roll forward previous price", instrument.Ticker);
+                        
+                        var latestPrice = await _instrumentPriceRepository.GetLatestPriceAsync(instrument.InstrumentId, valuationDate.AddDays(-1), cancellationToken);
+                        
+                        if (latestPrice != null)
                         {
-                            Ticker = instrument.Ticker,
-                            ErrorMessage = "No price data available",
-                            ErrorCode = "NO_DATA"
-                        });
+                            // Roll forward the previous price with updated valuation date
+                            var rolledForwardPrice = new InstrumentPrice
+                            {
+                                InstrumentId = instrument.InstrumentId,
+                                Ticker = latestPrice.Ticker,
+                                ValuationDate = valuationDate, // Use current valuation date
+                                Name = latestPrice.Name,
+                                Price = latestPrice.Price, // Keep same price
+                                Currency = latestPrice.Currency,
+                                Change = 0, // No change since we're rolling forward
+                                ChangePercent = 0, // No change percent
+                                PreviousClose = latestPrice.Price, // Previous close is the same price
+                                Open = latestPrice.Price, // Open is the same price
+                                High = latestPrice.Price, // High is the same price
+                                Low = latestPrice.Price, // Low is the same price
+                                Volume = 0, // No volume for rolled forward price
+                                Market = latestPrice.Market,
+                                MarketStatus = "ROLLED_FORWARD", // Indicate this is a rolled forward price
+                                PriceTimestamp = DateTime.UtcNow,
+                                CreatedAt = DateTime.UtcNow
+                            };
+                            
+                            lock (pricesToPersist)
+                            {
+                                pricesToPersist.Add(rolledForwardPrice);
+                            }
+                            
+                            _logger.LogInformation("Successfully rolled forward price for {Ticker}: {Price} {Currency} from {PreviousDate}", 
+                                instrument.Ticker, latestPrice.Price, latestPrice.Currency, latestPrice.ValuationDate);
+                        }
+                        else
+                        {
+                            // No previous price available either
+                            _logger.LogWarning("No previous price available to roll forward for {Ticker}", instrument.Ticker);
+                            result.FailedTickers.Add(new FailedPriceData
+                            {
+                                Ticker = instrument.Ticker,
+                                ErrorMessage = "No price data available and no previous price to roll forward",
+                                ErrorCode = "NO_DATA"
+                            });
+                        }
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning(ex, "Failed to fetch price for (Ticker: {Ticker})", instrument.Ticker);
-                    result.FailedTickers.Add(new FailedPriceData
+                    _logger.LogWarning(ex, "Failed to fetch price for {Ticker}, attempting to roll forward previous price", instrument.Ticker);
+                    
+                    // Try to roll forward previous price when API call fails
+                    try
                     {
-                        Ticker = instrument.Ticker,
-                        ErrorMessage = ex.Message,
-                        ErrorCode = "FETCH_ERROR"
-                    });
+                        var latestPrice = await _instrumentPriceRepository.GetLatestPriceAsync(instrument.InstrumentId, valuationDate.AddDays(-1), cancellationToken);
+                        
+                        if (latestPrice != null)
+                        {
+                            // Roll forward the previous price with updated valuation date
+                            var rolledForwardPrice = new InstrumentPrice
+                            {
+                                InstrumentId = instrument.InstrumentId,
+                                Ticker = latestPrice.Ticker,
+                                ValuationDate = valuationDate, // Use current valuation date
+                                Name = latestPrice.Name,
+                                Price = latestPrice.Price, // Keep same price
+                                Currency = latestPrice.Currency,
+                                Change = 0, // No change since we're rolling forward
+                                ChangePercent = 0, // No change percent
+                                PreviousClose = latestPrice.Price, // Previous close is the same price
+                                Open = latestPrice.Price, // Open is the same price
+                                High = latestPrice.Price, // High is the same price
+                                Low = latestPrice.Price, // Low is the same price
+                                Volume = 0, // No volume for rolled forward price
+                                Market = latestPrice.Market,
+                                MarketStatus = "ROLLED_FORWARD", // Indicate this is a rolled forward price
+                                PriceTimestamp = DateTime.UtcNow,
+                                CreatedAt = DateTime.UtcNow
+                            };
+                            
+                            lock (pricesToPersist)
+                            {
+                                pricesToPersist.Add(rolledForwardPrice);
+                            }
+                            
+                            _logger.LogInformation("Successfully rolled forward price for {Ticker} after API failure: {Price} {Currency} from {PreviousDate}", 
+                                instrument.Ticker, latestPrice.Price, latestPrice.Currency, latestPrice.ValuationDate);
+                        }
+                        else
+                        {
+                            // No previous price available either
+                            _logger.LogWarning("No previous price available to roll forward for {Ticker} after API failure", instrument.Ticker);
+                            result.FailedTickers.Add(new FailedPriceData
+                            {
+                                Ticker = instrument.Ticker,
+                                ErrorMessage = $"API fetch failed: {ex.Message}. No previous price to roll forward.",
+                                ErrorCode = "FETCH_ERROR"
+                            });
+                        }
+                    }
+                    catch (Exception rollforwardEx)
+                    {
+                        _logger.LogError(rollforwardEx, "Failed to roll forward price for {Ticker}", instrument.Ticker);
+                        result.FailedTickers.Add(new FailedPriceData
+                        {
+                            Ticker = instrument.Ticker,
+                            ErrorMessage = $"API fetch failed: {ex.Message}. Rollforward failed: {rollforwardEx.Message}",
+                            ErrorCode = "FETCH_ERROR"
+                        });
+                    }
                 }
             });
 
@@ -144,6 +244,20 @@ public class PriceFetchingService : IPriceFetching
                 await _unitOfWork.SaveChangesAsync();
                 
                 _logger.LogInformation("Successfully persisted {Count} price records to database", pricesToPersist.Count);
+            }
+
+            // Step 3: Fetch and persist exchange rates for the same valuation date
+            _logger.LogInformation("Fetching exchange rates for valuation date {ValuationDate}", valuationDate);
+            try
+            {
+                var exchangeRateResult = await FetchAndPersistExchangeRatesForDateAsync(valuationDate, cancellationToken);
+                _logger.LogInformation("Exchange rate fetch completed: Success: {SuccessfulRates}, Rolled Forward: {RolledForwardRates}, Failed: {FailedRates}, Duration: {Duration}ms",
+                    exchangeRateResult.SuccessfulRates, exchangeRateResult.RolledForwardRates, exchangeRateResult.FailedRates, exchangeRateResult.FetchDuration.TotalMilliseconds);
+            }
+            catch (Exception exchangeEx)
+            {
+                _logger.LogWarning(exchangeEx, "Failed to fetch exchange rates for {ValuationDate}, but price fetching was successful", valuationDate);
+                // Continue - don't fail the entire operation if exchange rates fail
             }
 
             stopwatch.Stop();
@@ -269,15 +383,240 @@ public class PriceFetchingService : IPriceFetching
         }
     }
 
+    public async Task<ExchangeRateFetchResult> FetchAndPersistExchangeRatesForDateAsync(DateOnly valuationDate, CancellationToken cancellationToken = default)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var result = new ExchangeRateFetchResult
+        {
+            FetchedAt = DateTime.UtcNow
+        };
+
+        var ratesToPersist = new List<ExchangeRate>();
+
+        try
+        {
+            _logger.LogInformation("Starting exchange rate fetch and persist operation for valuation date {ValuationDate}", valuationDate);
+
+            // Define required currency pairs (base currency is always GBP)
+            var requiredCurrencyPairs = new[]
+            {
+                ("USD", "GBP"),
+                ("EUR", "GBP")
+            };
+
+            result.TotalCurrencyPairs = requiredCurrencyPairs.Length;
+
+            // Fetch exchange rates for each currency pair
+            var rateTasks = requiredCurrencyPairs.Select(async currencyPair =>
+            {
+                try
+                {
+                    var (baseCurrency, targetCurrency) = currencyPair;
+                    var rateData = await FetchExchangeRateForPair(baseCurrency, targetCurrency, valuationDate, cancellationToken);
+                    
+                    if (rateData != null)
+                    {
+                        var exchangeRate = new ExchangeRate(
+                            baseCurrency,
+                            targetCurrency,
+                            rateData.Value.rate,
+                            valuationDate,
+                            "EOD"
+                        );
+                        
+                        lock (ratesToPersist)
+                        {
+                            ratesToPersist.Add(exchangeRate);
+                        }
+                        
+                        _logger.LogDebug("Successfully fetched exchange rate for {BaseCurrency}/{TargetCurrency}: {Rate}", 
+                            baseCurrency, targetCurrency, rateData.Value.rate);
+                    }
+                    else
+                    {
+                        // Try to roll forward previous rate
+                        await TryRollForwardExchangeRate(baseCurrency, targetCurrency, valuationDate, ratesToPersist, result, cancellationToken);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to fetch exchange rate for {CurrencyPair}, attempting rollforward", $"{currencyPair.Item1}/{currencyPair.Item2}");
+                    
+                    // Try to roll forward previous rate when API fails
+                    await TryRollForwardExchangeRate(currencyPair.Item1, currencyPair.Item2, valuationDate, ratesToPersist, result, cancellationToken);
+                }
+            });
+
+            // Execute all exchange rate fetching tasks concurrently
+            await Task.WhenAll(rateTasks);
+
+            // Persist the collected rates to database
+            if (ratesToPersist.Any())
+            {
+                _logger.LogInformation("Persisting {Count} exchange rate records to database for valuation date {ValuationDate}", 
+                    ratesToPersist.Count, valuationDate);
+                
+                await _exchangeRateRepository.BulkUpsertAsync(ratesToPersist, cancellationToken);
+                await _unitOfWork.SaveChangesAsync();
+                
+                _logger.LogInformation("Successfully persisted {Count} exchange rate records to database", ratesToPersist.Count);
+            }
+
+            result.SuccessfulRates = ratesToPersist.Count(r => r.Source == "EOD");
+            result.RolledForwardRates = ratesToPersist.Count(r => r.Source == "ROLLED_FORWARD");
+            result.FailedRates = result.TotalCurrencyPairs - result.SuccessfulRates - result.RolledForwardRates;
+
+            stopwatch.Stop();
+            result.FetchDuration = stopwatch.Elapsed;
+
+            _logger.LogInformation("Exchange rate fetch completed for {ValuationDate}. Success: {SuccessfulRates}, Rolled Forward: {RolledForwardRates}, Failed: {FailedRates}, Duration: {Duration}ms",
+                valuationDate, result.SuccessfulRates, result.RolledForwardRates, result.FailedRates, result.FetchDuration.TotalMilliseconds);
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            stopwatch.Stop();
+            result.FetchDuration = stopwatch.Elapsed;
+            _logger.LogError(ex, "Error during exchange rate fetch operation for date {ValuationDate}", valuationDate);
+            throw;
+        }
+    }
+
+    private async Task<(decimal rate, DateTime timestamp)?> FetchExchangeRateForPair(string baseCurrency, string targetCurrency, DateOnly valuationDate, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(_eodApiOptions.Token))
+        {
+            throw new InvalidOperationException("EOD API token is not configured.");
+        }
+
+        try
+        {
+            // EOD Forex endpoint format with date filter: https://eodhd.com/api/eod/USDGBP.FOREX?api_token=TOKEN&fmt=json&from=2023-01-01&to=2023-01-01
+            var forexSymbol = $"{baseCurrency}{targetCurrency}.FOREX";
+            var dateString = valuationDate.ToString("yyyy-MM-dd");
+            var url = $"{_eodApiOptions.BaseUrl}/eod/{forexSymbol}?api_token={_eodApiOptions.Token}&fmt=json&from={dateString}&to={dateString}";
+
+            _logger.LogInformation("Fetching exchange rate for {BaseCurrency}/{TargetCurrency} for date {ValuationDate} from URL: {Url}", 
+                baseCurrency, targetCurrency, valuationDate, url.Replace(_eodApiOptions.Token, "***"));
+
+            using var httpClient = new HttpClient();
+            httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
+
+            var response = await httpClient.GetStringAsync(url, cancellationToken);
+            _logger.LogInformation("EOD FOREX API response for {BaseCurrency}/{TargetCurrency}: {Response}", 
+                baseCurrency, targetCurrency, response.Length > 500 ? response.Substring(0, 500) + "..." : response);
+            
+            var forexData = JsonSerializer.Deserialize<EODHistoricalData[]>(response);
+
+            if (forexData != null && forexData.Length > 0)
+            {
+                var latestRate = forexData[0]; // Should be the rate for the specific date
+                _logger.LogInformation("Successfully parsed exchange rate for {BaseCurrency}/{TargetCurrency}: {Rate} on {Date}", 
+                    baseCurrency, targetCurrency, latestRate.Close, latestRate.Date);
+                return (latestRate.Close, DateTime.Parse(latestRate.Date));
+            }
+
+            _logger.LogWarning("No forex data returned from EOD API for {BaseCurrency}/{TargetCurrency} on {ValuationDate}", baseCurrency, targetCurrency, valuationDate);
+            return null;
+        }
+        catch (HttpRequestException httpEx)
+        {
+            _logger.LogError(httpEx, "HTTP error while fetching exchange rate for {BaseCurrency}/{TargetCurrency}: {Message}", baseCurrency, targetCurrency, httpEx.Message);
+            throw;
+        }
+        catch (TaskCanceledException timeoutEx)
+        {
+            _logger.LogError(timeoutEx, "Timeout while fetching exchange rate for {BaseCurrency}/{TargetCurrency}", baseCurrency, targetCurrency);
+            throw;
+        }
+        catch (JsonException jsonEx)
+        {
+            _logger.LogError(jsonEx, "JSON parsing error while fetching exchange rate for {BaseCurrency}/{TargetCurrency}: {Message}", baseCurrency, targetCurrency, jsonEx.Message);
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Exception while fetching exchange rate for {BaseCurrency}/{TargetCurrency}", baseCurrency, targetCurrency);
+            throw;
+        }
+    }
+
+    private async Task TryRollForwardExchangeRate(string baseCurrency, string targetCurrency, DateOnly valuationDate, List<ExchangeRate> ratesToPersist, ExchangeRateFetchResult result, CancellationToken cancellationToken)
+    {
+        try
+        {
+            _logger.LogInformation("No current exchange rate available for {BaseCurrency}/{TargetCurrency}, attempting to roll forward previous rate", baseCurrency, targetCurrency);
+            
+            var latestRate = await _exchangeRateRepository.GetLatestRateAsync(baseCurrency, targetCurrency, valuationDate.AddDays(-1), cancellationToken);
+            
+            if (latestRate != null)
+            {
+                // Roll forward the previous rate with updated valuation date
+                var rolledForwardRate = new ExchangeRate(
+                    baseCurrency,
+                    targetCurrency,
+                    latestRate.Rate, // Keep same rate
+                    valuationDate, // Use current valuation date
+                    "ROLLED_FORWARD"
+                );
+                
+                lock (ratesToPersist)
+                {
+                    ratesToPersist.Add(rolledForwardRate);
+                }
+                
+                _logger.LogInformation("Successfully rolled forward exchange rate for {BaseCurrency}/{TargetCurrency}: {Rate} from {PreviousDate}", 
+                    baseCurrency, targetCurrency, latestRate.Rate, latestRate.RateDate);
+            }
+            else
+            {
+                // No previous rate available either
+                _logger.LogWarning("No previous exchange rate available to roll forward for {BaseCurrency}/{TargetCurrency}", baseCurrency, targetCurrency);
+                result.FailedCurrencyPairs.Add(new FailedExchangeRateData
+                {
+                    BaseCurrency = baseCurrency,
+                    TargetCurrency = targetCurrency,
+                    ErrorMessage = "No exchange rate data available and no previous rate to roll forward",
+                    ErrorCode = "NO_DATA"
+                });
+            }
+        }
+        catch (Exception rollforwardEx)
+        {
+            _logger.LogError(rollforwardEx, "Failed to roll forward exchange rate for {BaseCurrency}/{TargetCurrency}", baseCurrency, targetCurrency);
+            result.FailedCurrencyPairs.Add(new FailedExchangeRateData
+            {
+                BaseCurrency = baseCurrency,
+                TargetCurrency = targetCurrency,
+                ErrorMessage = $"Rollforward failed: {rollforwardEx.Message}",
+                ErrorCode = "ROLLFORWARD_ERROR"
+            });
+        }
+    }
+
     // Data model for EOD Historical Data API response
     private class EODHistoricalData
     {
+        [JsonPropertyName("date")]
         public string Date { get; set; } = string.Empty;
+        
+        [JsonPropertyName("open")]
         public decimal Open { get; set; }
+        
+        [JsonPropertyName("high")]
         public decimal High { get; set; }
+        
+        [JsonPropertyName("low")]
         public decimal Low { get; set; }
+        
+        [JsonPropertyName("close")]
         public decimal Close { get; set; }
+        
+        [JsonPropertyName("adjusted_close")]
         public decimal Adjusted_Close { get; set; }
+        
+        [JsonPropertyName("volume")]
         public long Volume { get; set; }
     }
 }

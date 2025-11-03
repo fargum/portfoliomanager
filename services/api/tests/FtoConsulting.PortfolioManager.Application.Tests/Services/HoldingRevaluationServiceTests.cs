@@ -11,6 +11,7 @@ public class HoldingRevaluationServiceTests
 {
     private readonly Mock<IHoldingRepository> _holdingRepositoryMock;
     private readonly Mock<IInstrumentPriceRepository> _instrumentPriceRepositoryMock;
+    private readonly Mock<ICurrencyConversionService> _currencyConversionServiceMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
     private readonly Mock<ILogger<HoldingRevaluationService>> _loggerMock;
     private readonly HoldingRevaluationService _service;
@@ -19,12 +20,19 @@ public class HoldingRevaluationServiceTests
     {
         _holdingRepositoryMock = new Mock<IHoldingRepository>();
         _instrumentPriceRepositoryMock = new Mock<IInstrumentPriceRepository>();
+        _currencyConversionServiceMock = new Mock<ICurrencyConversionService>();
         _unitOfWorkMock = new Mock<IUnitOfWork>();
         _loggerMock = new Mock<ILogger<HoldingRevaluationService>>();
+        
+        // Setup default currency conversion behavior (GBP to GBP = no conversion)
+        _currencyConversionServiceMock
+            .Setup(x => x.ConvertCurrencyAsync(It.IsAny<decimal>(), "GBP", "GBP", It.IsAny<DateOnly>(), It.IsAny<CancellationToken>()))
+            .ReturnsAsync((decimal amount, string from, string to, DateOnly date, CancellationToken ct) => (amount, 1m, "SAME_CURRENCY"));
         
         _service = new HoldingRevaluationService(
             _holdingRepositoryMock.Object,
             _instrumentPriceRepositoryMock.Object,
+            _currencyConversionServiceMock.Object,
             _unitOfWorkMock.Object,
             _loggerMock.Object);
     }

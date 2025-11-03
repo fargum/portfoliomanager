@@ -21,6 +21,11 @@ public class AzureFoundryOptions
     public string ApiKey { get; set; } = string.Empty;
     
     /// <summary>
+    /// Chat model name to use for AI requests
+    /// </summary>
+    public string ModelName { get; set; } = "gpt-4o-mini";
+    
+    /// <summary>
     /// Timeout for API requests in seconds
     /// </summary>
     public int TimeoutSeconds { get; set; } = 120;

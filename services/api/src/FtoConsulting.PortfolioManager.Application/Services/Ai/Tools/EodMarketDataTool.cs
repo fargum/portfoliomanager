@@ -190,40 +190,76 @@ public class EodMarketDataTool
         {
             JsonElement jsonElement;
             
-            // Handle the nested EOD MCP response structure
-            if (result is JsonElement resultElement && 
-                resultElement.TryGetProperty("content", out var contentArray) && 
-                contentArray.ValueKind == JsonValueKind.Array &&
-                contentArray.GetArrayLength() > 0)
+            if (result is JsonElement resultElement)
             {
-                var firstContent = contentArray.EnumerateArray().First();
-                if (firstContent.TryGetProperty("text", out var textProp))
+                // Handle MCP JSON-RPC response structure - EOD specific format
+                if (resultElement.TryGetProperty("result", out var resultProp) && 
+                    resultProp.TryGetProperty("content", out var contentArray) && 
+                    contentArray.ValueKind == JsonValueKind.Array &&
+                    contentArray.GetArrayLength() > 0)
                 {
-                    var newsJsonString = textProp.GetString();
+                    var firstContent = contentArray.EnumerateArray().First();
+                    if (firstContent.TryGetProperty("text", out var textProp))
+                    {
+                        var newsJsonString = textProp.GetString();
+                        if (!string.IsNullOrEmpty(newsJsonString))
+                        {
+                            _logger.LogInformation("Parsing EOD news from content.text: {Length} characters", newsJsonString.Length);
+                            jsonElement = JsonSerializer.Deserialize<JsonElement>(newsJsonString);
+                            _logger.LogInformation("Successfully parsed JSON from content.text, ValueKind: {ValueKind}", jsonElement.ValueKind);
+                        }
+                        else
+                        {
+                            _logger.LogWarning("EOD news response text is empty");
+                            return Array.Empty<NewsItemDto>();
+                        }
+                    }
+                    else
+                    {
+                        _logger.LogWarning("EOD news response missing text property");
+                        return Array.Empty<NewsItemDto>();
+                    }
+                }
+                // Alternative: Try structuredContent.result
+                else if (resultElement.TryGetProperty("result", out var resultProp2) &&
+                         resultProp2.TryGetProperty("structuredContent", out var structuredProp) &&
+                         structuredProp.TryGetProperty("result", out var structuredResultProp))
+                {
+                    var newsJsonString = structuredResultProp.GetString();
                     if (!string.IsNullOrEmpty(newsJsonString))
                     {
+                        _logger.LogInformation("Parsing EOD news from structuredContent.result: {Length} characters", newsJsonString.Length);
                         jsonElement = JsonSerializer.Deserialize<JsonElement>(newsJsonString);
                     }
                     else
                     {
-                        _logger.LogWarning("EOD news response text is empty");
+                        _logger.LogWarning("EOD structuredContent result is empty");
                         return Array.Empty<NewsItemDto>();
                     }
                 }
+                // Handle direct result property with array
+                else if (resultElement.TryGetProperty("result", out var directResultProp) && 
+                         directResultProp.ValueKind == JsonValueKind.Array)
+                {
+                    _logger.LogInformation("Found direct result array in EOD response");
+                    jsonElement = directResultProp;
+                }
+                // Handle direct array response
+                else if (resultElement.ValueKind == JsonValueKind.Array)
+                {
+                    _logger.LogInformation("EOD response is direct array");
+                    jsonElement = resultElement;
+                }
                 else
                 {
-                    _logger.LogWarning("EOD news response missing text property");
+                    _logger.LogWarning("EOD news response structure not recognized. Properties: {Properties}", 
+                        string.Join(", ", resultElement.EnumerateObject().Select(p => p.Name)));
                     return Array.Empty<NewsItemDto>();
                 }
             }
-            else if (result is JsonElement directElement && directElement.ValueKind == JsonValueKind.Array)
-            {
-                // Handle direct array response (fallback)
-                jsonElement = directElement;
-            }
             else
             {
-                _logger.LogWarning("EOD news response not in expected format: {ResultType}", result?.GetType().Name ?? "null");
+                _logger.LogWarning("EOD news response not a JsonElement: {ResultType}", result?.GetType().Name ?? "null");
                 return Array.Empty<NewsItemDto>();
             }
 

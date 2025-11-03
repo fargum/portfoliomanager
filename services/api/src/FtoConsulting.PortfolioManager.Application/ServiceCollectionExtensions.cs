@@ -19,6 +19,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IHoldingsRetrieval, HoldingsRetrievalService>();
         services.AddScoped<IPriceFetching, PriceFetchingService>();
         services.AddScoped<IHoldingRevaluationService, HoldingRevaluationService>();
+        services.AddScoped<ICurrencyConversionService, CurrencyConversionService>();
         
         // Register Azure OpenAI client and AI chat service for dependency injection
         services.AddScoped<AzureOpenAIClient>(serviceProvider =>
@@ -46,7 +47,8 @@ public static class ServiceCollectionExtensions
             }
             
             var logger = serviceProvider.GetRequiredService<ILogger<AzureOpenAiChatService>>();
-            return new AzureOpenAiChatService(azureOpenAIClient, logger);
+            var azureFoundryOptions = serviceProvider.GetRequiredService<IOptions<AzureFoundryOptions>>();
+            return new AzureOpenAiChatService(azureOpenAIClient, azureFoundryOptions, logger);
         });
         
         // Register AI services (now in correct Application layer)

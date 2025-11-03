@@ -39,6 +39,15 @@ public class InstrumentPriceRepository : Repository<InstrumentPrice>, IInstrumen
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<InstrumentPrice?> GetLatestPriceAsync(int instrumentId, DateOnly beforeOrOnDate, CancellationToken cancellationToken = default)
+    {
+        return await _context.Set<InstrumentPrice>()
+            .Include(ip => ip.Instrument)
+            .Where(ip => ip.InstrumentId == instrumentId && ip.ValuationDate <= beforeOrOnDate)
+            .OrderByDescending(ip => ip.ValuationDate)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
     public async Task<int> DeleteByValuationDateAsync(DateOnly valuationDate, CancellationToken cancellationToken = default)
     {
         var pricesToDelete = await _context.Set<InstrumentPrice>()

@@ -306,7 +306,7 @@ I can analyze your holdings, market conditions, and provide insights to help you
                 )}
                 
                 {/* Render content with markdown support */}
-                <div className="prose prose-sm max-w-none">
+                <div className="max-w-none">
                   {isUser ? (
                     <div className="whitespace-pre-wrap text-white">{message.content}</div>
                   ) : (
@@ -371,17 +371,17 @@ I can analyze your holdings, market conditions, and provide insights to help you
                           </strong>
                         ),
                         ul: ({ children }) => (
-                          <ul className="list-disc list-inside mb-2 space-y-1">
+                          <ul className="list-disc list-outside mb-2 ml-4 space-y-0">
                             {children}
                           </ul>
                         ),
                         ol: ({ children }) => (
-                          <ol className="list-decimal list-inside mb-2 space-y-1">
+                          <ol className="list-decimal list-outside mb-2 ml-4 space-y-0">
                             {children}
                           </ol>
                         ),
                         li: ({ children }) => (
-                          <li className="text-gray-800">
+                          <li className="text-gray-800 mb-1">
                             {children}
                           </li>
                         ),

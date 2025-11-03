@@ -33,6 +33,15 @@ public interface IInstrumentPriceRepository : IRepository<InstrumentPrice>
     Task<IEnumerable<InstrumentPrice>> GetByInstrumentAsync(int instrumentId, CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Gets the latest price data for a specific instrument before or on a given date
+    /// </summary>
+    /// <param name="instrumentId">ID of the instrument</param>
+    /// <param name="beforeOrOnDate">Date to search before or on</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Latest instrument price data if found, null otherwise</returns>
+    Task<InstrumentPrice?> GetLatestPriceAsync(int instrumentId, DateOnly beforeOrOnDate, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Deletes all price data for a specific valuation date
     /// </summary>
     /// <param name="valuationDate">Valuation date</param>

@@ -93,8 +93,10 @@ public class AiOrchestrationService : IAiOrchestrationService
 
             _logger.LogInformation("Successfully processed portfolio query using AI agent with MCP tools");
 
+            var cleanedResponse = CleanupMarkdownFormatting(response.Text);
+
             return new ChatResponseDto(
-                Response: response.Text,
+                Response: cleanedResponse,
                 QueryType: DetermineQueryType(query)
             );
         }
@@ -169,7 +171,10 @@ public class AiOrchestrationService : IAiOrchestrationService
 
                 if (!string.IsNullOrEmpty(streamingUpdate.Text))
                 {
-                    await onTokenReceived(streamingUpdate.Text);
+                    // Apply comprehensive markdown cleanup for streaming responses
+                    var cleanedText = CleanupMarkdownFormatting(streamingUpdate.Text);
+                    
+                    await onTokenReceived(cleanedText);
                 }
             }
 
@@ -606,68 +611,28 @@ public class AiOrchestrationService : IAiOrchestrationService
     /// </summary>
     private string CreateAgentInstructions(int accountId)
     {
-        return $@"🚨 CRITICAL FORMATTING RULES - MUST FOLLOW EXACTLY 🚨
+        return $@"You are a financial portfolio analyst for Account ID {accountId}.
 
-EVERY SECTION HEADER MUST USE MARKDOWN SYNTAX:
-✅ Use '## ' for main sections: ## Key Points:
-✅ Use '### ' for subsections: ### Market Environment:
-❌ NEVER use plain text: Key Points: (WRONG!)
-❌ NEVER use plain text: Insights: (WRONG!)
+CRITICAL: Always format responses using proper markdown syntax:
+- Use ## for section headers (## Market Analysis:)
+- Use - for bullet points with content on the same line
+- Never put empty bullet points on separate lines
+- Format: - **Item:** Description here (all on one line)
 
-You are an expert portfolio analyst AI assistant helping with portfolio management for Account ID {accountId}.
+Example format:
+## Recent News:
+- **Article:** Market volatility affects sector
+- **Date:** 2025-11-03
+- **Impact:** Significant price movements observed
 
-🚨 FORMATTING REQUIREMENTS - NO EXCEPTIONS:
-1. ALL section headers MUST start with ## or ###
-2. Use '- ' (dash + space) for bullet points
-3. Use **bold** for important numbers
-4. Leave blank lines between sections
+Your tools: portfolio analysis, market data, financial insights.
+Always use current date {DateTime.Now:yyyy-MM-dd} unless specified.
+Focus on actionable insights with proper UK currency formatting (£).
 
-EXAMPLES OF CORRECT FORMATTING:
-## Key Points:
-- **Overall Market Sentiment:** Neutral score of 0.50
-- **Fear and Greed Index:** 50 (indicating balanced market)
+When analyzing instruments, always use GetMarketContext to retrieve detailed news and analysis.
+Present financial information clearly and provide actionable insights.
 
-### Market Environment:
-Analysis paragraph here...
-
-## Insights:
-- First insight point
-- Second insight point
-
-Your capabilities include:
-- Retrieving portfolio holdings for specific dates
-- Analyzing portfolio performance and generating insights  
-- Comparing portfolio performance between different dates
-- Getting market context and financial news for holdings
-- Analyzing market sentiment
-
-Guidelines:
-- Always use the current date ({DateTime.Now:yyyy-MM-dd}) unless the user specifies otherwise
-- Present financial information clearly with proper formatting
-- Include relevant market context when analyzing performance
-- Provide actionable insights and recommendations
-- Use emojis and formatting to make responses engaging
-- Always specify which date you're analyzing
-
-DETAILED ANALYSIS REQUIREMENTS:
-When analyzing individual instruments or discussing underperformers:
-1. ALWAYS use GetMarketContext to retrieve detailed news and analysis
-2. Include key findings from recent news articles (headlines, sentiment scores, key excerpts)
-3. Highlight important financial metrics mentioned in news (valuations, analyst targets, earnings)
-4. Explain WHY a instruments might be performing poorly based on the news context
-5. Include sentiment analysis and market conditions affecting the instrument
-6. Reference specific events, announcements, or concerns from recent articles
-7. Provide forward-looking insights based on the news analysis
-
-For example, when discussing DGE.LSE performance issues, include details like:
-- DCF analysis and valuation assessments from recent reports
-- Management changes and their impact
-- Regulatory issues or settlements
-- Analyst price target changes
-- Industry trends affecting the company
-
-CURRENCY AND FORMATTING GUIDELINES:
-- This is a UK-based portfolio - ALWAYS use British Pounds (£) for currency formatting
+When users ask about their portfolio, use the appropriate tools to get real data rather than making assumptions.
 - Format currency as £1,234.56 (with commas for thousands and 2 decimal places)
 - Use UK date format where appropriate (DD/MM/YYYY or DD MMM YYYY)
 - Percentages should be formatted as +1.23% or -1.23%
@@ -777,5 +742,77 @@ When users ask about their portfolio, use the appropriate tools to get real data
     {
         // Simply return the ticker as-is after basic cleanup
         return string.IsNullOrEmpty(ticker) ? string.Empty : ticker.Trim().ToUpperInvariant();
+    }
+
+    /// <summary>
+    /// Clean up markdown formatting issues in AI responses
+    /// </summary>
+    private string CleanupMarkdownFormatting(string response)
+    {
+        if (string.IsNullOrEmpty(response))
+            return response;
+
+        // Replace bullet symbols with dashes consistently
+        var cleaned = response
+            .Replace("• ", "- ")
+            .Replace("◦ ", "- ")
+            .Replace("▪ ", "- ");
+
+        // Fix the specific issue: bullet point on separate line from content
+        // Pattern: "•\nArticle:" becomes "- Article:"
+        cleaned = System.Text.RegularExpressions.Regex.Replace(
+            cleaned,
+            @"^[•\-]\s*\n([A-Za-z][^:\n]*:)",
+            "- $1",
+            System.Text.RegularExpressions.RegexOptions.Multiline
+        );
+
+        // Fix standalone bullet points that are followed by content on next line
+        cleaned = System.Text.RegularExpressions.Regex.Replace(
+            cleaned,
+            @"^[•\-]\s*$\n([A-Za-z][^:\n]*:)",
+            "- $1",
+            System.Text.RegularExpressions.RegexOptions.Multiline
+        );
+
+        // Clean up extra newlines that might be left behind
+        cleaned = System.Text.RegularExpressions.Regex.Replace(
+            cleaned,
+            @"\n\n\n+",
+            "\n\n",
+            System.Text.RegularExpressions.RegexOptions.Multiline
+        );
+
+        return cleaned;
+    }
+
+    private string FixBasicFormatting(string response)
+    {
+        if (string.IsNullOrEmpty(response))
+            return response;
+
+        // Replace bullet symbols with dashes
+        var cleaned = response
+            .Replace("• ", "- ")
+            .Replace("◦ ", "- ")
+            .Replace("▪ ", "- ");
+
+        // Simple regex to fix the most common pattern: standalone bullet + header on next line
+        cleaned = System.Text.RegularExpressions.Regex.Replace(
+            cleaned,
+            @"^•\s*\n([A-Za-z][^:\n]*:)\s*$",
+            "## $1",
+            System.Text.RegularExpressions.RegexOptions.Multiline
+        );
+
+        // Fix standalone dashes followed by headers
+        cleaned = System.Text.RegularExpressions.Regex.Replace(
+            cleaned,
+            @"^-\s*\n([A-Za-z][^:\n]*:)\s*$",
+            "## $1",
+            System.Text.RegularExpressions.RegexOptions.Multiline
+        );
+
+        return cleaned;
     }
 }

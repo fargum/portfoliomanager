@@ -1,6 +1,8 @@
 using Azure.AI.OpenAI;
 using OpenAI.Chat;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using FtoConsulting.PortfolioManager.Application.Configuration;
 
 namespace FtoConsulting.PortfolioManager.Application.Services.Ai;
 
@@ -10,13 +12,16 @@ namespace FtoConsulting.PortfolioManager.Application.Services.Ai;
 public class AzureOpenAiChatService : IAiChatService
 {
     private readonly AzureOpenAIClient _azureOpenAIClient;
+    private readonly AzureFoundryOptions _azureFoundryOptions;
     private readonly ILogger<AzureOpenAiChatService> _logger;
 
     public AzureOpenAiChatService(
         AzureOpenAIClient azureOpenAIClient,
+        IOptions<AzureFoundryOptions> azureFoundryOptions,
         ILogger<AzureOpenAiChatService> logger)
     {
         _azureOpenAIClient = azureOpenAIClient;
+        _azureFoundryOptions = azureFoundryOptions.Value;
         _logger = logger;
     }
 
@@ -24,7 +29,7 @@ public class AzureOpenAiChatService : IAiChatService
     {
         try
         {
-            var chatClient = _azureOpenAIClient.GetChatClient("gpt-4o-mini");
+            var chatClient = _azureOpenAIClient.GetChatClient(_azureFoundryOptions.ModelName);
             var response = await chatClient.CompleteChatAsync(messages, cancellationToken: cancellationToken);
             return response.Value.Content[0].Text;
         }

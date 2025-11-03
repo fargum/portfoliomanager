@@ -20,6 +20,7 @@ public class PortfolioManagerDbContext : DbContext
     public DbSet<InstrumentType> InstrumentTypes { get; set; }
     public DbSet<Platform> Platforms { get; set; }
     public DbSet<InstrumentPrice> InstrumentPrices { get; set; }
+    public DbSet<ExchangeRate> ExchangeRates { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
