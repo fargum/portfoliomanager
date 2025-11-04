@@ -230,22 +230,35 @@ public class HoldingRevaluationService : IHoldingRevaluationService
         // Get price for this instrument
         if (!priceDict.TryGetValue(sourceHolding.Instrument.Ticker, out var instrumentPrice))
         {
-            _logger.LogInformation("No price data found for instrument {Ticker} ({Name}) on {ValuationDate}, rolling forward holding with previous valuation", 
+            _logger.LogInformation("No price data found for instrument {Ticker} ({Name}) on {ValuationDate}, rolling forward holding with previous valuation",
                 sourceHolding.Instrument.Ticker, sourceHolding.Instrument.Name, valuationDate);
-            
+
             // Roll forward the holding with the same valuation as the source date
             var rolledForwardHolding = CreateRolledForwardHolding(sourceHolding, valuationDate);
-            
-            _logger.LogInformation("Successfully rolled forward holding for {Ticker}: UnitAmount={UnitAmount}, CurrentValue={CurrentValue} (unchanged from {SourceDate})", 
+
+            _logger.LogInformation("Successfully rolled forward holding for {Ticker}: UnitAmount={UnitAmount}, CurrentValue={CurrentValue} (unchanged from {SourceDate})",
                 sourceHolding.Instrument.Ticker, sourceHolding.UnitAmount, sourceHolding.CurrentValue, DateOnly.FromDateTime(sourceHolding.ValuationDate));
 
             return rolledForwardHolding;
         }
 
+        // Apply scaling factor for proxy instruments
+        // ISF.LSE is a proxy for an underlying instrument that requires price scaling
+        //TO DO: move this to config or db.
+        var scaledPrice = instrumentPrice.Price;
+        if (sourceHolding.Instrument.Ticker.Equals("ISF.LSE", StringComparison.OrdinalIgnoreCase))
+        {
+            const decimal ISF_SCALING_FACTOR = 3.362m;
+            scaledPrice = instrumentPrice.Price * ISF_SCALING_FACTOR;
+            
+            _logger.LogInformation("Applied scaling factor {ScalingFactor} to {Ticker}: Original price={OriginalPrice}, Scaled price={ScaledPrice}", 
+                ISF_SCALING_FACTOR, sourceHolding.Instrument.Ticker, instrumentPrice.Price, scaledPrice);
+        }
+
         // Calculate current value considering quote unit and currency conversion
         var currentValue = await CalculateCurrentValueAsync(
             sourceHolding.UnitAmount, 
-            instrumentPrice.Price, 
+            scaledPrice, // Use scaled price instead of raw price
             sourceHolding.Instrument.QuoteUnit,
             instrumentPrice.Currency,
             valuationDate);
@@ -256,8 +269,8 @@ public class HoldingRevaluationService : IHoldingRevaluationService
         // Create new holding for the target valuation date
         var revaluedHolding = CreateRevaluedHolding(sourceHolding, valuationDate, currentValue, dailyChange, dailyChangePercentage);
 
-        _logger.LogDebug("Revalued holding for {Ticker}: UnitAmount={UnitAmount}, Price={Price}, CurrentValue={CurrentValue}, DailyChange={DailyChange}", 
-            sourceHolding.Instrument.Ticker, sourceHolding.UnitAmount, instrumentPrice.Price, currentValue, dailyChange);
+        _logger.LogDebug("Revalued holding for {Ticker}: UnitAmount={UnitAmount}, Price={Price}, ScaledPrice={ScaledPrice}, CurrentValue={CurrentValue}, DailyChange={DailyChange}", 
+            sourceHolding.Instrument.Ticker, sourceHolding.UnitAmount, instrumentPrice.Price, scaledPrice, currentValue, dailyChange);
 
         return revaluedHolding;
     }

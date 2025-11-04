@@ -2,6 +2,7 @@ using FtoConsulting.PortfolioManager.Application.Configuration;
 using FtoConsulting.PortfolioManager.Application.Models;
 using FtoConsulting.PortfolioManager.Domain.Entities;
 using FtoConsulting.PortfolioManager.Domain.Repositories;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Diagnostics;
@@ -14,7 +15,7 @@ namespace FtoConsulting.PortfolioManager.Application.Services;
 /// <summary>
 /// Service implementation for fetching market prices using EOD Historical Data
 /// </summary>
-public class PriceFetchingService : IPriceFetching
+public class PriceFetchingService : IPriceFetching, IDisposable
 {
     private readonly IHoldingRepository _holdingRepository;
     private readonly IInstrumentPriceRepository _instrumentPriceRepository;
@@ -22,6 +23,7 @@ public class PriceFetchingService : IPriceFetching
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<PriceFetchingService> _logger;
     private readonly EodApiOptions _eodApiOptions;
+    private readonly SemaphoreSlim _dbSemaphore;
 
     public PriceFetchingService(
         IHoldingRepository holdingRepository,
@@ -37,6 +39,7 @@ public class PriceFetchingService : IPriceFetching
         _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _eodApiOptions = eodApiOptions?.Value ?? throw new ArgumentNullException(nameof(eodApiOptions));
+        _dbSemaphore = new SemaphoreSlim(1, 1); // Allow only 1 concurrent database operation
     }
 
     public async Task<PriceFetchResult> FetchAndPersistPricesForDateAsync(DateOnly valuationDate, CancellationToken cancellationToken = default)
@@ -118,50 +121,59 @@ public class PriceFetchingService : IPriceFetching
                         // No price data available from EOD - try to roll forward previous price
                         _logger.LogInformation("No current price available for {Ticker}, attempting to roll forward previous price", instrument.Ticker);
                         
-                        var latestPrice = await _instrumentPriceRepository.GetLatestPriceAsync(instrument.InstrumentId, valuationDate.AddDays(-1), cancellationToken);
-                        
-                        if (latestPrice != null)
+                        // Use semaphore to ensure thread-safe database access
+                        await _dbSemaphore.WaitAsync(cancellationToken);
+                        try
                         {
-                            // Roll forward the previous price with updated valuation date
-                            var rolledForwardPrice = new InstrumentPrice
-                            {
-                                InstrumentId = instrument.InstrumentId,
-                                Ticker = latestPrice.Ticker,
-                                ValuationDate = valuationDate, // Use current valuation date
-                                Name = latestPrice.Name,
-                                Price = latestPrice.Price, // Keep same price
-                                Currency = latestPrice.Currency,
-                                Change = 0, // No change since we're rolling forward
-                                ChangePercent = 0, // No change percent
-                                PreviousClose = latestPrice.Price, // Previous close is the same price
-                                Open = latestPrice.Price, // Open is the same price
-                                High = latestPrice.Price, // High is the same price
-                                Low = latestPrice.Price, // Low is the same price
-                                Volume = 0, // No volume for rolled forward price
-                                Market = latestPrice.Market,
-                                MarketStatus = "ROLLED_FORWARD", // Indicate this is a rolled forward price
-                                PriceTimestamp = DateTime.UtcNow,
-                                CreatedAt = DateTime.UtcNow
-                            };
+                            var latestPrice = await _instrumentPriceRepository.GetLatestPriceAsync(instrument.InstrumentId, valuationDate.AddDays(-1), cancellationToken);
                             
-                            lock (pricesToPersist)
+                            if (latestPrice != null)
                             {
-                                pricesToPersist.Add(rolledForwardPrice);
+                                // Roll forward the previous price with updated valuation date
+                                var rolledForwardPrice = new InstrumentPrice
+                                {
+                                    InstrumentId = instrument.InstrumentId,
+                                    Ticker = latestPrice.Ticker,
+                                    ValuationDate = valuationDate, // Use current valuation date
+                                    Name = latestPrice.Name,
+                                    Price = latestPrice.Price, // Keep same price
+                                    Currency = latestPrice.Currency,
+                                    Change = 0, // No change since we're rolling forward
+                                    ChangePercent = 0, // No change percent
+                                    PreviousClose = latestPrice.Price, // Previous close is the same price
+                                    Open = latestPrice.Price, // Open is the same price
+                                    High = latestPrice.Price, // High is the same price
+                                    Low = latestPrice.Price, // Low is the same price
+                                    Volume = 0, // No volume for rolled forward price
+                                    Market = latestPrice.Market,
+                                    MarketStatus = "ROLLED_FORWARD", // Indicate this is a rolled forward price
+                                    PriceTimestamp = DateTime.UtcNow,
+                                    CreatedAt = DateTime.UtcNow
+                                };
+                                
+                                lock (pricesToPersist)
+                                {
+                                    pricesToPersist.Add(rolledForwardPrice);
+                                }
+                                
+                                _logger.LogInformation("Successfully rolled forward price for {Ticker}: {Price} {Currency} from {PreviousDate}", 
+                                    instrument.Ticker, latestPrice.Price, latestPrice.Currency, latestPrice.ValuationDate);
                             }
-                            
-                            _logger.LogInformation("Successfully rolled forward price for {Ticker}: {Price} {Currency} from {PreviousDate}", 
-                                instrument.Ticker, latestPrice.Price, latestPrice.Currency, latestPrice.ValuationDate);
-                        }
-                        else
-                        {
-                            // No previous price available either
-                            _logger.LogWarning("No previous price available to roll forward for {Ticker}", instrument.Ticker);
-                            result.FailedTickers.Add(new FailedPriceData
+                            else
                             {
-                                Ticker = instrument.Ticker,
-                                ErrorMessage = "No price data available and no previous price to roll forward",
-                                ErrorCode = "NO_DATA"
-                            });
+                                // No previous price available either
+                                _logger.LogWarning("No previous price available to roll forward for {Ticker}", instrument.Ticker);
+                                result.FailedTickers.Add(new FailedPriceData
+                                {
+                                    Ticker = instrument.Ticker,
+                                    ErrorMessage = "No price data available and no previous price to roll forward",
+                                    ErrorCode = "NO_DATA"
+                                });
+                            }
+                        }
+                        finally
+                        {
+                            _dbSemaphore.Release();
                         }
                     }
                 }
@@ -300,12 +312,13 @@ public class PriceFetchingService : IPriceFetching
                 throw new InvalidOperationException("EOD API token is not configured.");
             }
             
-            // Use direct HTTP call to EOD API endpoint like your working example
-            // Format: https://eodhd.com/api/eod/SYMBOL.EXCHANGE?api_token=TOKEN&fmt=json&order=d
+            // Use direct HTTP call to EOD API endpoint for historical data on specific date
+            // Format: https://eodhd.com/api/eod/SYMBOL.EXCHANGE?api_token=TOKEN&fmt=json&from=YYYY-MM-DD&to=YYYY-MM-DD
             var symbol = ticker.Contains('.') ? ticker : $"{ticker}.LSE"; // Default to LSE if no exchange specified
-            var url = $"{_eodApiOptions.BaseUrl}/eod/{symbol}?api_token={_eodApiOptions.Token}&fmt=json&order=d&period=d";
+            var dateString = valuationDate.ToString("yyyy-MM-dd");
+            var url = $"{_eodApiOptions.BaseUrl}/eod/{symbol}?api_token={_eodApiOptions.Token}&fmt=json&from={dateString}&to={dateString}";
             
-            _logger.LogInformation("Calling EOD API: {Url}", url.Replace(_eodApiOptions.Token, "***"));
+            _logger.LogInformation("Calling EOD API for specific date {ValuationDate}: {Url}", valuationDate, url.Replace(_eodApiOptions.Token, "***"));
             
             using var httpClient = new HttpClient();
             httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
@@ -333,31 +346,40 @@ public class PriceFetchingService : IPriceFetching
                 
                 if (priceData == null || !priceData.Any())
                 {
-                    _logger.LogWarning("No price data returned from EOD API for ISIN {ISIN} (Ticker: {Ticker})", isin, ticker);
+                    _logger.LogWarning("No price data returned from EOD API for ISIN {ISIN} (Ticker: {Ticker}) on date {ValuationDate}. This may be a non-trading day.", 
+                        isin, ticker, valuationDate);
                     return null;
                 }
                 
-                // Get the most recent price data
-                var latestPrice = priceData.First(); // Data is ordered by date descending (order=d)
+                // Get the price data for the requested date (should be only one record when using from/to date range)
+                var requestedDatePrice = priceData.FirstOrDefault(p => 
+                    DateTime.Parse(p.Date).Date == valuationDate.ToDateTime(TimeOnly.MinValue).Date);
+                
+                if (requestedDatePrice == null)
+                {
+                    _logger.LogWarning("No price data available for the specific date {ValuationDate} for {Ticker}. Available dates: {AvailableDates}",
+                        valuationDate, ticker, string.Join(", ", priceData.Select(p => p.Date)));
+                    return null;
+                }
                 
                 // Map the EOD data to our InstrumentPriceData
                 return new InstrumentPriceData
                 {
                     Ticker = ticker,
-                    Price = latestPrice.Close,
+                    Price = requestedDatePrice.Close,
                     Currency = "USD", // EOD typically returns USD for most stocks
                     Symbol = ticker,
                     Name = $"Instrument {ticker}",
-                    Change = latestPrice.Close - latestPrice.Open,
-                    ChangePercent = latestPrice.Open != 0 ? ((latestPrice.Close - latestPrice.Open) / latestPrice.Open) * 100 : null,
-                    PreviousClose = latestPrice.Open,
-                    Open = latestPrice.Open,
-                    High = latestPrice.High,
-                    Low = latestPrice.Low,
-                    Volume = latestPrice.Volume,
+                    Change = requestedDatePrice.Close - requestedDatePrice.Open,
+                    ChangePercent = requestedDatePrice.Open != 0 ? ((requestedDatePrice.Close - requestedDatePrice.Open) / requestedDatePrice.Open) * 100 : null,
+                    PreviousClose = requestedDatePrice.Open,
+                    Open = requestedDatePrice.Open,
+                    High = requestedDatePrice.High,
+                    Low = requestedDatePrice.Low,
+                    Volume = requestedDatePrice.Volume,
                     Market = symbol.Contains('.') ? symbol.Split('.').Last() : "LSE",
                     MarketStatus = "Closed",
-                    Timestamp = DateTime.Parse(latestPrice.Date)
+                    Timestamp = DateTime.Parse(requestedDatePrice.Date)
                 };
             }
             catch (HttpRequestException httpEx)
@@ -618,5 +640,10 @@ public class PriceFetchingService : IPriceFetching
         
         [JsonPropertyName("volume")]
         public long Volume { get; set; }
+    }
+
+    public void Dispose()
+    {
+        _dbSemaphore?.Dispose();
     }
 }
