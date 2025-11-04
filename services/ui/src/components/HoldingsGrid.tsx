@@ -22,6 +22,11 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = ({ accountId }) => {
   const [valuationDate, setValuationDate] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
+  const [filteredTotalValue, setFilteredTotalValue] = useState<number>(0);
+  const [filteredCount, setFilteredCount] = useState<number>(0);
+  const [gridApi, setGridApi] = useState<any>(null);
+  const [isGrouped, setIsGrouped] = useState(false);
+  const [displayData, setDisplayData] = useState<any[]>([]);
 
   const fetchHoldings = useCallback(async () => {
     setLoading(true);
@@ -43,6 +48,50 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = ({ accountId }) => {
       setLoading(false);
     }
   }, [accountId, valuationDate]);
+
+  // Calculate totals from filtered/displayed data
+  const updateFilteredTotals = useCallback(() => {
+    if (!gridApi) return;
+    
+    let totalValue = 0;
+    let count = 0;
+    
+    gridApi.forEachNodeAfterFilter((node: any) => {
+      if (node.data) {
+        totalValue += node.data.currentValue || 0;
+        count++;
+      }
+    });
+    
+    setFilteredTotalValue(totalValue);
+    setFilteredCount(count);
+  }, [gridApi]);
+
+  // Grid event handlers
+  const onGridReady = useCallback((params: any) => {
+    setGridApi(params.api);
+    // Initial calculation
+    setTimeout(() => {
+      let totalValue = 0;
+      let count = 0;
+      
+      params.api.forEachNodeAfterFilter((node: any) => {
+        if (node.data) {
+          totalValue += node.data.currentValue || 0;
+          count++;
+        }
+      });
+      
+      setFilteredTotalValue(totalValue);
+      setFilteredCount(count);
+    }, 100);
+  }, []);
+
+  const onFilterChanged = useCallback(() => {
+    updateFilteredTotals();
+  }, [updateFilteredTotals]);
+
+
 
   useEffect(() => {
     fetchHoldings();
@@ -78,8 +127,17 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = ({ accountId }) => {
             
             {/* Stats */}
             <div className="text-right">
-              <p className="text-xs text-primary-100">Total Value</p>
-              <p className="text-lg font-bold">{formatCurrency(totalValue)}</p>
+              <p className="text-xs text-primary-100">
+                {filteredCount !== holdings.length ? 'Filtered' : 'Total'} Value
+              </p>
+              <p className="text-lg font-bold">
+                {formatCurrency(filteredTotalValue > 0 ? filteredTotalValue : totalValue)}
+              </p>
+              {filteredCount !== holdings.length && (
+                <p className="text-xs text-primary-200">
+                  Total: {formatCurrency(totalValue)}
+                </p>
+              )}
             </div>
             
             <button
@@ -107,18 +165,37 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = ({ accountId }) => {
           </div>
         )}
 
-        {/* Grid Container - Full width with proper scrolling */}
+        {/* Grid Container - Full width with proper scrolling and space for row group panel */}
         <div className="flex-1 w-full px-4 pb-4">
-          <div className="ag-theme-alpine w-full h-full">
+          <div className="ag-theme-alpine w-full h-full" style={{ minHeight: '500px' }}>
             <AgGridReact
               rowData={holdings}
               columnDefs={getHoldingsColumnDefs()}
+              onGridReady={onGridReady}
+              onFilterChanged={onFilterChanged}
               defaultColDef={{
                 sortable: true,
                 filter: true,
                 resizable: true,
                 minWidth: 120,
                 flex: 1, // Allow columns to grow to fill available space
+              }}
+              // Enable aggregation
+              enableRangeSelection={true}
+              aggFuncs={{
+                // Keep basic aggregation functions for selection ranges
+                'sum': (params: any) => {
+                  const values = params.values.filter((val: any) => val != null && !isNaN(val));
+                  return values.reduce((sum: number, val: number) => sum + val, 0);
+                },
+                'avg': (params: any) => {
+                  const values = params.values.filter((val: any) => val != null && !isNaN(val));
+                  if (values.length === 0) return 0;
+                  return values.reduce((sum: number, val: number) => sum + val, 0) / values.length;
+                },
+                'count': (params: any) => {
+                  return params.values.filter((val: any) => val != null).length;
+                }
               }}
               pagination={true}
               paginationPageSize={50}
@@ -131,15 +208,32 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = ({ accountId }) => {
           </div>
         </div>
 
-        {/* Footer Summary */}
+        {/* Footer Summary - Dynamic based on filters */}
         {holdings.length > 0 && (
           <div className="px-4 pb-4">
             <div className="bg-gray-50 rounded-lg p-3">
               <div className="flex justify-between items-center text-sm text-gray-600">
-                <span>Showing {holdings.length} holdings</span>
-                <span className="font-semibold">
-                  Total Portfolio Value: <span className="text-green-600 text-base">{formatCurrency(totalValue)}</span>
-                </span>
+                <div className="flex items-center space-x-4">
+                  <span>
+                    Showing {filteredCount} of {holdings.length} holdings
+                    {filteredCount !== holdings.length && (
+                      <span className="text-blue-600 font-medium"> (filtered)</span>
+                    )}
+                  </span>
+                </div>
+                <div className="flex items-center space-x-6">
+                  {filteredCount !== holdings.length && (
+                    <span className="text-xs text-gray-500">
+                      Total Portfolio: {formatCurrency(totalValue)}
+                    </span>
+                  )}
+                  <span className="font-semibold">
+                    {filteredCount !== holdings.length ? 'Filtered' : 'Total'} Value: 
+                    <span className="text-green-600 text-base ml-1">
+                      {formatCurrency(filteredTotalValue > 0 ? filteredTotalValue : totalValue)}
+                    </span>
+                  </span>
+                </div>
               </div>
             </div>
           </div>

@@ -29,9 +29,9 @@ export const formatDate = (dateString: string): string => {
 // AG Grid column definitions
 export const getHoldingsColumnDefs = (): ColDef<HoldingResponse>[] => [
   {
-    field: 'portfolioName',
-    headerName: 'Portfolio',
-    width: 150,
+    field: 'platformName',
+    headerName: 'Platform',
+    width: 130,
     sortable: true,
     filter: true,
     pinned: 'left',
@@ -124,13 +124,6 @@ export const getHoldingsColumnDefs = (): ColDef<HoldingResponse>[] => [
       fontWeight: 'bold',
       color: params.value >= 0 ? '#10b981' : '#ef4444',
     }),
-  },
-  {
-    field: 'platformName',
-    headerName: 'Platform',
-    width: 130,
-    sortable: true,
-    filter: true,
   },
   {
     field: 'valuationDate',
