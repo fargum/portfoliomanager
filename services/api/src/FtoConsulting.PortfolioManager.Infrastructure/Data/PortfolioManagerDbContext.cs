@@ -21,6 +21,11 @@ public class PortfolioManagerDbContext : DbContext
     public DbSet<Platform> Platforms { get; set; }
     public DbSet<InstrumentPrice> InstrumentPrices { get; set; }
     public DbSet<ExchangeRate> ExchangeRates { get; set; }
+    
+    // Memory entities for AI conversation persistence
+    public DbSet<ConversationThread> ConversationThreads { get; set; }
+    public DbSet<ChatMessage> ChatMessages { get; set; }
+    public DbSet<MemorySummary> MemorySummaries { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
