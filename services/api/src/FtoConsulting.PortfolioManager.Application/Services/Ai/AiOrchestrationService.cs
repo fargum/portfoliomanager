@@ -20,24 +20,15 @@ namespace FtoConsulting.PortfolioManager.Application.Services.Ai;
 /// </summary>
 public class AiOrchestrationService : IAiOrchestrationService
 {
-    private readonly IHoldingsRetrieval _holdingsRetrieval;
-    private readonly IPortfolioAnalysisService _portfolioAnalysisService;
-    private readonly IMarketIntelligenceService _marketIntelligenceService;
     private readonly ILogger<AiOrchestrationService> _logger;
     private readonly AzureFoundryOptions _azureFoundryOptions;
     private readonly IMcpServerService _mcpServerService;
 
     public AiOrchestrationService(
-        IHoldingsRetrieval holdingsRetrieval,
-        IPortfolioAnalysisService portfolioAnalysisService,
-        IMarketIntelligenceService marketIntelligenceService,
         ILogger<AiOrchestrationService> logger,
         IOptions<AzureFoundryOptions> azureFoundryOptions,
         IMcpServerService mcpServerService)
     {
-        _holdingsRetrieval = holdingsRetrieval;
-        _portfolioAnalysisService = portfolioAnalysisService;
-        _marketIntelligenceService = marketIntelligenceService;
         _logger = logger;
         _azureFoundryOptions = azureFoundryOptions.Value;
         _mcpServerService = mcpServerService;
@@ -266,303 +257,6 @@ public class AiOrchestrationService : IAiOrchestrationService
         };
     }
 
-    private async Task<string> GenerateResponseAsync(string query, string queryType, PortfolioAnalysisDto analysis, DateTime analysisDate, CancellationToken cancellationToken)
-    {
-        return queryType switch
-        {
-            "Performance" => await GeneratePerformanceResponse(query, analysis, analysisDate),
-            "Holdings" => await GenerateHoldingsResponse(analysis, analysisDate),
-            "Market" => await GenerateMarketResponse(analysis, analysisDate),
-            "Risk" => await GenerateRiskResponse(analysis),
-            "Comparison" => await GenerateComparisonResponse(analysis, analysisDate),
-            _ => await GenerateGeneralResponse(analysis, analysisDate)
-        };
-    }
-
-    private async Task<string> GeneratePerformanceResponse(string query, PortfolioAnalysisDto analysis, DateTime analysisDate)
-    {
-        var dateDisplay = analysisDate.ToString("MMMM dd, yyyy");
-        var changeIcon = analysis.DayChangePercentage >= 0 ? "📈" : "📉";
-        var changeColor = analysis.DayChangePercentage >= 0 ? "positive" : "negative";
-
-        var response = $"📊 **Portfolio Performance for {dateDisplay}**\n\n";
-        response += $"💰 **Total Value:** ${analysis.TotalValue:N2}\n";
-        response += $"{changeIcon} **Daily Change:** ${analysis.DayChange:N2} ({analysis.DayChangePercentage:P2})\n";
-        response += $"📋 **Holdings:** {analysis.HoldingPerformance.Count()} positions\n\n";
-
-        if (analysis.Metrics.TopPerformers.Any())
-        {
-            response += $"🌟 **Top Performers:** {string.Join(", ", analysis.Metrics.TopPerformers)}\n";
-        }
-
-        if (analysis.Metrics.BottomPerformers.Any())
-        {
-            response += $"⚠️ **Underperformers:** {string.Join(", ", analysis.Metrics.BottomPerformers)}\n";
-            
-            // If user is asking specifically about underperformers, provide detailed analysis
-            if (query.ToLower().Contains("lowest") || query.ToLower().Contains("worst") || 
-                query.ToLower().Contains("underperform") || query.ToLower().Contains("poor") ||
-                analysis.Metrics.BottomPerformers.Any(ticker => query.ToUpper().Contains(ticker)))
-            {
-                response += "\n📊 **Detailed Analysis of Underperformers:**\n\n";
-                
-                foreach (var ticker in analysis.Metrics.BottomPerformers)
-                {
-                    var holding = analysis.HoldingPerformance.FirstOrDefault(h => h.Ticker == ticker);
-                    if (holding != null)
-                    {
-                        response += $"**{holding.InstrumentName} ({ticker})**\n";
-                        response += $"💵 Current Value: ${holding.CurrentValue:N2}\n";
-                        response += $"📉 Daily Change: ${holding.DayChange:N2} ({holding.DayChangePercentage:P2})\n";
-                        response += $"📊 Total Return: ${holding.TotalReturn:N2} ({holding.TotalReturnPercentage:P2})\n";
-                        
-                        // Get detailed market context for this specific ticker
-                        try
-                        {
-                            var tickerArray = ConvertTickersForEodCompatibility(new List<string> { ticker });
-                            var marketContext = await _marketIntelligenceService.GetMarketContextAsync(tickerArray, analysisDate);
-                            
-                            if (marketContext.RelevantNews.Any())
-                            {
-                                response += $"\n📰 **Recent News & Analysis:**\n";
-                                foreach (var news in marketContext.RelevantNews.Take(2))
-                                {
-                                    response += $"• **{news.Title}**\n";
-                                    if (news.SentimentScore != 0.5m)
-                                    {
-                                        var sentimentEmoji = news.SentimentScore > 0.7m ? "😊" : 
-                                                           news.SentimentScore < 0.3m ? "😟" : "😐";
-                                        response += $"  {sentimentEmoji} Sentiment: {news.SentimentScore:N2}\n";
-                                    }
-                                    
-                                    if (!string.IsNullOrEmpty(news.Summary) && news.Summary.Length > 50)
-                                    {
-                                        var excerpt = news.Summary.Length > 300 ? 
-                                            news.Summary.Substring(0, 300) + "..." : 
-                                            news.Summary;
-                                        response += $"  {excerpt}\n";
-                                    }
-                                    response += "\n";
-                                }
-                            }
-                        }
-                        catch
-                        {
-                            response += "📊 Market analysis temporarily unavailable for this ticker.\n";
-                        }
-                        
-                        response += "\n---\n\n";
-                    }
-                }
-            }
-        }
-
-        response += $"🎯 **Risk Profile:** {analysis.Metrics.RiskProfile}";
-
-        return response;
-    }
-
-    private async Task<string> GenerateHoldingsResponse(PortfolioAnalysisDto analysis, DateTime analysisDate)
-    {
-        await Task.CompletedTask;
-
-        var response = $"📋 **Your Portfolio Holdings - {analysisDate:MMMM dd, yyyy}**\n\n";
-        
-        foreach (var holding in analysis.HoldingPerformance.OrderByDescending(h => h.CurrentValue))
-        {
-            var changeIcon = holding.DayChangePercentage >= 0 ? "📈" : "📉";
-            response += $"• **{holding.InstrumentName}** ({holding.Ticker})\n";
-            response += $"  💵 Value: ${holding.CurrentValue:N2} | Units: {holding.UnitAmount:N2}\n";
-            response += $"  {changeIcon} Daily: ${holding.DayChange:N2} ({holding.DayChangePercentage:P2})\n";
-            response += $"  📊 Total Return: ${holding.TotalReturn:N2} ({holding.TotalReturnPercentage:P2})\n\n";
-        }
-
-        return response;
-    }
-
-    private async Task<string> GenerateMarketResponse(PortfolioAnalysisDto analysis, DateTime analysisDate)
-    {
-        await Task.CompletedTask;
-
-        // Get tickers for market analysis
-        var portfolioTickers = analysis.HoldingPerformance.Select(h => h.Ticker).ToList();
-        
-        // Convert tickers to EOD-compatible format and add fallbacks
-        var tickers = ConvertTickersForEodCompatibility(portfolioTickers);
-        
-        try
-        {
-            var marketContext = await _marketIntelligenceService.GetMarketContextAsync(tickers, analysisDate);
-            
-            var response = $"📈 **Market Context for {analysisDate:MMMM dd, yyyy}**\n\n";
-            response += $"🌍 **Market Summary:** {marketContext.MarketSummary}\n\n";
-            response += $"😊 **Sentiment:** {marketContext.Sentiment.SentimentLabel} (Score: {marketContext.Sentiment.OverallSentimentScore:N2})\n";
-            response += $"📊 **Fear & Greed Index:** {marketContext.Sentiment.FearGreedIndex}\n\n";
-
-            if (marketContext.RelevantNews.Any())
-            {
-                response += "📰 **Recent News & Analysis:**\n\n";
-                foreach (var news in marketContext.RelevantNews.Take(5))
-                {
-                    response += $"**{news.Title}**\n";
-                    response += $"*Source: {news.Source} | {news.PublishedDate:MMM dd, yyyy}*\n";
-                    
-                    // Show sentiment if available
-                    if (news.SentimentScore != 0.5m) // Not neutral
-                    {
-                        var sentimentEmoji = news.SentimentScore > 0.7m ? "😊" : 
-                                           news.SentimentScore < 0.3m ? "😟" : "😐";
-                        response += $"{sentimentEmoji} Sentiment: {news.SentimentScore:N2}\n";
-                    }
-                    
-                    // Show key excerpt from content
-                    if (!string.IsNullOrEmpty(news.Summary))
-                    {
-                        var excerpt = news.Summary.Length > 400 ? 
-                            news.Summary.Substring(0, 400) + "..." : 
-                            news.Summary;
-                        response += $"{excerpt}\n";
-                    }
-                    
-                    // Show related tickers if any
-                    if (news.RelatedTickers.Any())
-                    {
-                        response += $"🎯 Related: {string.Join(", ", news.RelatedTickers.Take(3))}\n";
-                    }
-                    
-                    if (!string.IsNullOrEmpty(news.Url))
-                    {
-                        response += $"🔗 [Read more]({news.Url})\n";
-                    }
-                    
-                    response += "\n---\n\n";
-                }
-                
-                // Remove the last separator
-                if (response.EndsWith("---\n\n"))
-                {
-                    response = response.Substring(0, response.Length - 5);
-                }
-            }
-
-            return response;
-        }
-        catch
-        {
-            return "📈 Market analysis is temporarily unavailable. Please try again later.";
-        }
-    }
-
-    private async Task<string> GenerateRiskResponse(PortfolioAnalysisDto analysis)
-    {
-        await Task.CompletedTask;
-
-        var response = $"⚖️ **Portfolio Risk Analysis**\n\n";
-        response += $"🎯 **Risk Profile:** {analysis.Metrics.RiskProfile}\n";
-        response += $"📊 **Daily Volatility:** {analysis.Metrics.DailyVolatility:P2}\n\n";
-
-        // Concentration analysis
-        var totalValue = analysis.TotalValue;
-        var concentrationRisks = analysis.HoldingPerformance
-            .Where(h => h.CurrentValue / totalValue > 0.25m)
-            .ToList();
-
-        if (concentrationRisks.Any())
-        {
-            response += "⚠️ **Concentration Risks:**\n";
-            foreach (var risk in concentrationRisks)
-            {
-                var percentage = (risk.CurrentValue / totalValue) * 100;
-                response += $"• {risk.Ticker}: {percentage:N1}% of portfolio\n";
-            }
-            response += "\n💡 Consider diversifying positions above 25% allocation.\n";
-        }
-        else
-        {
-            response += "✅ **Good diversification** - No single position exceeds 25% allocation.\n";
-        }
-
-        return response;
-    }
-
-    private async Task<string> GenerateComparisonResponse(PortfolioAnalysisDto analysis, DateTime analysisDate)
-    {
-        await Task.CompletedTask;
-
-        try
-        {
-            var previousDate = analysisDate.AddDays(-1);
-            var comparison = await _portfolioAnalysisService.ComparePerformanceAsync(
-                analysis.AccountId, previousDate, analysisDate);
-
-            var response = $"📊 **Portfolio Comparison: {previousDate:MMM dd} vs {analysisDate:MMM dd}**\n\n";
-            response += $"💰 **Value Change:** ${comparison.StartValue:N2} → ${comparison.EndValue:N2}\n";
-            response += $"📈 **Net Change:** ${comparison.TotalChange:N2} ({comparison.TotalChangePercentage:P2})\n\n";
-            response += $"📋 **Trend:** {comparison.Insights.OverallTrend}\n";
-
-            if (comparison.Insights.KeyDrivers.Any())
-            {
-                response += $"\n🔑 **Key Drivers:**\n";
-                foreach (var driver in comparison.Insights.KeyDrivers.Take(3))
-                {
-                    response += $"• {driver}\n";
-                }
-            }
-
-            return response;
-        }
-        catch
-        {
-            return "📊 Portfolio comparison is not available for the requested dates.";
-        }
-    }
-
-    private async Task<string> GenerateGeneralResponse(PortfolioAnalysisDto analysis, DateTime analysisDate)
-    {
-        // Default to performance response for general queries
-        return await GeneratePerformanceResponse("general", analysis, analysisDate);
-    }
-
-    private IEnumerable<InsightDto> GenerateInsights(PortfolioAnalysisDto analysis)
-    {
-        var insights = new List<InsightDto>();
-
-        // Performance insights
-        if (analysis.DayChangePercentage > 0.02m) // > 2%
-        {
-            insights.Add(new InsightDto(
-                Type: "Performance",
-                Title: "Strong Daily Performance",
-                Description: $"Your portfolio gained {analysis.DayChangePercentage:P2} today, outperforming typical market movements.",
-                Severity: "Positive"
-            ));
-        }
-        else if (analysis.DayChangePercentage < -0.02m) // < -2%
-        {
-            insights.Add(new InsightDto(
-                Type: "Performance", 
-                Title: "Notable Daily Decline",
-                Description: $"Your portfolio declined {Math.Abs(analysis.DayChangePercentage):P2} today. Consider reviewing individual holdings.",
-                Severity: "Warning"
-            ));
-        }
-
-        // Concentration insights
-        var topHolding = analysis.HoldingPerformance.OrderByDescending(h => h.CurrentValue).FirstOrDefault();
-        if (topHolding != null && (topHolding.CurrentValue / analysis.TotalValue) > 0.3m)
-        {
-            insights.Add(new InsightDto(
-                Type: "Risk",
-                Title: "High Concentration Risk",
-                Description: $"{topHolding.Ticker} represents a large portion of your portfolio. Consider diversification.",
-                Severity: "Warning",
-                RelatedTickers: new[] { topHolding.Ticker }
-            ));
-        }
-
-        return insights;
-    }
-
     /// <summary>
     /// Create AI functions that connect to our MCP server tools
     /// </summary>
@@ -579,7 +273,7 @@ public class AiOrchestrationService : IAiOrchestrationService
 
             AIFunctionFactory.Create(
                 method: (int accountId, string analysisDate) => CallMcpTool("AnalyzePortfolioPerformance", new { accountId, analysisDate }),
-                name: "AnalyzePortfolioPerformance", 
+                name: "AnalyzePortfolioPerformance",
                 description: "Analyze portfolio performance and generate insights for a specific date"),
 
             AIFunctionFactory.Create(
@@ -715,34 +409,6 @@ When users ask about their portfolio, use the appropriate tools to get real data
         };
     }
 
-    /// <summary>
-    /// Convert portfolio tickers to EOD-compatible format with fallbacks
-    /// </summary>
-    private List<string> ConvertTickersForEodCompatibility(List<string> portfolioTickers)
-    {
-        var validTickers = portfolioTickers
-            .Where(t => !string.IsNullOrEmpty(t))
-            .Select(t => t.Trim().ToUpperInvariant())
-            .Where(t => !string.IsNullOrEmpty(t))
-            .ToList();
-
-        // If we have no tickers, provide some default market representatives
-        if (!validTickers.Any())
-        {
-            return new List<string> { "AAPL.US", "MSFT.US", "GOOGL.US", "BP.LSE", "HSBA.LSE", "AZN.LSE" };
-        }
-
-        return validTickers;
-    }
-
-    /// <summary>
-    /// Convert a single ticker to EOD format (removed - using tickers as-is)
-    /// </summary>
-    private string ConvertSingleTickerToEodFormat(string ticker)
-    {
-        // Simply return the ticker as-is after basic cleanup
-        return string.IsNullOrEmpty(ticker) ? string.Empty : ticker.Trim().ToUpperInvariant();
-    }
 
     /// <summary>
     /// Clean up markdown formatting issues in AI responses
@@ -786,33 +452,4 @@ When users ask about their portfolio, use the appropriate tools to get real data
         return cleaned;
     }
 
-    private string FixBasicFormatting(string response)
-    {
-        if (string.IsNullOrEmpty(response))
-            return response;
-
-        // Replace bullet symbols with dashes
-        var cleaned = response
-            .Replace("• ", "- ")
-            .Replace("◦ ", "- ")
-            .Replace("▪ ", "- ");
-
-        // Simple regex to fix the most common pattern: standalone bullet + header on next line
-        cleaned = System.Text.RegularExpressions.Regex.Replace(
-            cleaned,
-            @"^•\s*\n([A-Za-z][^:\n]*:)\s*$",
-            "## $1",
-            System.Text.RegularExpressions.RegexOptions.Multiline
-        );
-
-        // Fix standalone dashes followed by headers
-        cleaned = System.Text.RegularExpressions.Regex.Replace(
-            cleaned,
-            @"^-\s*\n([A-Za-z][^:\n]*:)\s*$",
-            "## $1",
-            System.Text.RegularExpressions.RegexOptions.Multiline
-        );
-
-        return cleaned;
-    }
-}
+ }
