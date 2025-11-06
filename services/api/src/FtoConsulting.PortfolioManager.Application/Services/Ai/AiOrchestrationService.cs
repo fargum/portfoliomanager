@@ -69,7 +69,7 @@ public class AiOrchestrationService : IAiOrchestrationService
                 new AzureKeyCredential(_azureFoundryOptions.ApiKey));
 
             // Get a chat client for the specific model
-            var chatClient = azureOpenAIClient.GetChatClient("gpt-4o-mini");
+            var chatClient = azureOpenAIClient.GetChatClient(_azureFoundryOptions.ModelName);
             
             _logger.LogInformation("Created Azure OpenAI client and chat client successfully");
             
@@ -143,7 +143,7 @@ public class AiOrchestrationService : IAiOrchestrationService
                 new AzureKeyCredential(_azureFoundryOptions.ApiKey));
 
             // Get a chat client for the specific model
-            var chatClient = azureOpenAIClient.GetChatClient("gpt-4o-mini");
+            var chatClient = azureOpenAIClient.GetChatClient(_azureFoundryOptions.ModelName);
             
             _logger.LogInformation("Created Azure OpenAI client and chat client successfully for streaming");
             

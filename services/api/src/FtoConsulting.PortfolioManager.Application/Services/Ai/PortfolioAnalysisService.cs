@@ -201,15 +201,23 @@ public class PortfolioAnalysisService : IPortfolioAnalysisService
         IEnumerable<Domain.Entities.Holding> startHoldings, 
         IEnumerable<Domain.Entities.Holding> endHoldings)
     {
-        var startDict = startHoldings.ToDictionary(h => h.Instrument?.Ticker ?? "UNKNOWN", h => h);
-        var endDict = endHoldings.ToDictionary(h => h.Instrument?.Ticker ?? "UNKNOWN", h => h);
+        // Create composite keys using ticker + platform to handle same ticker across different platforms
+        var startDict = startHoldings.ToDictionary(
+            h => $"{h.Instrument?.Ticker ?? "UNKNOWN"}|{h.Platform?.Name ?? "UNKNOWN"}", 
+            h => h);
+        var endDict = endHoldings.ToDictionary(
+            h => $"{h.Instrument?.Ticker ?? "UNKNOWN"}|{h.Platform?.Name ?? "UNKNOWN"}", 
+            h => h);
 
-        var allTickers = startDict.Keys.Union(endDict.Keys);
+        var allCompositeKeys = startDict.Keys.Union(endDict.Keys);
 
-        return allTickers.Select(ticker =>
+        return allCompositeKeys.Select(compositeKey =>
         {
-            var startHolding = startDict.GetValueOrDefault(ticker);
-            var endHolding = endDict.GetValueOrDefault(ticker);
+            var startHolding = startDict.GetValueOrDefault(compositeKey);
+            var endHolding = endDict.GetValueOrDefault(compositeKey);
+
+            var ticker = compositeKey.Split('|')[0];
+            var platform = compositeKey.Split('|')[1];
 
             var startValue = startHolding?.CurrentValue ?? 0;
             var endValue = endHolding?.CurrentValue ?? 0;
@@ -227,7 +235,7 @@ public class PortfolioAnalysisService : IPortfolioAnalysisService
             };
 
             return new HoldingComparisonDto(
-                Ticker: ticker,
+                Ticker: platform != "UNKNOWN" ? $"{ticker} ({platform})" : ticker,
                 InstrumentName: endHolding?.Instrument?.Name ?? startHolding?.Instrument?.Name ?? "Unknown",
                 StartValue: startValue,
                 EndValue: endValue,

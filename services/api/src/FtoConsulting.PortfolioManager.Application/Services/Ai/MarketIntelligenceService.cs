@@ -115,6 +115,7 @@ public class MarketIntelligenceService : IMarketIntelligenceService
     /// <param name="news">Relevant news items</param>
     /// <param name="sentiment">Market sentiment data</param>
     /// <param name="indices">Market indices performance</param>
+    /// <param name="wordWeights">News word weights and trending topics (optional)</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>AI-generated market summary</returns>
     public async Task<string> GenerateMarketSummaryAsync(
@@ -230,6 +231,9 @@ Keep the response professional, concise, and actionable for portfolio management
         }
     }
 
+    /// <summary>
+    /// Get news word weights from EOD - returns null if unavailable
+    /// </summary>
     /// <summary>
     /// Get sentiment data from EOD - throws exception if unavailable
     /// </summary>

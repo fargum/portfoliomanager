@@ -50,13 +50,28 @@ public class EodMarketDataTool
                 return Array.Empty<NewsItemDto>();
             }
 
+            // Clean ticker symbols - just remove exchange suffixes
+            var cleanedTickers = tickers.Select(ticker => 
+            {
+                // Remove any exchange suffix (.LSE, .US, .L, etc.)
+                var dotIndex = ticker.LastIndexOf('.');
+                if (dotIndex > 0)
+                {
+                    return ticker.Substring(0, dotIndex);
+                }
+                return ticker;
+            }).ToList();
+
             var parameters = new Dictionary<string, object>
             {
-                ["ticker"] = string.Join(",", tickers), // Use ticker parameter name from schema
-                ["start_date"] = fromDate.ToString("yyyy-MM-dd"), // Use start_date parameter name
-                ["end_date"] = toDate.ToString("yyyy-MM-dd"), // Use end_date parameter name  
-                ["limit"] = 50
+                ["ticker"] = string.Join(",", cleanedTickers), // Use cleaned tickers
+                ["start_date"] = fromDate.ToString("yyyy-MM-dd"), 
+                ["end_date"] = toDate.ToString("yyyy-MM-dd"),  
+                ["limit"] = 10 
             };
+
+            _logger.LogInformation("Using cleaned tickers for news: {CleanedTickers} (original: {OriginalTickers})", 
+                string.Join(",", cleanedTickers), string.Join(",", tickers));
 
             var result = await mcpServerService.CallMcpToolAsync(
                 _eodApiOptions.McpServerUrl, 
@@ -323,7 +338,16 @@ public class EodMarketDataTool
                 }
 
                 _logger.LogInformation("Successfully parsed {NewsCount} news items from EOD", newsList.Count);
-                return newsList;
+                
+                // Limit to 4 news stories to prevent overwhelming the LLM context window
+                var limitedNewsList = newsList.Take(4).ToList();
+                if (limitedNewsList.Count < newsList.Count)
+                {
+                    _logger.LogInformation("Limited news results from {OriginalCount} to {LimitedCount} stories", 
+                        newsList.Count, limitedNewsList.Count);
+                }
+                
+                return limitedNewsList;
             }
         }
         catch (Exception ex)

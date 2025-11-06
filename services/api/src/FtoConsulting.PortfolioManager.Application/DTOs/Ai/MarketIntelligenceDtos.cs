@@ -70,3 +70,40 @@ public record MarketIndicatorDto(
     string Description,
     DateTime Date
 );
+
+/// <summary>
+/// News word weights and trending topics analysis
+/// </summary>
+public record NewsWordWeightsDto(
+    DateTime StartDate,
+    DateTime EndDate,
+    IEnumerable<WordWeightDto> TopPositiveWords,
+    IEnumerable<WordWeightDto> TopNegativeWords,
+    IEnumerable<TrendingTopicDto> TrendingTopics,
+    decimal OverallSentimentScore,
+    string MarketTheme,
+    IEnumerable<string> RelatedTickers
+);
+
+/// <summary>
+/// Individual word weight with sentiment analysis
+/// </summary>
+public record WordWeightDto(
+    string Word,
+    decimal Weight,
+    decimal SentimentScore,
+    int Frequency,
+    string Category
+);
+
+/// <summary>
+/// Trending topic with associated metrics
+/// </summary>
+public record TrendingTopicDto(
+    string Topic,
+    decimal RelevanceScore,
+    decimal SentimentScore,
+    int MentionCount,
+    IEnumerable<string> KeyWords,
+    IEnumerable<string> RelatedSymbols
+);

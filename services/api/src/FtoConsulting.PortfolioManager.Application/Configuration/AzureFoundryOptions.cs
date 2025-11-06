@@ -23,7 +23,7 @@ public class AzureFoundryOptions
     /// <summary>
     /// Chat model name to use for AI requests
     /// </summary>
-    public string ModelName { get; set; } = "gpt-4o-mini";
+    public string ModelName { get; set; } = "gpt-5-mini";
     
     /// <summary>
     /// Timeout for API requests in seconds
