@@ -6,9 +6,16 @@ This document describes the AI agent architecture implemented in the Portfolio M
 
 ## Architecture Diagram
 
-![AI Agent Architecture](../assets/agent-architecture.svg)
+<div align="center">
+  <img src="../assets/agent-architecture.svg" alt="AI Agent Architecture" width="800">
+</div>
 
 *Source: Microsoft Agent Framework Documentation - Used with acknowledgment*
+
+> **Note**: If the diagram above doesn't display correctly in GitHub, you can:
+> 1. View the raw SVG file: [assets/agent-architecture.svg](../assets/agent-architecture.svg)
+> 2. Download and open locally with any SVG viewer
+> 3. The diagram shows the agentic loop pattern with User → Agent → LLM → Tools/MCP integration
 
 ## How This Architecture Maps to Our Implementation
 
