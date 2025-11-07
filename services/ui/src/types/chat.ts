@@ -3,6 +3,7 @@
 export interface ChatRequestDto {
   query: string;
   accountId: number;
+  threadId?: number; // Optional thread ID for memory context
 }
 
 export interface ChatResponseDto {
@@ -11,6 +12,8 @@ export interface ChatResponseDto {
   portfolioSummary?: PortfolioSummaryDto;
   insights?: InsightDto[];
   timestamp?: string;
+  threadId?: number; // Thread ID for memory context
+  threadTitle?: string; // Thread title for display
 }
 
 export interface PortfolioSummaryDto {

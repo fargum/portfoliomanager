@@ -6,7 +6,10 @@ namespace FtoConsulting.PortfolioManager.Application.DTOs.Ai;
 public record ChatRequestDto(
     string Query,
     int AccountId,
-    DateTime? ContextDate = null
+    DateTime? ContextDate = null,
+    int? ThreadId = null,
+    string? ThreadTitle = null,
+    bool CreateNewThread = false
 );
 
 /// <summary>
@@ -16,7 +19,9 @@ public record ChatResponseDto(
     string Response,
     string QueryType,
     PortfolioSummaryDto? PortfolioSummary = null,
-    IEnumerable<InsightDto>? Insights = null
+    IEnumerable<InsightDto>? Insights = null,
+    int? ThreadId = null,
+    string? ThreadTitle = null
 )
 {
     public DateTime Timestamp { get; init; } = DateTime.UtcNow;
@@ -54,4 +59,44 @@ public record InsightDto(
     string Description,
     string Severity,
     IEnumerable<string>? RelatedTickers = null
+);
+
+/// <summary>
+/// Conversation thread DTO
+/// </summary>
+public record ConversationThreadDto(
+    int Id,
+    int AccountId,
+    string ThreadTitle,
+    DateTime LastActivity,
+    bool IsActive,
+    int MessageCount,
+    DateTime CreatedAt
+);
+
+/// <summary>
+/// Thread list response DTO
+/// </summary>
+public record ThreadListResponseDto(
+    IEnumerable<ConversationThreadDto> Threads,
+    int TotalThreads,
+    int ActiveThreads
+);
+
+/// <summary>
+/// Thread creation request DTO
+/// </summary>
+public record CreateThreadRequestDto(
+    int AccountId,
+    string ThreadTitle
+);
+
+/// <summary>
+/// Thread update request DTO
+/// </summary>
+public record UpdateThreadRequestDto(
+    int ThreadId,
+    int AccountId,
+    string? ThreadTitle = null,
+    bool? IsActive = null
 );

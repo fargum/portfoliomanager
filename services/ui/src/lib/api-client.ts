@@ -111,16 +111,18 @@ export class PortfolioApiClient {
     accountId: number, 
     onChunk: (chunk: string) => void,
     onComplete: () => void,
-    onError: (error: string) => void
+    onError: (error: string) => void,
+    threadId?: number
   ): Promise<void> {
     try {
       const url = `${this.baseUrl}/api/ai/chat/stream`;
       
-      console.log(`Sending streaming chat query to: ${url}`);
+      console.log(`Sending streaming chat query to: ${url}`, { threadId });
       
       const requestBody: ChatRequestDto = {
         query,
-        accountId
+        accountId,
+        threadId
       };
 
       const response = await fetch(url, {
@@ -168,15 +170,16 @@ export class PortfolioApiClient {
   /**
    * Send a chat query to the AI assistant
    */
-  async sendChatQuery(query: string, accountId: number): Promise<ApiResponse<ChatResponseDto>> {
+  async sendChatQuery(query: string, accountId: number, threadId?: number): Promise<ApiResponse<ChatResponseDto>> {
     try {
       const url = `${this.baseUrl}/api/ai/chat/query`;
       
-      console.log(`Sending chat query to: ${url}`);
+      console.log(`Sending chat query to: ${url}`, { threadId });
       
       const requestBody: ChatRequestDto = {
         query,
-        accountId
+        accountId,
+        threadId
       };
 
       const response = await fetch(url, {

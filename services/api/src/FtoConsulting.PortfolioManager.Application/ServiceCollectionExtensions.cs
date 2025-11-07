@@ -1,12 +1,14 @@
 using FtoConsulting.PortfolioManager.Application.Services;
 using FtoConsulting.PortfolioManager.Application.Services.Ai;
 using FtoConsulting.PortfolioManager.Application.Services.Ai.Tools;
+using FtoConsulting.PortfolioManager.Application.Services.Memory;
 using FtoConsulting.PortfolioManager.Application.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Azure;
 using Azure.AI.OpenAI;
+using Microsoft.Extensions.AI;
 
 namespace FtoConsulting.PortfolioManager.Application;
 
@@ -54,6 +56,9 @@ public static class ServiceCollectionExtensions
         // Register AI services (now in correct Application layer)
         services.AddScoped<IAiOrchestrationService, AiOrchestrationService>();
         services.AddScoped<IPortfolioAnalysisService, PortfolioAnalysisService>();
+        
+        // Register memory services
+        services.AddScoped<IConversationThreadService, ConversationThreadService>();
         
         // Register MCP Tools first (to avoid circular dependencies)
         services.AddScoped<PortfolioHoldingsTool>();

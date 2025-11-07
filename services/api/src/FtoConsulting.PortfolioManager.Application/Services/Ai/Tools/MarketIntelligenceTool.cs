@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using FtoConsulting.PortfolioManager.Application.Services.Ai;
+using FtoConsulting.PortfolioManager.Application.Utilities;
 
 namespace FtoConsulting.PortfolioManager.Application.Services.Ai.Tools;
 
@@ -18,7 +19,7 @@ public class MarketIntelligenceTool
     [Description("Get market context and news for specific stock tickers")]
     public async Task<object> GetMarketContext(
         [Description("List of stock tickers")] string[] tickers,
-        [Description("Date for market analysis in YYYY-MM-DD format")] string date,
+        [Description("Date for market analysis in various formats (YYYY-MM-DD, DD/MM/YYYY, DD MMMM YYYY, etc.)")] string date,
         CancellationToken cancellationToken = default)
     {
         if (_marketIntelligenceServiceFactory == null)
@@ -27,7 +28,7 @@ public class MarketIntelligenceTool
         }
 
         var marketIntelligenceService = _marketIntelligenceServiceFactory();
-        var parsedDate = DateTime.Parse(date);
+        var parsedDate = DateUtilities.ParseDateTime(date);
         var context = await marketIntelligenceService.GetMarketContextAsync(tickers, parsedDate, cancellationToken);
         
         return new
@@ -41,8 +42,8 @@ public class MarketIntelligenceTool
     [Description("Search for financial news related to specific tickers within a date range")]
     public async Task<object> SearchFinancialNews(
         [Description("List of stock tickers")] string[] tickers,
-        [Description("Start date in YYYY-MM-DD format")] string fromDate,
-        [Description("End date in YYYY-MM-DD format")] string toDate,
+        [Description("Start date in various formats (YYYY-MM-DD, DD/MM/YYYY, DD MMMM YYYY, etc.)")] string fromDate,
+        [Description("End date in various formats (YYYY-MM-DD, DD/MM/YYYY, DD MMMM YYYY, etc.)")] string toDate,
         CancellationToken cancellationToken = default)
     {
         if (_marketIntelligenceServiceFactory == null)
@@ -51,8 +52,8 @@ public class MarketIntelligenceTool
         }
 
         var marketIntelligenceService = _marketIntelligenceServiceFactory();
-        var from = DateTime.Parse(fromDate);
-        var to = DateTime.Parse(toDate);
+        var from = DateUtilities.ParseDateTime(fromDate);
+        var to = DateUtilities.ParseDateTime(toDate);
         var news = await marketIntelligenceService.SearchFinancialNewsAsync(tickers, from, to, cancellationToken);
         
         return new
@@ -66,7 +67,7 @@ public class MarketIntelligenceTool
 
     [Description("Get overall market sentiment and indicators for a specific date")]
     public async Task<object> GetMarketSentiment(
-        [Description("Date for sentiment analysis in YYYY-MM-DD format")] string date,
+        [Description("Date for sentiment analysis in various formats (YYYY-MM-DD, DD/MM/YYYY, DD MMMM YYYY, etc.)")] string date,
         CancellationToken cancellationToken = default)
     {
         if (_marketIntelligenceServiceFactory == null)
@@ -75,7 +76,7 @@ public class MarketIntelligenceTool
         }
 
         var marketIntelligenceService = _marketIntelligenceServiceFactory();
-        var parsedDate = DateTime.Parse(date);
+        var parsedDate = DateUtilities.ParseDateTime(date);
         var sentiment = await marketIntelligenceService.GetMarketSentimentAsync(parsedDate, cancellationToken);
         
         return new

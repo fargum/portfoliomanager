@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using FtoConsulting.PortfolioManager.Application.Services;
+using FtoConsulting.PortfolioManager.Application.Utilities;
 using Microsoft.Extensions.AI;
 
 namespace FtoConsulting.PortfolioManager.Application.Services.Ai.Tools;
@@ -19,10 +20,10 @@ public class PortfolioHoldingsTool
     [Description("Retrieve portfolio holdings for a specific account and date")]
     public async Task<object> GetPortfolioHoldings(
         [Description("Account ID")] int accountId,
-        [Description("Date in YYYY-MM-DD format")] string date,
+        [Description("Date in various formats (YYYY-MM-DD, DD/MM/YYYY, DD MMMM YYYY, etc.)")] string date,
         CancellationToken cancellationToken = default)
     {
-        var parsedDate = DateOnly.Parse(date);
+        var parsedDate = DateUtilities.ParseDate(date);
         var holdings = await _holdingsRetrieval.GetHoldingsByAccountAndDateAsync(accountId, parsedDate, cancellationToken);
         
         return new

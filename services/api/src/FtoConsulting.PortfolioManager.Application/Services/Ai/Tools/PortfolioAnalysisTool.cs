@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using FtoConsulting.PortfolioManager.Application.Services.Ai;
+using FtoConsulting.PortfolioManager.Application.Utilities;
 
 namespace FtoConsulting.PortfolioManager.Application.Services.Ai.Tools;
 
@@ -18,10 +19,10 @@ public class PortfolioAnalysisTool
     [Description("Analyze portfolio performance and generate insights for a specific date")]
     public async Task<object> AnalyzePortfolioPerformance(
         [Description("Account ID")] int accountId,
-        [Description("Analysis date in YYYY-MM-DD format")] string analysisDate,
+        [Description("Analysis date in various formats (YYYY-MM-DD, DD/MM/YYYY, DD MMMM YYYY, etc.)")] string analysisDate,
         CancellationToken cancellationToken = default)
     {
-        var parsedDate = DateTime.Parse(analysisDate);
+        var parsedDate = DateUtilities.ParseDateTime(analysisDate);
         var analysis = await _portfolioAnalysisService.AnalyzePortfolioPerformanceAsync(accountId, parsedDate, cancellationToken);
         
         return new

@@ -1,9 +1,12 @@
 using FtoConsulting.PortfolioManager.Application.DTOs.Ai;
 using FtoConsulting.PortfolioManager.Application.Services.Ai;
 using FtoConsulting.PortfolioManager.Application.Services;
+using FtoConsulting.PortfolioManager.Application.Services.Memory;
 using FtoConsulting.PortfolioManager.Application.Configuration;
+using FtoConsulting.PortfolioManager.Application.Utilities;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.DependencyInjection;
 using System;
 using Azure;
 using Azure.AI.OpenAI;
@@ -23,15 +26,27 @@ public class AiOrchestrationService : IAiOrchestrationService
     private readonly ILogger<AiOrchestrationService> _logger;
     private readonly AzureFoundryOptions _azureFoundryOptions;
     private readonly IMcpServerService _mcpServerService;
+    private readonly IConversationThreadService _conversationThreadService;
+    private readonly IServiceProvider _serviceProvider;
+    private readonly Func<int, int?, System.Text.Json.JsonSerializerOptions?, ChatMessageStore> _chatMessageStoreFactory;
+    private readonly Func<int, IChatClient, AIContextProvider> _memoryContextProviderFactory;
 
     public AiOrchestrationService(
         ILogger<AiOrchestrationService> logger,
         IOptions<AzureFoundryOptions> azureFoundryOptions,
-        IMcpServerService mcpServerService)
+        IMcpServerService mcpServerService,
+        IConversationThreadService conversationThreadService,
+        IServiceProvider serviceProvider,
+        Func<int, int?, System.Text.Json.JsonSerializerOptions?, ChatMessageStore> chatMessageStoreFactory,
+        Func<int, IChatClient, AIContextProvider> memoryContextProviderFactory)
     {
         _logger = logger;
         _azureFoundryOptions = azureFoundryOptions.Value;
         _mcpServerService = mcpServerService;
+        _conversationThreadService = conversationThreadService;
+        _serviceProvider = serviceProvider;
+        _chatMessageStoreFactory = chatMessageStoreFactory;
+        _memoryContextProviderFactory = memoryContextProviderFactory;
     }
 
     public async Task<ChatResponseDto> ProcessPortfolioQueryAsync(string query, int accountId, CancellationToken cancellationToken = default)
@@ -73,9 +88,10 @@ public class AiOrchestrationService : IAiOrchestrationService
                 tools: portfolioTools.ToList());
 
             // Process the query with the AI agent that has access to our MCP tools
+            var currentDataDate = DateUtilities.GetPreviousWorkingDayForApi();
             var chatMessages = new[]
             {
-                new ChatMessage(ChatRole.User, $"User Query: {query}\nAccount ID: {accountId}\nCurrent Date: {DateTime.Now:yyyy-MM-dd}")
+                new ChatMessage(ChatRole.User, $"User Query: {query}\nAccount ID: {accountId}\nData Available As Of: {currentDataDate} (use this date for 'current' or 'today' portfolio checks)")
             };
             
             _logger.LogInformation("Sending request to Azure OpenAI with {MessageCount} messages", chatMessages.Length);
@@ -108,6 +124,92 @@ public class AiOrchestrationService : IAiOrchestrationService
                 Response: "I apologize, but I encountered an issue analyzing your portfolio. Please ensure your account ID is correct and try again.",
                 QueryType: "Error"
             );
+        }
+    }
+
+    public async Task<ChatResponseDto> ProcessPortfolioQueryWithMemoryAsync(string query, int accountId, int? threadId = null, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            _logger.LogInformation("Processing portfolio query with memory for account {AccountId}, thread {ThreadId}: {Query}", 
+                accountId, threadId, query);
+            
+            // Get or create conversation thread
+            var thread = threadId.HasValue 
+                ? await _conversationThreadService.GetThreadByIdAsync(threadId.Value, accountId, cancellationToken)
+                : await _conversationThreadService.GetOrCreateActiveThreadAsync(accountId, cancellationToken);
+
+            if (thread == null)
+            {
+                _logger.LogWarning("Could not get or create thread for account {AccountId}", accountId);
+                // Fallback to non-memory version
+                return await ProcessPortfolioQueryAsync(query, accountId, cancellationToken);
+            }
+
+            // Try to use memory-aware processing
+            try
+            {
+                var response = await ProcessWithMemoryComponents(query, accountId, thread.Id, cancellationToken);
+                return response with { 
+                    ThreadId = thread.Id, 
+                    ThreadTitle = thread.ThreadTitle 
+                };
+            }
+            catch (Exception memoryEx)
+            {
+                _logger.LogWarning(memoryEx, "Memory components failed, falling back to standard processing");
+                var response = await ProcessPortfolioQueryAsync(query, accountId, cancellationToken);
+                return response with { 
+                    ThreadId = thread.Id, 
+                    ThreadTitle = thread.ThreadTitle 
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing portfolio query with memory for account {AccountId}", accountId);
+            
+            return new ChatResponseDto(
+                Response: "I apologize, but I encountered an issue analyzing your portfolio. Please ensure your account ID is correct and try again.",
+                QueryType: "Error"
+            );
+        }
+    }
+
+    public async Task ProcessPortfolioQueryStreamWithMemoryAsync(string query, int accountId, Func<string, Task> onTokenReceived, int? threadId = null, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            _logger.LogInformation("Processing streaming portfolio query with memory for account {AccountId}, thread {ThreadId}: {Query}", 
+                accountId, threadId, query);
+            
+            // Get or create conversation thread
+            var thread = threadId.HasValue 
+                ? await _conversationThreadService.GetThreadByIdAsync(threadId.Value, accountId, cancellationToken)
+                : await _conversationThreadService.GetOrCreateActiveThreadAsync(accountId, cancellationToken);
+
+            if (thread == null)
+            {
+                _logger.LogWarning("Could not get or create thread for account {AccountId}", accountId);
+                await ProcessPortfolioQueryStreamAsync(query, accountId, onTokenReceived, cancellationToken);
+                return;
+            }
+
+            // Try to use memory-aware streaming
+            try
+            {
+                await ProcessStreamingWithMemoryComponents(query, accountId, thread.Id, onTokenReceived, cancellationToken);
+            }
+            catch (Exception memoryEx)
+            {
+                _logger.LogWarning(memoryEx, "Memory components failed, falling back to standard streaming");
+                await ProcessPortfolioQueryStreamAsync(query, accountId, onTokenReceived, cancellationToken);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing streaming portfolio query with memory for account {AccountId}", accountId);
+            await onTokenReceived("I apologize, but I encountered an issue analyzing your portfolio. Please ensure your account ID is correct and try again.");
         }
     }
 
@@ -147,9 +249,10 @@ public class AiOrchestrationService : IAiOrchestrationService
                 tools: portfolioTools.ToList());
 
             // Process the query with streaming using the AI agent
+            var currentDataDate = DateUtilities.GetPreviousWorkingDayForApi();
             var chatMessages = new[]
             {
-                new ChatMessage(ChatRole.User, $"User Query: {query}\nAccount ID: {accountId}\nCurrent Date: {DateTime.Now:yyyy-MM-dd}")
+                new ChatMessage(ChatRole.User, $"User Query: {query}\nAccount ID: {accountId}\nData Available As Of: {currentDataDate} (use this date for 'current' or 'today' portfolio checks)")
             };
             
             _logger.LogInformation("Sending streaming request to Azure OpenAI with {MessageCount} messages", chatMessages.Length);
@@ -307,6 +410,26 @@ public class AiOrchestrationService : IAiOrchestrationService
     {
         return $@"You are a financial portfolio analyst for Account ID {accountId}.
 
+TOOL USAGE GUIDELINES:
+Only use portfolio tools when users explicitly request:
+- Portfolio analysis, holdings, or performance data
+- Market information, news, or financial insights
+- Stock prices, valuations, or market context
+- Investment recommendations or financial advice
+
+For general conversation, introductions, greetings, or simple questions, respond naturally without invoking any tools.
+
+Examples of when NOT to use tools:
+- ""My name is Neil"" -> Respond conversationally
+- ""Hello"" -> Simple greeting response
+- ""How are you?"" -> Casual conversation
+- ""What can you do?"" -> Explain capabilities without tools
+
+Examples of when TO use tools:
+- ""Show me my portfolio"" -> Use GetPortfolioData
+- ""What's the latest news on Apple?"" -> Use GetMarketContext
+- ""How is my portfolio performing?"" -> Use portfolio analysis tools
+
 CRITICAL: Always format responses using proper markdown syntax:
 - Use ## for section headers (## Market Analysis:)
 - Use - for bullet points with content on the same line
@@ -320,7 +443,7 @@ Example format:
 - **Impact:** Significant price movements observed
 
 Your tools: portfolio analysis, market data, financial insights.
-Always use current date {DateTime.Now:yyyy-MM-dd} unless specified.
+Always use the data available date provided in the user message for 'current' or 'today' portfolio checks.
 Focus on actionable insights with proper UK currency formatting (£).
 
 When analyzing instruments, always use GetMarketContext to retrieve detailed news and analysis.
@@ -450,6 +573,147 @@ When users ask about their portfolio, use the appropriate tools to get real data
         );
 
         return cleaned;
+    }
+
+    /// <summary>
+    /// Process portfolio query with Microsoft Agent Framework memory components
+    /// </summary>
+    private async Task<ChatResponseDto> ProcessWithMemoryComponents(string query, int accountId, int threadId, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Validate Azure Foundry configuration
+            if (string.IsNullOrEmpty(_azureFoundryOptions.Endpoint) || string.IsNullOrEmpty(_azureFoundryOptions.ApiKey))
+            {
+                throw new InvalidOperationException("Azure Foundry configuration is not valid for memory processing.");
+            }
+
+            // Create Azure OpenAI client
+            var azureOpenAIClient = new AzureOpenAIClient(
+                new Uri(_azureFoundryOptions.Endpoint),
+                new AzureKeyCredential(_azureFoundryOptions.ApiKey));
+
+            // Get a chat client for the specific model
+            var chatClient = azureOpenAIClient.GetChatClient(_azureFoundryOptions.ModelName);
+            
+            // Create AI functions from our MCP tools
+            var portfolioTools = CreatePortfolioMcpFunctions();
+            
+            // Create memory-aware AI agent with ChatClientAgentOptions
+            var agent = chatClient.CreateAIAgent(new ChatClientAgentOptions
+            {
+                Instructions = CreateAgentInstructions(accountId),
+                ChatOptions = new ChatOptions { Tools = portfolioTools.ToList() },
+                ChatMessageStoreFactory = ctx => _chatMessageStoreFactory(accountId, threadId, ctx.JsonSerializerOptions),
+                AIContextProviderFactory = ctx => _memoryContextProviderFactory(accountId, chatClient.AsIChatClient())
+            });
+
+            _logger.LogInformation("Memory store and context provider configured for agent on thread {ThreadId}", threadId);
+
+            // Load existing conversation history from the chat message store
+            var messageStore = _chatMessageStoreFactory(accountId, threadId, null);
+            var existingMessages = await messageStore.GetMessagesAsync(cancellationToken);
+            var conversationHistory = existingMessages.ToList();
+
+            // Add the new user query to the conversation
+            var currentDataDate = DateUtilities.GetPreviousWorkingDayForApi();
+            var newUserMessage = new ChatMessage(ChatRole.User, $"User Query: {query}\nAccount ID: {accountId}\nThread ID: {threadId}\nData Available As Of: {currentDataDate} (use this date for 'current' or 'today' portfolio checks)");
+            conversationHistory.Add(newUserMessage);
+
+            _logger.LogInformation("Loaded {HistoryCount} previous messages for thread {ThreadId}, processing with full conversation context", 
+                existingMessages.Count(), threadId);
+            
+            _logger.LogInformation("Processing with memory-aware agent for thread {ThreadId}", threadId);
+            
+            // Run the agent with full conversation history
+            var response = await agent.RunAsync(conversationHistory, cancellationToken: cancellationToken);
+
+            var cleanedResponse = CleanupMarkdownFormatting(response.Text);
+
+            _logger.LogInformation("Successfully processed portfolio query with memory for thread {ThreadId}", threadId);
+
+            return new ChatResponseDto(
+                Response: cleanedResponse,
+                QueryType: DetermineQueryType(query)
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in memory-aware processing for thread {ThreadId}", threadId);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Process streaming portfolio query with Microsoft Agent Framework memory components
+    /// </summary>
+    private async Task ProcessStreamingWithMemoryComponents(string query, int accountId, int threadId, Func<string, Task> onTokenReceived, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // Validate Azure Foundry configuration
+            if (string.IsNullOrEmpty(_azureFoundryOptions.Endpoint) || string.IsNullOrEmpty(_azureFoundryOptions.ApiKey))
+            {
+                throw new InvalidOperationException("Azure Foundry configuration is not valid for memory processing.");
+            }
+
+            // Create Azure OpenAI client
+            var azureOpenAIClient = new AzureOpenAIClient(
+                new Uri(_azureFoundryOptions.Endpoint),
+                new AzureKeyCredential(_azureFoundryOptions.ApiKey));
+
+            // Get a chat client for the specific model
+            var chatClient = azureOpenAIClient.GetChatClient(_azureFoundryOptions.ModelName);
+            
+            // Create AI functions from our MCP tools
+            var portfolioTools = CreatePortfolioMcpFunctions();
+            
+            // Create memory-aware AI agent with ChatClientAgentOptions
+            var agent = chatClient.CreateAIAgent(new ChatClientAgentOptions
+            {
+                Instructions = CreateAgentInstructions(accountId),
+                ChatOptions = new ChatOptions { Tools = portfolioTools.ToList() },
+                ChatMessageStoreFactory = ctx => _chatMessageStoreFactory(accountId, threadId, ctx.JsonSerializerOptions),
+                AIContextProviderFactory = ctx => _memoryContextProviderFactory(accountId, chatClient.AsIChatClient())
+            });
+
+            _logger.LogInformation("Memory store and context provider configured for streaming agent on thread {ThreadId}", threadId);
+
+            // Load existing conversation history from the chat message store
+            var messageStore = _chatMessageStoreFactory(accountId, threadId, null);
+            var existingMessages = await messageStore.GetMessagesAsync(cancellationToken);
+            var conversationHistory = existingMessages.ToList();
+
+            // Add the new user query to the conversation
+            var currentDataDate = DateUtilities.GetPreviousWorkingDayForApi();
+            var newUserMessage = new ChatMessage(ChatRole.User, $"User Query: {query}\nAccount ID: {accountId}\nThread ID: {threadId}\nData Available As Of: {currentDataDate} (use this date for 'current' or 'today' portfolio checks)");
+            conversationHistory.Add(newUserMessage);
+
+            _logger.LogInformation("Loaded {HistoryCount} previous messages for streaming on thread {ThreadId}", 
+                existingMessages.Count(), threadId);
+            
+            _logger.LogInformation("Processing streaming with memory-aware agent for thread {ThreadId}", threadId);
+            
+            // Use streaming response from the memory-aware agent with full conversation history
+            await foreach (var streamingUpdate in agent.RunStreamingAsync(conversationHistory, cancellationToken: cancellationToken))
+            {
+                if (cancellationToken.IsCancellationRequested)
+                    break;
+
+                if (!string.IsNullOrEmpty(streamingUpdate.Text))
+                {
+                    var cleanedText = CleanupMarkdownFormatting(streamingUpdate.Text);
+                    await onTokenReceived(cleanedText);
+                }
+            }
+
+            _logger.LogInformation("Successfully completed streaming with memory for thread {ThreadId}", threadId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error in memory-aware streaming processing for thread {ThreadId}", threadId);
+            throw;
+        }
     }
 
  }

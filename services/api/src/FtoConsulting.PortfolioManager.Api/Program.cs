@@ -6,7 +6,13 @@ using FtoConsulting.PortfolioManager.Infrastructure.Data;
 using FtoConsulting.PortfolioManager.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
+using System.Globalization;
 using System.Reflection;
+
+// Configure culture for consistent date parsing
+var cultureInfo = new CultureInfo("en-GB"); // UK culture for dd/MM/yyyy preference
+CultureInfo.DefaultThreadCurrentCulture = cultureInfo;
+CultureInfo.DefaultThreadCurrentUICulture = cultureInfo;
 
 var builder = WebApplication.CreateBuilder(args);
 

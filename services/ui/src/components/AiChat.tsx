@@ -14,6 +14,8 @@ interface AiChatProps {
 }
 
 export function AiChat({ accountId, className = '', isVisible = true }: AiChatProps) {
+  const [inputValue, setInputValue] = useState('');
+  const [currentThreadId, setCurrentThreadId] = useState<number | undefined>(undefined);
   const [chatState, setChatState] = useState<ChatState>({
     messages: [
       {
@@ -32,8 +34,6 @@ I can analyze your holdings, market conditions, and provide insights to help you
     ],
     isLoading: false,
   });
-
-  const [inputValue, setInputValue] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -120,10 +120,15 @@ I can analyze your holdings, market conditions, and provide insights to help you
           
           // Fallback to regular API call
           try {
-            const response = await apiClient.sendChatQuery(query, accountId);
+            const response = await apiClient.sendChatQuery(query, accountId, currentThreadId);
             
             if (response.error) {
               throw new Error(response.error);
+            }
+
+            // Update threadId if response includes it
+            if (response.data?.threadId && !currentThreadId) {
+              setCurrentThreadId(response.data.threadId);
             }
 
             const aiMessage: ChatMessage = {
@@ -163,7 +168,8 @@ I can analyze your holdings, market conditions, and provide insights to help you
               error: fallbackError instanceof Error ? fallbackError.message : 'Unknown error',
             }));
           }
-        }
+        },
+        currentThreadId
       );
     } catch (error) {
       // If streaming is not supported, fall back to regular API

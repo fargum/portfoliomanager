@@ -30,11 +30,11 @@ public class ChatController : ControllerBase
     }
 
     /// <summary>
-    /// Process a natural language query about portfolio data with streaming response
+    /// Process a natural language query about portfolio data with streaming response and memory
     /// </summary>
     /// <param name="request">Chat request containing query and account information</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Streaming AI-generated response based on portfolio data</returns>
+    /// <returns>Streaming AI-generated response based on portfolio data with conversation memory</returns>
     [HttpPost("stream")]
     [ProducesResponseType(200)]
     [ProducesResponseType(400)]
@@ -55,16 +55,16 @@ public class ChatController : ControllerBase
                 return BadRequest("Valid account ID is required");
             }
 
-            _logger.LogInformation("Processing streaming AI chat query for account {AccountId}: {Query}", 
-                request.AccountId, request.Query);
+            _logger.LogInformation("Processing streaming AI chat query with memory for account {AccountId}, thread {ThreadId}: {Query}", 
+                request.AccountId, request.ThreadId, request.Query);
 
             // Set up Server-Sent Events headers
             Response.Headers["Content-Type"] = "text/plain; charset=utf-8";
             Response.Headers["Cache-Control"] = "no-cache";
             Response.Headers["Connection"] = "keep-alive";
 
-            // Use real streaming from the AI service
-            await _aiOrchestrationService.ProcessPortfolioQueryStreamAsync(
+            // Use memory-aware streaming from the AI service
+            await _aiOrchestrationService.ProcessPortfolioQueryStreamWithMemoryAsync(
                 request.Query, 
                 request.AccountId,
                 async (token) =>
@@ -75,16 +75,17 @@ public class ChatController : ControllerBase
                         await Response.Body.FlushAsync(cancellationToken);
                     }
                 },
+                request.ThreadId,
                 cancellationToken);
 
-            _logger.LogInformation("Successfully completed streaming AI chat query for account {AccountId}", 
+            _logger.LogInformation("Successfully completed streaming AI chat query with memory for account {AccountId}", 
                 request.AccountId);
 
             return new EmptyResult();
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing streaming AI chat query for account {AccountId}: {Query}", 
+            _logger.LogError(ex, "Error processing streaming AI chat query with memory for account {AccountId}: {Query}", 
                 request.AccountId, request.Query);
             
             if (!Response.HasStarted)
@@ -96,11 +97,11 @@ public class ChatController : ControllerBase
     }
 
     /// <summary>
-    /// Process a natural language query about portfolio data
+    /// Process a natural language query about portfolio data with memory support
     /// </summary>
     /// <param name="request">Chat request containing query and account information</param>
     /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>AI-generated response based on portfolio data</returns>
+    /// <returns>AI-generated response based on portfolio data with conversation memory</returns>
     [HttpPost("query")]
     [ProducesResponseType(typeof(ChatResponseDto), 200)]
     [ProducesResponseType(400)]
@@ -121,22 +122,23 @@ public class ChatController : ControllerBase
                 return BadRequest("Valid account ID is required");
             }
 
-            _logger.LogInformation("Processing AI chat query for account {AccountId}: {Query}", 
-                request.AccountId, request.Query);
+            _logger.LogInformation("Processing AI chat query with memory for account {AccountId}, thread {ThreadId}: {Query}", 
+                request.AccountId, request.ThreadId, request.Query);
 
-            var response = await _aiOrchestrationService.ProcessPortfolioQueryAsync(
+            var response = await _aiOrchestrationService.ProcessPortfolioQueryWithMemoryAsync(
                 request.Query, 
                 request.AccountId,
+                request.ThreadId,
                 cancellationToken);
 
-            _logger.LogInformation("Successfully processed AI chat query for account {AccountId}", 
+            _logger.LogInformation("Successfully processed AI chat query with memory for account {AccountId}", 
                 request.AccountId);
 
             return Ok(response);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing AI chat query for account {AccountId}: {Query}", 
+            _logger.LogError(ex, "Error processing AI chat query with memory for account {AccountId}: {Query}", 
                 request.AccountId, request.Query);
             return StatusCode(500, "An error occurred processing your request");
         }
