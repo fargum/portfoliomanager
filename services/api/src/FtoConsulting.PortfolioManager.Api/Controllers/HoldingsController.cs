@@ -41,6 +41,11 @@ public class HoldingsController : ControllerBase
     /// <returns>Collection of flattened holdings data including portfolio, instrument, and platform information</returns>
     /// <remarks>
     /// This endpoint retrieves all holdings across all portfolios for a given account on a specific valuation date.
+    /// 
+    /// **Real-Time vs Historical Data:**
+    /// - If the valuation date is today's date, holdings are returned with real-time market prices
+    /// - If the valuation date is in the past, holdings are returned with historical data from the database
+    /// 
     /// The response includes flattened data combining information from:
     /// 
     /// **Holdings Data:**
@@ -66,7 +71,8 @@ public class HoldingsController : ControllerBase
     /// 
     /// **Example Usage:**
     /// ```
-    /// GET /api/holdings/account/12345678/date/2025-09-27
+    /// GET /api/holdings/account/12345678/date/2025-11-10  // Returns real-time data for today
+    /// GET /api/holdings/account/12345678/date/2025-09-27  // Returns historical data
     /// ```
     /// 
     /// **Response Features:**
@@ -74,6 +80,7 @@ public class HoldingsController : ControllerBase
     /// - Gain/loss percentages are calculated and rounded to 2 decimal places
     /// - Holdings are ordered by portfolio name, then by instrument name
     /// - All related entity data is included to minimize additional API calls
+    /// - Real-time prices are fetched live and not persisted to the database
     /// </remarks>
     /// <response code="200">Returns the collection of holdings for the specified account and date</response>
     /// <response code="400">Invalid account ID format or date format</response>
@@ -108,7 +115,7 @@ public class HoldingsController : ControllerBase
             // Convert DateTime to DateOnly for service call
             var dateOnly = DateOnly.FromDateTime(valuationDate);
 
-            // Retrieve holdings from the service
+            // Retrieve holdings from the service - it will handle both real-time and historical data automatically
             var holdings = await _holdingsRetrieval.GetHoldingsByAccountAndDateAsync(accountId, dateOnly, cancellationToken);
 
             // Check if any holdings were found

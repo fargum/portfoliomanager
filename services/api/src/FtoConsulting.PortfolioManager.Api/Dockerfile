@@ -1,10 +1,10 @@
-FROM mcr.microsoft.com/dotnet/aspnet:9.0-nanoserver-1809 AS base
+FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
 WORKDIR /app
 EXPOSE 5125
 
 ENV ASPNETCORE_URLS=http://+:5125
 
-FROM mcr.microsoft.com/dotnet/sdk:9.0-nanoserver-1809 AS build
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
 ARG configuration=Release
 WORKDIR /src
 COPY ["services/api/src/FtoConsulting.PortfolioManager.Api/FtoConsulting.PortfolioManager.Api.csproj", "services/api/src/FtoConsulting.PortfolioManager.Api/"]

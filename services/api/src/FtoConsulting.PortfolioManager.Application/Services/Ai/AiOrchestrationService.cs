@@ -21,33 +21,22 @@ namespace FtoConsulting.PortfolioManager.Application.Services.Ai;
 /// <summary>
 /// Implementation of AI orchestration service for portfolio queries
 /// </summary>
-public class AiOrchestrationService : IAiOrchestrationService
+public class AiOrchestrationService(
+    ILogger<AiOrchestrationService> logger,
+    IOptions<AzureFoundryOptions> azureFoundryOptions,
+    IMcpServerService mcpServerService,
+    IConversationThreadService conversationThreadService,
+    IServiceProvider serviceProvider,
+    Func<int, int?, System.Text.Json.JsonSerializerOptions?, ChatMessageStore> chatMessageStoreFactory,
+    Func<int, IChatClient, AIContextProvider> memoryContextProviderFactory) : IAiOrchestrationService
 {
-    private readonly ILogger<AiOrchestrationService> _logger;
-    private readonly AzureFoundryOptions _azureFoundryOptions;
-    private readonly IMcpServerService _mcpServerService;
-    private readonly IConversationThreadService _conversationThreadService;
-    private readonly IServiceProvider _serviceProvider;
-    private readonly Func<int, int?, System.Text.Json.JsonSerializerOptions?, ChatMessageStore> _chatMessageStoreFactory;
-    private readonly Func<int, IChatClient, AIContextProvider> _memoryContextProviderFactory;
-
-    public AiOrchestrationService(
-        ILogger<AiOrchestrationService> logger,
-        IOptions<AzureFoundryOptions> azureFoundryOptions,
-        IMcpServerService mcpServerService,
-        IConversationThreadService conversationThreadService,
-        IServiceProvider serviceProvider,
-        Func<int, int?, System.Text.Json.JsonSerializerOptions?, ChatMessageStore> chatMessageStoreFactory,
-        Func<int, IChatClient, AIContextProvider> memoryContextProviderFactory)
-    {
-        _logger = logger;
-        _azureFoundryOptions = azureFoundryOptions.Value;
-        _mcpServerService = mcpServerService;
-        _conversationThreadService = conversationThreadService;
-        _serviceProvider = serviceProvider;
-        _chatMessageStoreFactory = chatMessageStoreFactory;
-        _memoryContextProviderFactory = memoryContextProviderFactory;
-    }
+    private readonly ILogger<AiOrchestrationService> _logger = logger;
+    private readonly AzureFoundryOptions _azureFoundryOptions = azureFoundryOptions.Value;
+    private readonly IMcpServerService _mcpServerService = mcpServerService;
+    private readonly IConversationThreadService _conversationThreadService = conversationThreadService;
+    private readonly IServiceProvider _serviceProvider = serviceProvider;
+    private readonly Func<int, int?, System.Text.Json.JsonSerializerOptions?, ChatMessageStore> _chatMessageStoreFactory = chatMessageStoreFactory;
+    private readonly Func<int, IChatClient, AIContextProvider> _memoryContextProviderFactory = memoryContextProviderFactory;
 
     public async Task<ChatResponseDto> ProcessPortfolioQueryAsync(string query, int accountId, CancellationToken cancellationToken = default)
     {
@@ -397,7 +386,8 @@ public class AiOrchestrationService : IAiOrchestrationService
             AIFunctionFactory.Create(
                 method: (string date) => CallMcpTool("GetMarketSentiment", new { date }),
                 name: "GetMarketSentiment",
-                description: "Get overall market sentiment and indicators for a specific date")
+                description: "Get overall market sentiment and indicators for a specific date"),
+
         };
 
         return functions;

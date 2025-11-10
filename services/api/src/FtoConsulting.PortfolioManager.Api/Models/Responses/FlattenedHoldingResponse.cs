@@ -119,4 +119,29 @@ public class FlattenedHoldingResponse
     /// </summary>
     /// <example>Interactive Brokers</example>
     public string PlatformName { get; set; } = string.Empty;
+
+    // Real-time pricing information
+    /// <summary>
+    /// Current price per unit (only available for real-time data)
+    /// </summary>
+    /// <example>150.25</example>
+    public decimal? CurrentPrice { get; set; }
+
+    /// <summary>
+    /// Indicates if the current price is real-time data
+    /// </summary>
+    /// <example>true</example>
+    public bool IsRealTimePrice { get; set; }
+
+    /// <summary>
+    /// ISIN identifier for the instrument
+    /// </summary>
+    /// <example>US0378331005</example>
+    public string? Isin { get; set; }
+
+    /// <summary>
+    /// SEDOL identifier for the instrument  
+    /// </summary>
+    /// <example>2046251</example>
+    public string? Sedol { get; set; }
 }

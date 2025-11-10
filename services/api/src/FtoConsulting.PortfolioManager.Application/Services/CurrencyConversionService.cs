@@ -1,4 +1,5 @@
 using FtoConsulting.PortfolioManager.Domain.Repositories;
+using FtoConsulting.PortfolioManager.Domain.Constants;
 using Microsoft.Extensions.Logging;
 
 namespace FtoConsulting.PortfolioManager.Application.Services;
@@ -12,8 +13,8 @@ public class CurrencyConversionService : ICurrencyConversionService
     private readonly ILogger<CurrencyConversionService> _logger;
 
     // Supported currency pairs for conversion
-    private static readonly string[] SupportedCurrencies = { "GBP", "USD", "EUR", "GBX" };
-    private const string BaseCurrency = "GBP"; // Portfolio base currency
+    private static readonly string[] SupportedCurrencies = { CurrencyConstants.GBP, CurrencyConstants.USD, CurrencyConstants.EUR, CurrencyConstants.GBX };
+    private const string BaseCurrency = CurrencyConstants.DEFAULT_BASE_CURRENCY; // Portfolio base currency
 
     public CurrencyConversionService(
         IExchangeRateRepository exchangeRateRepository,
@@ -40,12 +41,12 @@ public class CurrencyConversionService : ICurrencyConversionService
         }
 
         // Handle GBX to GBP conversion (quote unit conversion, not FX)
-        if (fromCurrency == "GBX" && toCurrency == "GBP")
+        if (fromCurrency == CurrencyConstants.GBX && toCurrency == CurrencyConstants.GBP)
         {
             return (amount / 100m, 0.01m, "QUOTE_UNIT_CONVERSION");
         }
 
-        if (fromCurrency == "GBP" && toCurrency == "GBX")
+        if (fromCurrency == CurrencyConstants.GBP && toCurrency == CurrencyConstants.GBX)
         {
             return (amount * 100m, 100m, "QUOTE_UNIT_CONVERSION");
         }

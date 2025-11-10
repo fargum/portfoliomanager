@@ -538,4 +538,229 @@ public class EodMarketDataTool
         }
         return "Unknown";
     }
+
+    /// <summary>
+    /// Get real-time prices for specific tickers from EOD Historical Data
+    /// Uses live pricing API endpoint: https://eodhd.com/api/real-time/{ticker}?api_token={token}&fmt=json
+    /// </summary>
+    /// <param name="mcpServerService">MCP server service for making external calls (not used for direct HTTP calls)</param>
+    /// <param name="tickers">Stock tickers to get real-time prices for</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Real-time price data for the tickers</returns>
+    public async Task<Dictionary<string, decimal>> GetRealTimePricesAsync(
+        IMcpServerService? mcpServerService,
+        IEnumerable<string> tickers,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            _logger.LogInformation("Fetching real-time prices from EOD for tickers: {Tickers}", string.Join(", ", tickers));
+
+            if (string.IsNullOrEmpty(_eodApiOptions.Token))
+            {
+                _logger.LogWarning("EOD API token not configured, returning empty prices");
+                return new Dictionary<string, decimal>();
+            }
+
+            var priceDict = new Dictionary<string, decimal>();
+            using var httpClient = new HttpClient();
+            httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
+
+            // Process each ticker individually for real-time pricing
+            foreach (var ticker in tickers)
+            {
+                try
+                {
+                    // Use ticker as provided without formatting
+                    var url = $"{_eodApiOptions.BaseUrl}/real-time/{ticker}?api_token={_eodApiOptions.Token}&fmt=json";
+                    
+                    _logger.LogInformation("Fetching real-time price for ticker: {Ticker} from URL: {Url}", ticker, url.Replace(_eodApiOptions.Token, "***"));
+
+                    var response = await httpClient.GetAsync(url, cancellationToken);
+                    
+                    if (response.IsSuccessStatusCode)
+                    {
+                        var jsonContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                        var price = ParseDirectRealTimePriceResponse(jsonContent, ticker);
+                        
+                        if (price.HasValue)
+                        {
+                            priceDict[ticker] = price.Value;
+                            _logger.LogInformation("Successfully fetched real-time price for {Ticker}: {Price:C}", ticker, price);
+                        }
+                        else
+                        {
+                            _logger.LogWarning("No valid price found in response for ticker: {Ticker}", ticker);
+                        }
+                    }
+                    else
+                    {
+                        _logger.LogWarning("HTTP error fetching price for {Ticker}: {StatusCode} - {Reason}", 
+                            ticker, response.StatusCode, response.ReasonPhrase);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error fetching real-time price for ticker: {Ticker}", ticker);
+                    // Continue with other tickers
+                }
+            }
+
+            _logger.LogInformation("Successfully fetched {Count} real-time prices out of {Total} requested", 
+                priceDict.Count, tickers.Count());
+
+            return priceDict;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching real-time prices from EOD for tickers: {Tickers}", string.Join(", ", tickers));
+            return new Dictionary<string, decimal>();
+        }
+    }
+
+    /// <summary>
+    /// Parse real-time price response from EOD MCP server
+    /// </summary>
+    private decimal? ParseRealTimePriceResponse(object result, string ticker)
+    {
+        try
+        {
+            if (result is JsonElement jsonElement)
+            {
+                // Handle MCP JSON-RPC response structure
+                if (jsonElement.TryGetProperty("result", out var resultProp))
+                {
+                    // Try content array structure first
+                    if (resultProp.TryGetProperty("content", out var contentArray) && 
+                        contentArray.ValueKind == JsonValueKind.Array &&
+                        contentArray.GetArrayLength() > 0)
+                    {
+                        var firstContent = contentArray.EnumerateArray().First();
+                        if (firstContent.TryGetProperty("text", out var textProp))
+                        {
+                            var priceJsonString = textProp.GetString();
+                            if (!string.IsNullOrEmpty(priceJsonString))
+                            {
+                                var priceElement = JsonSerializer.Deserialize<JsonElement>(priceJsonString);
+                                return ExtractPriceFromElement(priceElement, ticker);
+                            }
+                        }
+                    }
+                    // Try direct result structure
+                    else
+                    {
+                        return ExtractPriceFromElement(resultProp, ticker);
+                    }
+                }
+                // Try direct element
+                else
+                {
+                    return ExtractPriceFromElement(jsonElement, ticker);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error parsing real-time price response for ticker: {Ticker}", ticker);
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Extract price value from JSON element
+    /// </summary>
+    private decimal? ExtractPriceFromElement(JsonElement element, string ticker)
+    {
+        try
+        {
+            // Try different possible price field names
+            var priceFields = new[] { "close", "price", "last", "current_price", "value" };
+            
+            foreach (var field in priceFields)
+            {
+                if (element.TryGetProperty(field, out var priceProp))
+                {
+                    if (priceProp.ValueKind == JsonValueKind.Number)
+                    {
+                        var price = priceProp.GetDecimal();
+                        _logger.LogInformation("Extracted price for {Ticker} from field '{Field}': {Price}", ticker, field, price);
+                        return price;
+                    }
+                    else if (priceProp.ValueKind == JsonValueKind.String)
+                    {
+                        var priceString = priceProp.GetString();
+                        if (decimal.TryParse(priceString, out var price))
+                        {
+                            _logger.LogInformation("Parsed price for {Ticker} from string field '{Field}': {Price}", ticker, field, price);
+                            return price;
+                        }
+                    }
+                }
+            }
+
+            _logger.LogWarning("No recognized price field found for ticker: {Ticker}. Available fields: {Fields}", 
+                ticker, string.Join(", ", element.EnumerateObject().Select(p => p.Name)));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error extracting price from element for ticker: {Ticker}", ticker);
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// Format ticker for EOD API (add exchange suffix if needed)
+    /// </summary>
+    private string FormatTickerForEod(string ticker)
+    {
+        // If ticker already has an exchange suffix, use as-is
+        if (ticker.Contains('.'))
+        {
+            return ticker.ToLower(); // EOD uses lowercase for some exchanges like .lse
+        }
+
+        // Common exchange mappings - this should be enhanced based on your data
+        // For now, we'll try to detect the exchange or default to US
+        var upperTicker = ticker.ToUpper();
+        
+        // UK stocks often have specific patterns
+        if (upperTicker.Length == 4 && (upperTicker.EndsWith("L") || IsLikelyUkStock(upperTicker)))
+        {
+            return $"{ticker.ToLower()}.lse";
+        }
+        
+        // Default to US exchange
+        return $"{ticker.ToUpper()}.US";
+    }
+
+    /// <summary>
+    /// Simple heuristic to identify likely UK stocks
+    /// </summary>
+    private bool IsLikelyUkStock(string ticker)
+    {
+        // This is a simple heuristic - in practice you'd want a proper mapping
+        var commonUkPatterns = new[] { "LGEN", "BARC", "LLOY", "TSCO", "ULVR", "SHEL", "AZN", "GSK" };
+        return commonUkPatterns.Contains(ticker);
+    }
+
+    /// <summary>
+    /// Parse real-time price response from direct EOD API call
+    /// </summary>
+    private decimal? ParseDirectRealTimePriceResponse(string jsonContent, string ticker)
+    {
+        try
+        {
+            _logger.LogInformation("Parsing EOD response for {Ticker}: {JsonContent}", ticker, jsonContent);
+            
+            var jsonElement = JsonSerializer.Deserialize<JsonElement>(jsonContent);
+            return ExtractPriceFromElement(jsonElement, ticker);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error parsing direct real-time price response for ticker: {Ticker}", ticker);
+            return null;
+        }
+    }
 }

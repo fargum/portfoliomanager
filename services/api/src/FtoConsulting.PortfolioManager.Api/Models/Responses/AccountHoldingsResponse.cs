@@ -50,6 +50,18 @@ public class AccountHoldingsResponse
     public decimal TotalGainLossPercentage { get; set; }
 
     /// <summary>
+    /// Indicates if the data includes real-time prices
+    /// </summary>
+    /// <example>true</example>
+    public bool IsRealTime { get; set; }
+
+    /// <summary>
+    /// Percentage of holdings with real-time price coverage (only applicable when IsRealTime is true)
+    /// </summary>
+    /// <example>0.85</example>
+    public decimal? PriceCoverage { get; set; }
+
+    /// <summary>
     /// Collection of flattened holding data
     /// </summary>
     public IEnumerable<FlattenedHoldingResponse> Holdings { get; set; } = new List<FlattenedHoldingResponse>();

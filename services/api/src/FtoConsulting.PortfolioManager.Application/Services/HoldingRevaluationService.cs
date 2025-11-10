@@ -1,6 +1,7 @@
 using FtoConsulting.PortfolioManager.Application.Models;
 using FtoConsulting.PortfolioManager.Domain.Entities;
 using FtoConsulting.PortfolioManager.Domain.Repositories;
+using FtoConsulting.PortfolioManager.Domain.Constants;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 
@@ -14,6 +15,7 @@ public class HoldingRevaluationService : IHoldingRevaluationService
     private readonly IHoldingRepository _holdingRepository;
     private readonly IInstrumentPriceRepository _instrumentPriceRepository;
     private readonly ICurrencyConversionService _currencyConversionService;
+    private readonly IPricingCalculationService _pricingCalculationService;
     private readonly IPriceFetching _priceFetchingService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<HoldingRevaluationService> _logger;
@@ -22,6 +24,7 @@ public class HoldingRevaluationService : IHoldingRevaluationService
         IHoldingRepository holdingRepository,
         IInstrumentPriceRepository instrumentPriceRepository,
         ICurrencyConversionService currencyConversionService,
+        IPricingCalculationService pricingCalculationService,
         IPriceFetching priceFetchingService,
         IUnitOfWork unitOfWork,
         ILogger<HoldingRevaluationService> logger)
@@ -29,6 +32,7 @@ public class HoldingRevaluationService : IHoldingRevaluationService
         _holdingRepository = holdingRepository ?? throw new ArgumentNullException(nameof(holdingRepository));
         _instrumentPriceRepository = instrumentPriceRepository ?? throw new ArgumentNullException(nameof(instrumentPriceRepository));
         _currencyConversionService = currencyConversionService ?? throw new ArgumentNullException(nameof(currencyConversionService));
+        _pricingCalculationService = pricingCalculationService ?? throw new ArgumentNullException(nameof(pricingCalculationService));
         _priceFetchingService = priceFetchingService ?? throw new ArgumentNullException(nameof(priceFetchingService));
         _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -192,7 +196,7 @@ public class HoldingRevaluationService : IHoldingRevaluationService
         HoldingRevaluationResult result)
     {
         // Check if this is a CASH instrument - if so, roll forward without pricing
-        if (sourceHolding.Instrument.Ticker.Equals("CASH", StringComparison.OrdinalIgnoreCase))
+        if (sourceHolding.Instrument.Ticker.Equals(ExchangeConstants.CASH_TICKER, StringComparison.OrdinalIgnoreCase))
         {
             _logger.LogInformation("Rolling forward CASH holding for {Ticker} without pricing - Source: UnitAmount={UnitAmount}, CurrentValue={CurrentValue}, BoughtValue={BoughtValue}", 
                 sourceHolding.Instrument.Ticker, sourceHolding.UnitAmount, sourceHolding.CurrentValue, sourceHolding.BoughtValue);
@@ -245,21 +249,11 @@ public class HoldingRevaluationService : IHoldingRevaluationService
             return rolledForwardHolding;
         }
 
-        // Apply scaling factor for proxy instruments
-        // ISF.LSE is a proxy for an underlying instrument that requires price scaling
-        //TO DO: move this to config or db.
-        var scaledPrice = instrumentPrice.Price;
-        if (sourceHolding.Instrument.Ticker.Equals("ISF.LSE", StringComparison.OrdinalIgnoreCase))
-        {
-            const decimal ISF_SCALING_FACTOR = 3.362m;
-            scaledPrice = instrumentPrice.Price * ISF_SCALING_FACTOR;
-            
-            _logger.LogInformation("Applied scaling factor {ScalingFactor} to {Ticker}: Original price={OriginalPrice}, Scaled price={ScaledPrice}", 
-                ISF_SCALING_FACTOR, sourceHolding.Instrument.Ticker, instrumentPrice.Price, scaledPrice);
-        }
+        // Apply scaling factor for proxy instruments using shared service
+        var scaledPrice = _pricingCalculationService.ApplyScalingFactor(instrumentPrice.Price, sourceHolding.Instrument.Ticker);
 
         // Calculate current value considering quote unit and currency conversion
-        var currentValue = await CalculateCurrentValueAsync(
+        var currentValue = await _pricingCalculationService.CalculateCurrentValueAsync(
             sourceHolding.UnitAmount, 
             scaledPrice, // Use scaled price instead of raw price
             sourceHolding.Instrument.QuoteUnit,
@@ -328,78 +322,6 @@ public class HoldingRevaluationService : IHoldingRevaluationService
 
         _logger.LogInformation("Successfully saved {Count} revalued holdings for {ValuationDate}", 
             revaluedHoldings.Count, valuationDate);
-    }
-
-    /// <summary>
-    /// Calculate current value considering quote unit conversion and currency conversion to GBP
-    /// </summary>
-    /// <param name="unitAmount">Number of shares/units</param>
-    /// <param name="price">Price per unit</param>
-    /// <param name="quoteUnit">Quote unit (GBP, GBX, USD, etc.) - indicates the unit/scale of the price</param>
-    /// <param name="priceCurrency">Currency of the price (USD, GBP, etc.) - indicates the actual currency</param>
-    /// <param name="valuationDate">Date for currency conversion rate lookup</param>
-    /// <returns>Current value in GBP</returns>
-    private async Task<decimal> CalculateCurrentValueAsync(
-        decimal unitAmount, 
-        decimal price, 
-        string? quoteUnit, 
-        string? priceCurrency, 
-        DateOnly valuationDate)
-    {
-        // Default to GBP if no quote unit specified
-        var effectiveQuoteUnit = quoteUnit?.ToUpperInvariant() ?? "GBP";
-        var effectivePriceCurrency = priceCurrency?.ToUpperInvariant() ?? "GBP";
-        
-        // Step 1: Convert price based on quote unit (scale adjustment)
-        // This handles pence vs pounds, not currency conversion
-        decimal adjustedPrice = effectiveQuoteUnit switch
-        {
-            "GBX" => price / 100m, // Convert pence to pounds (100 pence = 1 pound)
-            "GBP" => price,        // Already in pounds
-            "USD" => price,        // USD price as-is (currency conversion happens later)
-            "EUR" => price,        // EUR price as-is (currency conversion happens later)
-            _ => price             // Default to no scale conversion for unknown units
-        };
-
-        // Step 2: Calculate gross value in the original currency
-        var grossValue = unitAmount * adjustedPrice;
-
-        // Step 3: Handle currency conversion if needed
-        // For UK securities: GBX and GBP both represent GBP currency (just different units)
-        // For foreign securities: USD quoteUnit = USD currency, EUR quoteUnit = EUR currency
-        var actualCurrency = effectiveQuoteUnit switch
-        {
-            "GBX" => "GBP", // Pence are still GBP currency
-            "GBP" => "GBP", // Already GBP currency
-            "USD" => "USD", // USD currency
-            "EUR" => "EUR", // EUR currency
-            _ => effectivePriceCurrency ?? "GBP" // Default to price currency or GBP
-        };
-        
-        if (actualCurrency != "GBP")
-        {
-            try
-            {
-                var conversionResult = await _currencyConversionService.ConvertCurrencyAsync(
-                    grossValue, 
-                    actualCurrency, 
-                    "GBP", 
-                    valuationDate);
-
-                return conversionResult.convertedAmount;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to convert {GrossValue} {Currency} to GBP for {ValuationDate}, using unconverted value", 
-                    grossValue, actualCurrency, valuationDate);
-                
-                // Fallback: return unconverted value (may not be accurate but allows processing to continue)
-                return grossValue;
-            }
-        }
-
-        // Already in GBP (including GBX which is pence but GBP currency), return as-is
-        return grossValue;
     }
 
     /// <summary>

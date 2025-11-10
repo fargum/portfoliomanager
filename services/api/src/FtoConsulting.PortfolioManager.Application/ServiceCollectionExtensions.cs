@@ -3,6 +3,7 @@ using FtoConsulting.PortfolioManager.Application.Services.Ai;
 using FtoConsulting.PortfolioManager.Application.Services.Ai.Tools;
 using FtoConsulting.PortfolioManager.Application.Services.Memory;
 using FtoConsulting.PortfolioManager.Application.Configuration;
+using FtoConsulting.PortfolioManager.Domain.Repositories;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -18,10 +19,30 @@ public static class ServiceCollectionExtensions
     {
         // Register core application services
         services.AddScoped<IPortfolioIngest, PortfolioIngestService>();
-        services.AddScoped<IHoldingsRetrieval, HoldingsRetrievalService>();
+        services.AddScoped<IHoldingsRetrieval>(serviceProvider =>
+        {
+            var holdingRepository = serviceProvider.GetRequiredService<IHoldingRepository>();
+            var logger = serviceProvider.GetRequiredService<ILogger<HoldingsRetrievalService>>();
+            var currencyConversionService = serviceProvider.GetRequiredService<ICurrencyConversionService>();
+            var pricingCalculationService = serviceProvider.GetRequiredService<IPricingCalculationService>();
+            
+            // Create factory for EodMarketDataTool for real-time pricing
+            Func<EodMarketDataTool>? eodMarketDataToolFactory = null;
+            try 
+            {
+                eodMarketDataToolFactory = () => serviceProvider.GetRequiredService<EodMarketDataTool>();
+            }
+            catch
+            {
+                // If EodMarketDataTool can't be resolved, leave factory as null - service will work without real-time pricing
+            }
+            
+            return new HoldingsRetrievalService(holdingRepository, logger, currencyConversionService, pricingCalculationService, eodMarketDataToolFactory);
+        });
         services.AddScoped<IPriceFetching, PriceFetchingService>();
         services.AddScoped<IHoldingRevaluationService, HoldingRevaluationService>();
         services.AddScoped<ICurrencyConversionService, CurrencyConversionService>();
+        services.AddScoped<IPricingCalculationService, PricingCalculationService>();
         
         // Register Azure OpenAI client and AI chat service for dependency injection
         services.AddScoped<AzureOpenAIClient>(serviceProvider =>

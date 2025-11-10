@@ -1,5 +1,6 @@
 using FtoConsulting.PortfolioManager.Application.Configuration;
 using FtoConsulting.PortfolioManager.Application.Models;
+using FtoConsulting.PortfolioManager.Domain.Constants;
 using FtoConsulting.PortfolioManager.Domain.Entities;
 using FtoConsulting.PortfolioManager.Domain.Repositories;
 using Microsoft.Extensions.DependencyInjection;
@@ -367,7 +368,7 @@ public class PriceFetchingService : IPriceFetching, IDisposable
                 {
                     Ticker = ticker,
                     Price = requestedDatePrice.Close,
-                    Currency = "USD", // EOD typically returns USD for most stocks
+                    Currency = CurrencyConstants.USD, // EOD typically returns USD for most stocks
                     Symbol = ticker,
                     Name = $"Instrument {ticker}",
                     Change = requestedDatePrice.Close - requestedDatePrice.Open,
@@ -422,8 +423,8 @@ public class PriceFetchingService : IPriceFetching, IDisposable
             // Define required currency pairs (base currency is always GBP)
             var requiredCurrencyPairs = new[]
             {
-                ("USD", "GBP"),
-                ("EUR", "GBP")
+                (CurrencyConstants.USD, CurrencyConstants.GBP),
+                (CurrencyConstants.EUR, CurrencyConstants.GBP)
             };
 
             result.TotalCurrencyPairs = requiredCurrencyPairs.Length;
