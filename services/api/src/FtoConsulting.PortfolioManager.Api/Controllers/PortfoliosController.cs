@@ -42,7 +42,7 @@ public class PortfoliosController : ControllerBase
     /// This endpoint accepts a portfolio with a collection of holdings and their associated instruments.
     /// 
     /// **Key Features:**
-    /// - **Automatic Instrument Management**: Instruments are identified by ISIN. If an instrument with the same ISIN already exists, it will be reused. If not, a new instrument will be created.
+    /// - **Automatic Instrument Management**: Instruments are identified by Ticker. If an instrument with the same Ticker already exists, it will be reused. If not, a new instrument will be created.
     /// - **Portfolio Creation/Update**: If a portfolio with the same ID exists, it will be updated. Otherwise, a new portfolio is created.
     /// - **Transaction Safety**: All operations are wrapped in a database transaction with automatic rollback on errors.
     /// - **Validation**: Input data is validated according to business rules and data constraints.
@@ -51,22 +51,21 @@ public class PortfoliosController : ControllerBase
     /// ```json
     /// {
     ///   "portfolioName": "My Investment Portfolio",
-    ///   "accountId": "12345678-1234-1234-1234-123456789012",
+    ///   "accountId": "12345678,
     ///   "holdings": [
     ///     {
     ///       "valuationDate": "2024-01-15T00:00:00Z",
-    ///       "platformId": "87654321-4321-4321-4321-210987654321",
+    ///       "platformId": "8765432",
     ///       "unitAmount": 100.0,
     ///       "boughtValue": 15000.00,
     ///       "currentValue": 18500.00,
     ///       "dailyProfitLoss": 250.00,
     ///       "dailyProfitLossPercentage": 1.37,
     ///       "instrument": {
-    ///         "isin": "US0378331005",
+    ///         "isin": "APL",
     ///         "name": "Apple Inc",
     ///         "description": "Apple Inc Common Stock",
-    ///         "sedol": "2046251",
-    ///         "instrumentTypeId": "11111111-1111-1111-1111-111111111111"
+    ///         "instrumentTypeId": "1"
     ///       }
     ///     }
     ///   ]

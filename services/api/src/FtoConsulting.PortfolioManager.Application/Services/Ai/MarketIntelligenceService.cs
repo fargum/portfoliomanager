@@ -42,10 +42,9 @@ public class MarketIntelligenceService : IMarketIntelligenceService
             // Try to get real data from EOD
             var news = await GetNewsAsync(tickers, date);
             var sentiment = await GetSentimentAsync(date, tickers);
-            var indices = await GetIndicesAsync(date);
 
             // Generate AI-powered market summary
-            var marketSummary = await GenerateMarketSummaryAsync(tickers, news, sentiment, indices, cancellationToken);
+            var marketSummary = await GenerateMarketSummaryAsync(tickers, news, sentiment, Array.Empty<MarketIndexDto>(), cancellationToken);
 
             return new MarketContextDto(
                 Tickers: tickers,
@@ -53,7 +52,7 @@ public class MarketIntelligenceService : IMarketIntelligenceService
                 MarketSummary: marketSummary,
                 RelevantNews: news,
                 Sentiment: sentiment,
-                Indices: indices
+                Indices: Array.Empty<MarketIndexDto>()
             );
         }
         catch (Exception ex)
@@ -143,7 +142,7 @@ public class MarketIntelligenceService : IMarketIntelligenceService
             var summary = await _aiChatService.CompleteChatAsync(
                 new ChatMessage[]
                 {
-                    new SystemChatMessage("You are a financial analyst AI assistant that provides concise, actionable market insights for portfolio management."),
+                    new SystemChatMessage("You are a financial analyst AI assistant that provides accurate, useful market insights for portfolio management."),
                     new UserChatMessage(prompt)
                 },
                 cancellationToken);
@@ -172,7 +171,7 @@ public class MarketIntelligenceService : IMarketIntelligenceService
         var newsItems = news.Take(5); // Limit to top 5 news items to avoid token limits
         var topIndices = indices.Take(3); // Top 3 indices
 
-        var prompt = $@"Analyze the current market conditions and provide a concise summary for a portfolio containing these holdings: {tickerList}
+        var prompt = $@"Analyze the current market conditions and provide a summary for a portfolio containing these holdings: {tickerList}
 
 MARKET SENTIMENT DATA:
 - Overall Sentiment: {sentiment.SentimentLabel} (Score: {sentiment.OverallSentimentScore:F2})
@@ -182,18 +181,16 @@ MARKET SENTIMENT DATA:
 SECTOR SENTIMENT:
 {string.Join("\n", sentiment.SectorSentiments.Select(s => $"- {s.SectorName}: {s.SentimentScore:F2} ({s.Trend}) - Key factors: {string.Join(", ", s.KeyFactors)}"))}
 
-MARKET INDICES:
-{string.Join("\n", topIndices.Select(idx => $"- {idx.Name}: {idx.CurrentValue:F2} ({idx.DayChangePercentage:+0.00%;-0.00%}%)"))}
-
 RECENT NEWS:
 {string.Join("\n", newsItems.Select(n => $"- {n.Title} (Sentiment: {n.SentimentScore:F2}) - {n.Summary}"))}
 
-Please provide a 2-3 sentence market summary that:
+Please provide a useful market summary that:
 1. Explains the current market environment in context of the portfolio holdings
 2. Highlights key opportunities or risks for these specific tickers
 3. Gives a forward-looking perspective based on the sentiment and news analysis
+4. If you were not able to find useful information, state that clearly.
 
-Keep the response professional, concise, and actionable for portfolio management decisions.";
+Keep the response professional, accurate, and useful for portfolio management decisions.";
 
         return prompt;
     }
@@ -280,39 +277,5 @@ Keep the response professional, concise, and actionable for portfolio management
             SectorSentiments: Array.Empty<SectorSentimentDto>(),
             Indicators: Array.Empty<MarketIndicatorDto>()
         );
-    }
-
-    /// <summary>
-    /// Get indices data from EOD - throws exception if unavailable
-    /// </summary>
-    private async Task<IEnumerable<MarketIndexDto>> GetIndicesAsync(DateTime date)
-    {
-        if (_eodMarketDataToolFactory == null)
-        {
-            _logger.LogWarning("EOD market data tool not configured, returning empty indices");
-            return Array.Empty<MarketIndexDto>();
-        }
-
-        try
-        {
-            var eodMarketDataTool = _eodMarketDataToolFactory();
-            var indexSymbols = new[] { "SPY", "QQQ", "DIA" }; // Major ETFs representing indices
-            var realIndices = await eodMarketDataTool.GetMarketIndicesAsync(_mcpServerService, indexSymbols, date);
-            if (realIndices.Any())
-            {
-                _logger.LogInformation("Retrieved {Count} indices from EOD", realIndices.Count());
-                return realIndices;
-            }
-            else
-            {
-                _logger.LogWarning("No indices data returned from EOD for date: {Date}", date);
-                return Array.Empty<MarketIndexDto>(); // Return empty instead of throwing
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Failed to retrieve indices data from EOD, returning empty indices");
-            return Array.Empty<MarketIndexDto>(); // Return empty instead of throwing
-        }
     }
 }

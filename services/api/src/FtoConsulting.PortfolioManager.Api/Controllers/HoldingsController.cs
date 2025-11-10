@@ -66,7 +66,7 @@ public class HoldingsController : ControllerBase
     /// 
     /// **Example Usage:**
     /// ```
-    /// GET /api/holdings/account/12345678-1234-5678-9012-123456789012/date/2025-09-27
+    /// GET /api/holdings/account/12345678/date/2025-09-27
     /// ```
     /// 
     /// **Response Features:**

@@ -14,4 +14,13 @@ public interface IHoldingRevaluationService
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Result containing revaluation statistics</returns>
     Task<HoldingRevaluationResult> RevalueHoldingsAsync(DateOnly valuationDate, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Fetches market prices and then revalues holdings for a specific valuation date
+    /// This is a combined operation that first fetches current market prices and then applies them to revalue holdings
+    /// </summary>
+    /// <param name="valuationDate">The date to fetch prices and revalue holdings for</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Combined result containing both price fetch and revaluation statistics</returns>
+    Task<CombinedPriceAndRevaluationResult> FetchPricesAndRevalueHoldingsAsync(DateOnly valuationDate, CancellationToken cancellationToken = default);
 }

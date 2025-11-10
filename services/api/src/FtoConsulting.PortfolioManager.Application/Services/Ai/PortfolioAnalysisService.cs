@@ -178,13 +178,13 @@ public class PortfolioAnalysisService : IPortfolioAnalysisService
         var topPerformers = holdingsList
             .Where(h => h.DayChangePercentage > 0)
             .OrderByDescending(h => h.DayChangePercentage)
-            .Take(3)
+            .Take(5)
             .Select(h => h.Ticker);
 
         var bottomPerformers = holdingsList
             .Where(h => h.DayChangePercentage < 0)
             .OrderBy(h => h.DayChangePercentage)
-            .Take(3)
+            .Take(5)
             .Select(h => h.Ticker);
 
         return new PerformanceMetricsDto(

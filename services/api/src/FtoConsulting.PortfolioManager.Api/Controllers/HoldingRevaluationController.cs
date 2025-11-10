@@ -1,4 +1,5 @@
 using FtoConsulting.PortfolioManager.Application.Services;
+using FtoConsulting.PortfolioManager.Application.Utilities;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FtoConsulting.PortfolioManager.Api.Controllers;
@@ -41,11 +42,16 @@ public class HoldingRevaluationController : ControllerBase
     {
         try
         {
-            // Parse the valuation date
-            if (!DateOnly.TryParseExact(valuationDate, "yyyy-MM-dd", out var parsedDate))
+            // Parse the valuation date using DateUtilities for consistent parsing
+            DateOnly parsedDate;
+            try
             {
-                _logger.LogWarning("Invalid valuation date format provided: {ValuationDate}", valuationDate);
-                return BadRequest($"Invalid valuation date format. Expected format: YYYY-MM-DD, received: {valuationDate}");
+                parsedDate = DateUtilities.ParseDate(valuationDate);
+            }
+            catch (Exception parseEx)
+            {
+                _logger.LogWarning(parseEx, "Invalid valuation date format provided: {ValuationDate}", valuationDate);
+                return BadRequest($"Invalid valuation date format. Expected formats include YYYY-MM-DD, DD/MM/YYYY, DD MMMM YYYY, received: {valuationDate}");
             }
 
             _logger.LogInformation("Starting holding revaluation for date {ValuationDate}", parsedDate);
@@ -80,5 +86,74 @@ public class HoldingRevaluationController : ControllerBase
     {
         var today = DateOnly.FromDateTime(DateTime.Today);
         return await RevalueHoldings(today.ToString("yyyy-MM-dd"), cancellationToken);
+    }
+
+    /// <summary>
+    /// Fetches current market prices and then revalues all holdings for a specific valuation date
+    /// This combined operation first fetches market prices from external data sources, 
+    /// then uses those prices to revalue all holdings
+    /// </summary>
+    /// <param name="valuationDate">The date to fetch prices and revalue holdings for (format: YYYY-MM-DD)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Combined result with both price fetch and revaluation statistics</returns>
+    /// <response code="200">Combined operation completed successfully</response>
+    /// <response code="400">Invalid valuation date format</response>
+    /// <response code="500">Internal server error during combined operation</response>
+    [HttpPost("fetch-prices-and-revalue/{valuationDate}")]
+    [ProducesResponseType(typeof(Application.Models.CombinedPriceAndRevaluationResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<Application.Models.CombinedPriceAndRevaluationResult>> FetchPricesAndRevalueHoldings(
+        string valuationDate,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // Parse the valuation date using DateUtilities for consistent parsing
+            DateOnly parsedDate;
+            try
+            {
+                parsedDate = DateUtilities.ParseDate(valuationDate);
+            }
+            catch (Exception parseEx)
+            {
+                _logger.LogWarning(parseEx, "Invalid valuation date format provided: {ValuationDate}", valuationDate);
+                return BadRequest($"Invalid valuation date format. Expected formats include YYYY-MM-DD, DD/MM/YYYY, DD MMMM YYYY, received: {valuationDate}");
+            }
+
+            _logger.LogInformation("Starting combined price fetch and holding revaluation for date {ValuationDate}", parsedDate);
+
+            var result = await _holdingRevaluationService.FetchPricesAndRevalueHoldingsAsync(parsedDate, cancellationToken);
+
+            _logger.LogInformation("Combined operation completed for {ValuationDate}. {Summary}", 
+                parsedDate, result.Summary);
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during combined price fetch and revaluation for date {ValuationDate}", valuationDate);
+            return StatusCode(StatusCodes.Status500InternalServerError, 
+                "An error occurred during the combined price fetch and revaluation process. Please check the logs for details.");
+        }
+    }
+
+    /// <summary>
+    /// Fetches current market prices and then revalues holdings for today's date
+    /// This combined operation first fetches market prices from external data sources, 
+    /// then uses those prices to revalue all holdings for the current date
+    /// </summary>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Combined result with both price fetch and revaluation statistics</returns>
+    /// <response code="200">Combined operation completed successfully</response>
+    /// <response code="500">Internal server error during combined operation</response>
+    [HttpPost("fetch-prices-and-revalue/today")]
+    [ProducesResponseType(typeof(Application.Models.CombinedPriceAndRevaluationResult), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<Application.Models.CombinedPriceAndRevaluationResult>> FetchPricesAndRevalueHoldingsToday(
+        CancellationToken cancellationToken = default)
+    {
+        var today = DateOnly.FromDateTime(DateTime.Today);
+        return await FetchPricesAndRevalueHoldings(today.ToString("yyyy-MM-dd"), cancellationToken);
     }
 }

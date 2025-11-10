@@ -12,6 +12,7 @@ public class MarketIntelligenceServiceTests
     private readonly Mock<HttpClient> _mockHttpClient;
     private readonly Mock<ILogger<MarketIntelligenceService>> _mockLogger;
     private readonly Mock<IAiChatService> _mockAiChatService;
+    private readonly Mock<IMcpServerService> _mockMcpServerService;
     private readonly MarketIntelligenceService _service;
 
     public MarketIntelligenceServiceTests()
@@ -19,11 +20,14 @@ public class MarketIntelligenceServiceTests
         _mockHttpClient = new Mock<HttpClient>();
         _mockLogger = new Mock<ILogger<MarketIntelligenceService>>();
         _mockAiChatService = new Mock<IAiChatService>();
+        _mockMcpServerService = new Mock<IMcpServerService>();
 
         _service = new MarketIntelligenceService(
             _mockHttpClient.Object,
             _mockLogger.Object,
-            _mockAiChatService.Object);
+            _mockAiChatService.Object,
+            _mockMcpServerService.Object,
+            null); // No EOD factory for these tests
     }
 
     [Fact]
@@ -146,41 +150,45 @@ public class MarketIntelligenceServiceTests
     public async Task GetMarketContextAsync_WithoutEodService_ThrowsInvalidOperationException()
     {
         // Arrange
-        var tickers = new[] { "AAPL", "GOOGL" };
+        var tickers = new[] { "AAPL", "MSFT" };
         var date = DateTime.Now;
 
         // Act & Assert
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             () => _service.GetMarketContextAsync(tickers, date));
         
-        Assert.Contains("News data unavailable: EOD market data service not configured", exception.Message);
+        Assert.Contains("Failed to generate market summary", exception.Message);
     }
 
     [Fact]
-    public async Task SearchFinancialNewsAsync_WithoutEodService_ThrowsInvalidOperationException()
+    public async Task SearchFinancialNewsAsync_WithoutEodService_ReturnsEmptyNews()
     {
         // Arrange
         var tickers = new[] { "AAPL", "MSFT" };
         var fromDate = DateTime.Now.AddDays(-7);
         var toDate = DateTime.Now;
 
-        // Act & Assert
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => _service.SearchFinancialNewsAsync(tickers, fromDate, toDate));
+        // Act
+        var result = await _service.SearchFinancialNewsAsync(tickers, fromDate, toDate);
         
-        Assert.Contains("News data unavailable: EOD market data service not configured", exception.Message);
+        // Assert
+        Assert.NotNull(result);
+        Assert.Empty(result);
     }
 
     [Fact]
-    public async Task GetMarketSentimentAsync_WithoutEodService_ThrowsInvalidOperationException()
+    public async Task GetMarketSentimentAsync_WithoutEodService_ReturnsFallbackSentiment()
     {
         // Arrange
         var date = DateTime.Now;
 
-        // Act & Assert
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => _service.GetMarketSentimentAsync(date));
+        // Act
+        var result = await _service.GetMarketSentimentAsync(date);
         
-        Assert.Contains("Sentiment data unavailable: EOD market data service not configured", exception.Message);
+        // Assert
+        Assert.NotNull(result);
+        Assert.Equal("Neutral (EOD unavailable)", result.SentimentLabel);
+        Assert.Equal(0.5m, result.OverallSentimentScore);
+        Assert.Equal(50, result.FearGreedIndex);
     }
 }

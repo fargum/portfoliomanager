@@ -57,7 +57,8 @@ public class Holding : BaseEntity
     public decimal TotalProfitLossPercentage => BoughtValue != 0 ? (TotalProfitLoss / BoughtValue) * 100 : 0;
     
     // Note: Daily P&L requires previous day's value - this would typically be calculated 
-    // by comparing with previous holding record or storing previous value
+    // by comparing with previous holding record or storing previous value. this will change when i find a service that
+    // provides real time pricing data at a reasonable cost
     public decimal DailyProfitLoss { get; private set; }
     public decimal DailyProfitLossPercentage { get; private set; }
 

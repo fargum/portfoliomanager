@@ -2,7 +2,6 @@ using FtoConsulting.PortfolioManager.Api.Models.Responses;
 using FtoConsulting.PortfolioManager.Api.Services;
 using FtoConsulting.PortfolioManager.Application.Services;
 using Microsoft.AspNetCore.Mvc;
-using System.ComponentModel.DataAnnotations;
 using System.Net;
 
 namespace FtoConsulting.PortfolioManager.Api.Controllers;
@@ -40,14 +39,14 @@ public class PricesController : ControllerBase
     /// <returns>Summary of price fetch operation with counts and metadata</returns>
     /// <remarks>
     /// This endpoint performs the following operations:
-    /// 1. Queries all distinct ISINs from holdings across all portfolios (regardless of holding date)
-    /// 2. Uses EOD Historical Data API to fetch market prices for those ISINs on the specified valuation date
+    /// 1. Queries all distinct tickers from holdings across all portfolios (regardless of holding date)
+    /// 2. Uses EOD Historical Data API to fetch market prices for those tickers on the specified valuation date
     /// 3. Persists the pricing data to the instrument_prices table
     /// 4. Returns a summary of the operation (not the actual price data)
     /// 
     /// **Process Flow:**
-    /// - Retrieves distinct ISINs from all portfolio holdings in the database
-    /// - Sends those ISINs to the EOD Historical Data pricing engine for the specified valuation date
+    /// - Retrieves distinct tickers from all portfolio holdings in the database
+    /// - Sends those tickers to the EOD Historical Data pricing engine for the specified valuation date
     /// - Persists market prices, currency, and market status information to database
     /// - Returns operation summary with success/failure counts and timing
     /// 
@@ -96,7 +95,7 @@ public class PricesController : ControllerBase
                     Title = "No Prices Available",
                     Detail = $"No market prices could be fetched for the specified valuation date: {dateOnly:yyyy-MM-dd}. " +
                             $"Total failures: {pricesResult?.FailedPrices ?? 0}. " +
-                            $"This could be due to market closure, invalid ISINs, or external API issues.",
+                            $"This could be due to market closure, invalid Tickers, or external API issues.",
                     Status = (int)HttpStatusCode.NotFound
                 });
             }

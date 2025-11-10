@@ -14,6 +14,7 @@ public class HoldingRevaluationService : IHoldingRevaluationService
     private readonly IHoldingRepository _holdingRepository;
     private readonly IInstrumentPriceRepository _instrumentPriceRepository;
     private readonly ICurrencyConversionService _currencyConversionService;
+    private readonly IPriceFetching _priceFetchingService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<HoldingRevaluationService> _logger;
 
@@ -21,12 +22,14 @@ public class HoldingRevaluationService : IHoldingRevaluationService
         IHoldingRepository holdingRepository,
         IInstrumentPriceRepository instrumentPriceRepository,
         ICurrencyConversionService currencyConversionService,
+        IPriceFetching priceFetchingService,
         IUnitOfWork unitOfWork,
         ILogger<HoldingRevaluationService> logger)
     {
         _holdingRepository = holdingRepository ?? throw new ArgumentNullException(nameof(holdingRepository));
         _instrumentPriceRepository = instrumentPriceRepository ?? throw new ArgumentNullException(nameof(instrumentPriceRepository));
         _currencyConversionService = currencyConversionService ?? throw new ArgumentNullException(nameof(currencyConversionService));
+        _priceFetchingService = priceFetchingService ?? throw new ArgumentNullException(nameof(priceFetchingService));
         _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
@@ -421,5 +424,46 @@ public class HoldingRevaluationService : IHoldingRevaluationService
         rolledForwardHolding.SetDailyProfitLoss(0m, 0m);
 
         return rolledForwardHolding;
+    }
+
+    public async Task<CombinedPriceAndRevaluationResult> FetchPricesAndRevalueHoldingsAsync(DateOnly valuationDate, CancellationToken cancellationToken = default)
+    {
+        var result = new CombinedPriceAndRevaluationResult
+        {
+            ValuationDate = valuationDate,
+            ProcessedAt = DateTime.UtcNow
+        };
+
+        _logger.LogInformation("Starting combined price fetch and revaluation for date {ValuationDate}", valuationDate);
+
+        try
+        {
+            // Step 1: Fetch market prices first
+            _logger.LogInformation("Step 1: Fetching market prices for {ValuationDate}", valuationDate);
+            result.PriceFetchResult = await _priceFetchingService.FetchAndPersistPricesForDateAsync(valuationDate, cancellationToken);
+
+            _logger.LogInformation("Price fetch completed: Success={Success}, Failed={Failed}, Duration={Duration}ms", 
+                result.PriceFetchResult.SuccessfulPrices, 
+                result.PriceFetchResult.FailedPrices, 
+                result.PriceFetchResult.FetchDuration.TotalMilliseconds);
+
+            // Step 2: Revalue holdings using the fetched prices
+            _logger.LogInformation("Step 2: Revaluing holdings for {ValuationDate}", valuationDate);
+            result.HoldingRevaluationResult = await RevalueHoldingsAsync(valuationDate, cancellationToken);
+
+            _logger.LogInformation("Revaluation completed: Success={Success}, Failed={Failed}, Duration={Duration}ms",
+                result.HoldingRevaluationResult.SuccessfulRevaluations,
+                result.HoldingRevaluationResult.FailedRevaluations,
+                result.HoldingRevaluationResult.Duration.TotalMilliseconds);
+
+            _logger.LogInformation("Combined operation completed successfully. {Summary}", result.Summary);
+
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during combined price fetch and revaluation for date {ValuationDate}", valuationDate);
+            throw;
+        }
     }
 }

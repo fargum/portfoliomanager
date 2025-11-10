@@ -139,14 +139,86 @@ The API requires:
 3. Click "Try it out"
 4. Paste the sample JSON from `docs/sample-portfolio-request.json`
 5. Update the GUIDs with valid values from your database
-6. Execute the request
+5. Execute the request
 
-## Example cURL Request
+### 2. Holdings Revaluation
 
+**Endpoint**: `POST /api/holdingrevaluation/revalue/{valuationDate}`
+
+**Description**: Revalues all holdings for a specific valuation date using current market prices stored in the database.
+
+**Key Features**:
+- ✅ **Uses Existing Prices**: Leverages prices from the instrument_prices table
+- ✅ **Quote Unit Conversion**: Handles GBX to GBP conversions automatically
+- ✅ **Daily Change Calculation**: Computes profit/loss from previous valuations
+- ✅ **Bulk Processing**: Efficiently processes all holdings in one operation
+
+**Example**: `POST /api/holdingrevaluation/revalue/2025-11-07`
+
+**Endpoint**: `POST /api/holdingrevaluation/revalue/today`
+
+**Description**: Revalues all holdings for today's date using current market prices.
+
+### 3. Combined Price Fetch and Revaluation
+
+**Endpoint**: `POST /api/holdingrevaluation/fetch-prices-and-revalue/{valuationDate}`
+
+**Description**: **NEW**: Performs a combined operation that first fetches current market prices from external data sources, then uses those prices to revalue all holdings.
+
+**Key Features**:
+- ✅ **Two-Step Process**: Fetches prices first, then revalues holdings
+- ✅ **External Data Integration**: Uses EOD Historical Data API for current prices
+- ✅ **Complete Operation**: Returns both price fetch and revaluation statistics
+- ✅ **Flexible Date Parsing**: Accepts multiple date formats (YYYY-MM-DD, DD/MM/YYYY, DD MMMM YYYY)
+
+**Example**: `POST /api/holdingrevaluation/fetch-prices-and-revalue/2025-11-07`
+
+**Endpoint**: `POST /api/holdingrevaluation/fetch-prices-and-revalue/today`
+
+**Description**: Performs the combined price fetch and revaluation operation for today's date.
+
+**Response Example**:
+```json
+{
+  "valuationDate": "2025-11-07",
+  "priceFetchResult": {
+    "totalTickers": 25,
+    "successfulPrices": 23,
+    "failedPrices": 2,
+    "fetchDuration": "00:00:45.123"
+  },
+  "holdingRevaluationResult": {
+    "valuationDate": "2025-11-07",
+    "totalHoldings": 50,
+    "successfulRevaluations": 48,
+    "failedRevaluations": 2,
+    "duration": "00:00:02.456"
+  },
+  "overallSuccess": true,
+  "totalDuration": "00:00:47.579",
+  "summary": "Fetched 23/25 prices, revalued 48/50 holdings in 47579ms"
+}
+```
+
+## Example cURL Requests
+
+### Portfolio Ingestion
 ```bash
 curl -X POST "https://localhost:7001/api/portfolios/ingest" \
   -H "Content-Type: application/json" \
   -d @docs/sample-portfolio-request.json
+```
+
+### Holdings Revaluation  
+```bash
+curl -X POST "https://localhost:7001/api/holdingrevaluation/revalue/2025-11-07" \
+  -H "Content-Type: application/json"
+```
+
+### Combined Price Fetch and Revaluation
+```bash
+curl -X POST "https://localhost:7001/api/holdingrevaluation/fetch-prices-and-revalue/2025-11-07" \
+  -H "Content-Type: application/json"
 ```
 
 ## Architecture
