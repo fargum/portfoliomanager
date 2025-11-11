@@ -14,6 +14,7 @@ using Azure;
 using System.ComponentModel;
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
+using System.Text.Json;
 
 namespace FtoConsulting.PortfolioManager.Application.Services.Ai;
 
@@ -254,7 +255,7 @@ public class McpServerService : IMcpServerService
 
     private async Task<object> ExecuteGetMarketContext(Dictionary<string, object> parameters, CancellationToken cancellationToken)
     {
-        var tickers = ((IEnumerable<object>)parameters["tickers"]).Select(t => t.ToString()!).ToArray();
+        var tickers = ExtractStringArrayFromJsonParameter(parameters["tickers"]);
         var date = parameters["date"].ToString()!;
         
         return await _marketIntelligenceTool.GetMarketContext(tickers, date, cancellationToken);
@@ -262,7 +263,7 @@ public class McpServerService : IMcpServerService
 
     private async Task<object> ExecuteSearchFinancialNews(Dictionary<string, object> parameters, CancellationToken cancellationToken)
     {
-        var tickers = ((IEnumerable<object>)parameters["tickers"]).Select(t => t.ToString()!).ToArray();
+        var tickers = ExtractStringArrayFromJsonParameter(parameters["tickers"]);
         var fromDate = parameters["fromDate"].ToString()!;
         var toDate = parameters["toDate"].ToString()!;
         
@@ -375,6 +376,21 @@ public class McpServerService : IMcpServerService
             var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
             _logger.LogInformation("EOD MCP server response for tool {ToolName}: {Response}", toolName, responseContent);
 
+            // Validate response content before parsing
+            if (string.IsNullOrWhiteSpace(responseContent))
+            {
+                _logger.LogError("EOD MCP server returned empty response for tool {ToolName}", toolName);
+                throw new InvalidOperationException($"EOD MCP server returned empty response for tool '{toolName}'");
+            }
+
+            // Check for common error indicators
+            if (responseContent.StartsWith("Error:") || responseContent.StartsWith("ERROR:") ||
+                responseContent.StartsWith("<!DOCTYPE") || responseContent.StartsWith("<html"))
+            {
+                _logger.LogError("EOD MCP server returned error response for tool {ToolName}: {Error}", toolName, responseContent);
+                throw new InvalidOperationException($"EOD MCP server returned error for tool '{toolName}': {responseContent}");
+            }
+
             // Parse MCP response - handle both SSE and JSON formats
             try
             {
@@ -387,6 +403,15 @@ public class McpServerService : IMcpServerService
                     if (dataLine != null)
                     {
                         var jsonData = dataLine.Substring("data: ".Length);
+                        
+                        // Validate JSON data before parsing
+                        if (string.IsNullOrWhiteSpace(jsonData) || !IsValidJsonStart(jsonData))
+                        {
+                            var analysis = string.IsNullOrWhiteSpace(jsonData) ? "JSON data is null or empty" : AnalyzeInvalidContent(jsonData);
+                            _logger.LogError("Invalid JSON data in SSE response for tool {ToolName}. Analysis: {Analysis}", toolName, analysis);
+                            throw new InvalidOperationException($"Invalid JSON in SSE response for tool '{toolName}': {analysis}");
+                        }
+                        
                         var mcpResponse = System.Text.Json.JsonSerializer.Deserialize<object>(jsonData);
                         if (mcpResponse == null)
                         {
@@ -403,6 +428,14 @@ public class McpServerService : IMcpServerService
                 }
                 else
                 {
+                    // Validate JSON format before parsing
+                    if (!IsValidJsonStart(responseContent))
+                    {
+                        var analysis = AnalyzeInvalidContent(responseContent);
+                        _logger.LogError("Response is not valid JSON for tool {ToolName}. Analysis: {Analysis}", toolName, analysis);
+                        throw new InvalidOperationException($"EOD MCP server returned non-JSON response for tool '{toolName}': {analysis}");
+                    }
+
                     // Try to parse as regular JSON
                     var mcpResponse = System.Text.Json.JsonSerializer.Deserialize<object>(responseContent);
                     
@@ -417,8 +450,8 @@ public class McpServerService : IMcpServerService
             }
             catch (System.Text.Json.JsonException ex)
             {
-                _logger.LogError(ex, "Failed to parse EOD MCP response as JSON for tool {ToolName}: {Response}", toolName, responseContent);
-                throw new InvalidOperationException($"EOD MCP server returned invalid JSON response for tool '{toolName}': {ex.Message}", ex);
+                _logger.LogError(ex, "Failed to parse EOD MCP response as JSON for tool {ToolName}. Response content: {Response}", toolName, responseContent);
+                throw new InvalidOperationException($"EOD MCP server returned invalid JSON response for tool '{toolName}': {ex.Message}. Response was: {responseContent}", ex);
             }
         }
         catch (HttpRequestException ex)
@@ -539,6 +572,92 @@ public class McpServerService : IMcpServerService
         {
             _sessionSemaphore.Release();
         }
+    }
+
+    /// <summary>
+    /// Helper method to validate if a string starts with valid JSON characters
+    /// </summary>
+    /// <param name="content">The content to validate</param>
+    /// <returns>True if the content appears to start with valid JSON</returns>
+    private static bool IsValidJsonStart(string content)
+    {
+        if (string.IsNullOrWhiteSpace(content))
+            return false;
+
+        var trimmed = content.TrimStart();
+        return trimmed.StartsWith("{") || trimmed.StartsWith("[") || trimmed.StartsWith("\"") ||
+               trimmed.StartsWith("true", StringComparison.OrdinalIgnoreCase) ||
+               trimmed.StartsWith("false", StringComparison.OrdinalIgnoreCase) ||
+               trimmed.StartsWith("null", StringComparison.OrdinalIgnoreCase) ||
+               char.IsDigit(trimmed[0]) || trimmed[0] == '-';
+    }
+
+    /// <summary>
+    /// Helper method to provide more detailed analysis of invalid response content
+    /// </summary>
+    /// <param name="content">The response content to analyze</param>
+    /// <returns>Diagnostic information about the content</returns>
+    private static string AnalyzeInvalidContent(string content)
+    {
+        if (string.IsNullOrEmpty(content))
+            return "Content is null or empty";
+
+        var trimmed = content.Trim();
+        var firstChars = trimmed.Length > 50 ? trimmed.Substring(0, 50) + "..." : trimmed;
+        
+        if (trimmed.StartsWith(":"))
+            return $"Content starts with colon (:) - possibly malformed MCP response. First 50 chars: '{firstChars}'";
+        
+        if (trimmed.StartsWith("Error:") || trimmed.StartsWith("ERROR:"))
+            return $"Content appears to be an error message: '{firstChars}'";
+        
+        if (trimmed.StartsWith("<!DOCTYPE") || trimmed.StartsWith("<html"))
+            return $"Content appears to be HTML: '{firstChars}'";
+        
+        if (trimmed.Contains("Internal Server Error"))
+            return $"Content indicates server error: '{firstChars}'";
+        
+        return $"Content format unrecognized. First 50 chars: '{firstChars}'";
+    }
+
+    /// <summary>
+    /// Helper method to extract string array from JSON parameter that might be JsonElement
+    /// </summary>
+    /// <param name="parameter">The parameter value (either JsonElement array or IEnumerable)</param>
+    /// <returns>Array of strings extracted from the parameter</returns>
+    private static string[] ExtractStringArrayFromJsonParameter(object parameter)
+    {
+        if (parameter is JsonElement jsonElement)
+        {
+            if (jsonElement.ValueKind == JsonValueKind.Array)
+            {
+                return jsonElement.EnumerateArray()
+                    .Where(item => item.ValueKind == JsonValueKind.String)
+                    .Select(item => item.GetString()!)
+                    .Where(s => !string.IsNullOrEmpty(s))
+                    .ToArray();
+            }
+            else if (jsonElement.ValueKind == JsonValueKind.String)
+            {
+                // Single string value
+                var value = jsonElement.GetString();
+                return !string.IsNullOrEmpty(value) ? new[] { value } : Array.Empty<string>();
+            }
+        }
+        else if (parameter is IEnumerable<object> enumerable)
+        {
+            // Legacy handling for non-JsonElement arrays
+            return enumerable.Select(item => item?.ToString()!)
+                .Where(s => !string.IsNullOrEmpty(s))
+                .ToArray();
+        }
+        else if (parameter is string singleString)
+        {
+            // Single string parameter
+            return !string.IsNullOrEmpty(singleString) ? new[] { singleString } : Array.Empty<string>();
+        }
+
+        return Array.Empty<string>();
     }
 
     #endregion

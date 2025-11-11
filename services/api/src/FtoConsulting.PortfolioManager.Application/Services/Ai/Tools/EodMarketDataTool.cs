@@ -27,7 +27,7 @@ public class EodMarketDataTool
     /// <summary>
     /// Get real financial news from EOD Historical Data
     /// </summary>
-    /// <param name="mcpServerService">MCP server service for making external calls</param>
+    /// <param name="mcpServerService">MCP server service for making external calls (not used for direct HTTP calls)</param>
     /// <param name="tickers">Stock tickers to get news for</param>
     /// <param name="fromDate">Start date for news search</param>
     /// <param name="toDate">End date for news search</param>
@@ -44,9 +44,9 @@ public class EodMarketDataTool
         {
             _logger.LogInformation("Fetching financial news from EOD for tickers: {Tickers}", string.Join(", ", tickers));
 
-            if (mcpServerService == null)
+            if (string.IsNullOrEmpty(_eodApiOptions.Token))
             {
-                _logger.LogWarning("MCP server service not available, returning empty news");
+                _logger.LogWarning("EOD API token not configured, returning empty news");
                 return Array.Empty<NewsItemDto>();
             }
 
@@ -62,24 +62,34 @@ public class EodMarketDataTool
                 return ticker;
             }).ToList();
 
-            var parameters = new Dictionary<string, object>
+            if (!cleanedTickers.Any())
             {
-                ["ticker"] = string.Join(",", cleanedTickers), // Use cleaned tickers
-                ["start_date"] = fromDate.ToString("yyyy-MM-dd"), 
-                ["end_date"] = toDate.ToString("yyyy-MM-dd"),  
-                ["limit"] = 10 
-            };
+                _logger.LogWarning("No valid tickers for news fetch");
+                return Array.Empty<NewsItemDto>();
+            }
 
-            _logger.LogInformation("Using cleaned tickers for news: {CleanedTickers} (original: {OriginalTickers})", 
-                string.Join(",", cleanedTickers), string.Join(",", tickers));
+            using var httpClient = new HttpClient();
+            httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
 
-            var result = await mcpServerService.CallMcpToolAsync(
-                _eodApiOptions.McpServerUrl, 
-                "get_company_news", 
-                parameters, 
-                cancellationToken);
+            // Use EOD's news API: https://eodhd.com/api/news?api_token=TOKEN&s=TICKER&from=DATE&to=DATE&limit=10&fmt=json
+            var tickerParam = string.Join(",", cleanedTickers);
+            var url = $"{_eodApiOptions.BaseUrl}/news?api_token={_eodApiOptions.Token}&s={tickerParam}&from={fromDate:yyyy-MM-dd}&to={toDate:yyyy-MM-dd}&limit=10&fmt=json";
+            
+            _logger.LogInformation("Fetching news from URL: {Url}", url.Replace(_eodApiOptions.Token, "***"));
 
-            return ParseNewsResponse(result);
+            var response = await httpClient.GetAsync(url, cancellationToken);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var jsonContent = await response.Content.ReadAsStringAsync(cancellationToken);
+                return ParseDirectNewsResponse(jsonContent);
+            }
+            else
+            {
+                _logger.LogWarning("HTTP error fetching news: {StatusCode} - {Reason}", 
+                    response.StatusCode, response.ReasonPhrase);
+                return Array.Empty<NewsItemDto>();
+            }
         }
         catch (Exception ex)
         {
@@ -760,6 +770,117 @@ public class EodMarketDataTool
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error parsing direct real-time price response for ticker: {Ticker}", ticker);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Parse direct news response from EOD API JSON string
+    /// </summary>
+    private IEnumerable<NewsItemDto> ParseDirectNewsResponse(string jsonContent)
+    {
+        try
+        {
+            _logger.LogInformation("Parsing direct EOD news response: {Length} characters", jsonContent.Length);
+            
+            if (string.IsNullOrWhiteSpace(jsonContent))
+            {
+                _logger.LogWarning("Direct EOD news response is empty");
+                return Array.Empty<NewsItemDto>();
+            }
+
+            var jsonElement = JsonSerializer.Deserialize<JsonElement>(jsonContent);
+            _logger.LogInformation("Successfully parsed direct news JSON, ValueKind: {ValueKind}", jsonElement.ValueKind);
+
+            var newsList = new List<NewsItemDto>();
+
+            if (jsonElement.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var newsItem in jsonElement.EnumerateArray())
+                {
+                    var dto = ParseSingleNewsItem(newsItem);
+                    if (dto != null)
+                        newsList.Add(dto);
+                }
+            }
+            else if (jsonElement.ValueKind == JsonValueKind.Object)
+            {
+                // Single news item
+                var dto = ParseSingleNewsItem(jsonElement);
+                if (dto != null)
+                    newsList.Add(dto);
+            }
+
+            _logger.LogInformation("Parsed {Count} news items from direct EOD response", newsList.Count);
+            return newsList;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error parsing direct news response from EOD");
+            return Array.Empty<NewsItemDto>();
+        }
+    }
+
+    /// <summary>
+    /// Parse a single news item from JSON element
+    /// </summary>
+    private NewsItemDto? ParseSingleNewsItem(JsonElement newsItem)
+    {
+        try
+        {
+            var title = newsItem.TryGetProperty("title", out var titleProp) ? titleProp.GetString() : "No Title";
+            var content = newsItem.TryGetProperty("content", out var contentProp) ? contentProp.GetString() : string.Empty;
+            var link = newsItem.TryGetProperty("link", out var linkProp) ? linkProp.GetString() : string.Empty;
+            var dateStr = newsItem.TryGetProperty("date", out var dateProp) ? dateProp.GetString() : string.Empty;
+            
+            // Handle symbols as either string or array
+            var symbolsList = new List<string>();
+            if (newsItem.TryGetProperty("symbols", out var symbolsProp))
+            {
+                if (symbolsProp.ValueKind == JsonValueKind.String)
+                {
+                    var symbolsString = symbolsProp.GetString();
+                    if (!string.IsNullOrEmpty(symbolsString))
+                    {
+                        symbolsList.AddRange(symbolsString.Split(',').Select(s => s.Trim()));
+                    }
+                }
+                else if (symbolsProp.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var symbol in symbolsProp.EnumerateArray())
+                    {
+                        if (symbol.ValueKind == JsonValueKind.String)
+                        {
+                            var symbolStr = symbol.GetString();
+                            if (!string.IsNullOrEmpty(symbolStr))
+                            {
+                                symbolsList.Add(symbolStr.Trim());
+                            }
+                        }
+                    }
+                }
+            }
+
+            DateTime publishedDate = DateTime.UtcNow;
+            if (!string.IsNullOrEmpty(dateStr) && DateTime.TryParse(dateStr, out var parsedDate))
+            {
+                publishedDate = parsedDate;
+            }
+
+            return new NewsItemDto(
+                Title: title ?? "No Title",
+                Summary: content ?? string.Empty,
+                Source: "EOD Historical Data",
+                PublishedDate: publishedDate,
+                Url: link ?? string.Empty,
+                RelatedTickers: symbolsList,
+                SentimentScore: 0.0m, // EOD doesn't provide sentiment in basic news
+                Category: "Financial News"
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error parsing individual news item");
             return null;
         }
     }

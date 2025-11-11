@@ -14,7 +14,7 @@ using System.Text.Json.Serialization;
 namespace FtoConsulting.PortfolioManager.Application.Services;
 
 /// <summary>
-/// Service implementation for fetching market prices using EOD Historical Data
+/// Service implementation for fetching market prices using EOD Data
 /// </summary>
 public class PriceFetchingService : IPriceFetching, IDisposable
 {
