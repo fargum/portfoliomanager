@@ -47,8 +47,7 @@ public class PortfolioAnalysisService : IPortfolioAnalysisService
                 DayChange: h.DailyProfitLoss,
                 DayChangePercentage: h.DailyProfitLossPercentage / 100m,
                 TotalReturn: h.CurrentValue - h.BoughtValue,
-                TotalReturnPercentage: h.BoughtValue > 0 ? (h.CurrentValue - h.BoughtValue) / h.BoughtValue : 0,
-                PerformanceContext: DeterminePerformanceContext(h.DailyProfitLossPercentage)
+                TotalReturnPercentage: h.BoughtValue > 0 ? (h.CurrentValue - h.BoughtValue) / h.BoughtValue : 0
             )).ToList();
 
             // Calculate portfolio totals
@@ -132,25 +131,10 @@ public class PortfolioAnalysisService : IPortfolioAnalysisService
             Metrics: new PerformanceMetricsDto(
                 TotalReturn: 0,
                 TotalReturnPercentage: 0,
-                DailyVolatility: 0,
-                RiskProfile: "No Data",
                 TopPerformers: Enumerable.Empty<string>(),
                 BottomPerformers: Enumerable.Empty<string>()
             )
         );
-    }
-
-    private string DeterminePerformanceContext(decimal dayChangePercentage)
-    {
-        return dayChangePercentage switch
-        {
-            > 5 => "Excellent",
-            > 2 => "Strong",
-            > 0 => "Positive",
-            > -2 => "Slight Decline",
-            > -5 => "Concerning",
-            _ => "Significant Decline"
-        };
     }
 
     private PerformanceMetricsDto CalculatePerformanceMetrics(IEnumerable<HoldingPerformanceDto> holdings)
@@ -164,16 +148,7 @@ public class PortfolioAnalysisService : IPortfolioAnalysisService
         // Simple volatility estimate based on day changes
         var dayChanges = holdingsList.Select(h => h.DayChangePercentage).ToList();
         var avgDayChange = dayChanges.Any() ? dayChanges.Average() : 0;
-        var variance = dayChanges.Any() ? dayChanges.Sum(x => Math.Pow((double)(x - avgDayChange), 2)) / dayChanges.Count : 0;
-        var volatility = (decimal)Math.Sqrt(variance);
 
-        var riskProfile = volatility switch
-        {
-            < 0.01m => "Conservative",
-            < 0.03m => "Moderate",
-            < 0.05m => "Aggressive",
-            _ => "High Risk"
-        };
 
         var topPerformers = holdingsList
             .Where(h => h.DayChangePercentage > 0)
@@ -190,8 +165,6 @@ public class PortfolioAnalysisService : IPortfolioAnalysisService
         return new PerformanceMetricsDto(
             TotalReturn: totalReturn,
             TotalReturnPercentage: totalReturnPercentage,
-            DailyVolatility: volatility,
-            RiskProfile: riskProfile,
             TopPerformers: topPerformers,
             BottomPerformers: bottomPerformers
         );
@@ -224,24 +197,13 @@ public class PortfolioAnalysisService : IPortfolioAnalysisService
             var change = endValue - startValue;
             var changePercentage = startValue > 0 ? change / startValue : 0;
 
-            var performanceCategory = changePercentage switch
-            {
-                > 0.1m => "Strong Performer",
-                > 0.05m => "Good Performer", 
-                > 0 => "Positive",
-                > -0.05m => "Slight Decline",
-                > -0.1m => "Poor Performer",
-                _ => "Significant Decline"
-            };
-
             return new HoldingComparisonDto(
                 Ticker: platform != "UNKNOWN" ? $"{ticker} ({platform})" : ticker,
                 InstrumentName: endHolding?.Instrument?.Name ?? startHolding?.Instrument?.Name ?? "Unknown",
                 StartValue: startValue,
                 EndValue: endValue,
                 Change: change,
-                ChangePercentage: changePercentage,
-                PerformanceCategory: performanceCategory
+                ChangePercentage: changePercentage
             );
         });
     }

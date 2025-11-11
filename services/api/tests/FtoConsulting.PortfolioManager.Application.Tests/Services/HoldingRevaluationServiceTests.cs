@@ -12,6 +12,7 @@ public class HoldingRevaluationServiceTests
     private readonly Mock<IHoldingRepository> _holdingRepositoryMock;
     private readonly Mock<IInstrumentPriceRepository> _instrumentPriceRepositoryMock;
     private readonly Mock<ICurrencyConversionService> _currencyConversionServiceMock;
+    private readonly Mock<IPricingCalculationService> _pricingCalculationServiceMock;
     private readonly Mock<IPriceFetching> _priceFetchingMock;
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
     private readonly Mock<ILogger<HoldingRevaluationService>> _loggerMock;
@@ -22,6 +23,7 @@ public class HoldingRevaluationServiceTests
         _holdingRepositoryMock = new Mock<IHoldingRepository>();
         _instrumentPriceRepositoryMock = new Mock<IInstrumentPriceRepository>();
         _currencyConversionServiceMock = new Mock<ICurrencyConversionService>();
+        _pricingCalculationServiceMock = new Mock<IPricingCalculationService>();
         _priceFetchingMock = new Mock<IPriceFetching>();
         _unitOfWorkMock = new Mock<IUnitOfWork>();
         _loggerMock = new Mock<ILogger<HoldingRevaluationService>>();
@@ -35,6 +37,7 @@ public class HoldingRevaluationServiceTests
             _holdingRepositoryMock.Object,
             _instrumentPriceRepositoryMock.Object,
             _currencyConversionServiceMock.Object,
+            _pricingCalculationServiceMock.Object,
             _priceFetchingMock.Object,
             _unitOfWorkMock.Object,
             _loggerMock.Object);

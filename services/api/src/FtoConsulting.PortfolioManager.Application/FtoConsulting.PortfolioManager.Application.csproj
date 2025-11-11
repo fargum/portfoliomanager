@@ -1,6 +1,10 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <EmbeddedResource Include="Configuration\AgentPrompts.json" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\FtoConsulting.PortfolioManager.Domain\FtoConsulting.PortfolioManager.Domain.csproj" />
   </ItemGroup>
 

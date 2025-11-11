@@ -229,9 +229,6 @@ Keep the response professional, accurate, and useful for portfolio management de
     }
 
     /// <summary>
-    /// Get news word weights from EOD - returns null if unavailable
-    /// </summary>
-    /// <summary>
     /// Get sentiment data from EOD - throws exception if unavailable
     /// </summary>
     private async Task<MarketSentimentDto> GetSentimentAsync(DateTime date, IEnumerable<string> tickers)
@@ -245,7 +242,7 @@ Keep the response professional, accurate, and useful for portfolio management de
         try
         {
             var eodMarketDataTool = _eodMarketDataToolFactory();
-            var realSentiment = await eodMarketDataTool.GetMarketSentimentAsync(_mcpServerService, tickers, date);
+            var realSentiment = await eodMarketDataTool.GetMarketSentimentAsync(tickers, date);
             if (realSentiment != null)
             {
                 _logger.LogInformation("Retrieved sentiment data from EOD");

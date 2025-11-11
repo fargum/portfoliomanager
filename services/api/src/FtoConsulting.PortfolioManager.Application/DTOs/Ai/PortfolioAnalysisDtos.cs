@@ -25,8 +25,7 @@ public record HoldingPerformanceDto(
     decimal DayChange,
     decimal DayChangePercentage,
     decimal TotalReturn,
-    decimal TotalReturnPercentage,
-    string PerformanceContext
+    decimal TotalReturnPercentage
 );
 
 /// <summary>
@@ -53,8 +52,7 @@ public record HoldingComparisonDto(
     decimal StartValue,
     decimal EndValue,
     decimal Change,
-    decimal ChangePercentage,
-    string PerformanceCategory
+    decimal ChangePercentage
 );
 
 /// <summary>
@@ -63,8 +61,6 @@ public record HoldingComparisonDto(
 public record PerformanceMetricsDto(
     decimal TotalReturn,
     decimal TotalReturnPercentage,
-    decimal DailyVolatility,
-    string RiskProfile,
     IEnumerable<string> TopPerformers,
     IEnumerable<string> BottomPerformers
 );

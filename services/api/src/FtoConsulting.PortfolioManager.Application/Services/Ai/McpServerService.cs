@@ -117,98 +117,10 @@ public class McpServerService : IMcpServerService
 
     public Task<IEnumerable<McpToolDefinition>> GetAvailableToolsAsync()
     {
-        _logger.LogInformation("Returning available MCP tools from integrated Microsoft Agent Framework");
+        _logger.LogInformation("Returning available MCP tools from centralized tool registry");
         
-        var tools = new[]
-        {
-            new McpToolDefinition(
-                Name: "GetPortfolioHoldings",
-                Description: "Retrieve portfolio holdings for a specific account and date",
-                Schema: new Dictionary<string, object>
-                {
-                    ["type"] = "object",
-                    ["properties"] = new Dictionary<string, object>
-                    {
-                        ["accountId"] = new { type = "integer", description = "Account ID" },
-                        ["date"] = new { type = "string", description = "Date in YYYY-MM-DD format" }
-                    },
-                    ["required"] = new[] { "accountId", "date" }
-                }
-            ),
-            new McpToolDefinition(
-                Name: "AnalyzePortfolioPerformance",
-                Description: "Analyze portfolio performance and generate insights for a specific date",
-                Schema: new Dictionary<string, object>
-                {
-                    ["type"] = "object",
-                    ["properties"] = new Dictionary<string, object>
-                    {
-                        ["accountId"] = new { type = "integer", description = "Account ID" },
-                        ["analysisDate"] = new { type = "string", description = "Analysis date in YYYY-MM-DD format" }
-                    },
-                    ["required"] = new[] { "accountId", "analysisDate" }
-                }
-            ),
-            new McpToolDefinition(
-                Name: "ComparePortfolioPerformance",
-                Description: "Compare portfolio performance between two dates",
-                Schema: new Dictionary<string, object>
-                {
-                    ["type"] = "object",
-                    ["properties"] = new Dictionary<string, object>
-                    {
-                        ["accountId"] = new { type = "integer", description = "Account ID" },
-                        ["startDate"] = new { type = "string", description = "Start date in YYYY-MM-DD format" },
-                        ["endDate"] = new { type = "string", description = "End date in YYYY-MM-DD format" }
-                    },
-                    ["required"] = new[] { "accountId", "startDate", "endDate" }
-                }
-            ),
-            new McpToolDefinition(
-                Name: "GetMarketContext",
-                Description: "Get market context and news for specific stock tickers",
-                Schema: new Dictionary<string, object>
-                {
-                    ["type"] = "object",
-                    ["properties"] = new Dictionary<string, object>
-                    {
-                        ["tickers"] = new { type = "array", items = new { type = "string" }, description = "List of stock tickers" },
-                        ["date"] = new { type = "string", description = "Date for market analysis in YYYY-MM-DD format" }
-                    },
-                    ["required"] = new[] { "tickers", "date" }
-                }
-            ),
-            new McpToolDefinition(
-                Name: "SearchFinancialNews",
-                Description: "Search for financial news related to specific tickers within a date range",
-                Schema: new Dictionary<string, object>
-                {
-                    ["type"] = "object",
-                    ["properties"] = new Dictionary<string, object>
-                    {
-                        ["tickers"] = new { type = "array", items = new { type = "string" }, description = "List of stock tickers" },
-                        ["fromDate"] = new { type = "string", description = "Start date in YYYY-MM-DD format" },
-                        ["toDate"] = new { type = "string", description = "End date in YYYY-MM-DD format" }
-                    },
-                    ["required"] = new[] { "tickers", "fromDate", "toDate" }
-                }
-            ),
-            new McpToolDefinition(
-                Name: "GetMarketSentiment",
-                Description: "Get overall market sentiment and indicators for a specific date",
-                Schema: new Dictionary<string, object>
-                {
-                    ["type"] = "object",
-                    ["properties"] = new Dictionary<string, object>
-                    {
-                        ["date"] = new { type = "string", description = "Date for sentiment analysis in YYYY-MM-DD format" }
-                    },
-                    ["required"] = new[] { "date" }
-                }
-            )
-        };
-
-        return Task.FromResult<IEnumerable<McpToolDefinition>>(tools);
+        var tools = PortfolioToolRegistry.GetMcpToolDefinitions();
+        return Task.FromResult(tools);
     }
 
     public async Task<bool> IsHealthyAsync()

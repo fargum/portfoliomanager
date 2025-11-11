@@ -27,6 +27,7 @@ public class AiOrchestrationService(
     IMcpServerService mcpServerService,
     IConversationThreadService conversationThreadService,
     IServiceProvider serviceProvider,
+    IAgentPromptService agentPromptService,
     Func<int, int?, System.Text.Json.JsonSerializerOptions?, ChatMessageStore> chatMessageStoreFactory,
     Func<int, IChatClient, AIContextProvider> memoryContextProviderFactory) : IAiOrchestrationService
 {
@@ -35,6 +36,7 @@ public class AiOrchestrationService(
     private readonly IMcpServerService _mcpServerService = mcpServerService;
     private readonly IConversationThreadService _conversationThreadService = conversationThreadService;
     private readonly IServiceProvider _serviceProvider = serviceProvider;
+    private readonly IAgentPromptService _agentPromptService = agentPromptService;
     private readonly Func<int, int?, System.Text.Json.JsonSerializerOptions?, ChatMessageStore> _chatMessageStoreFactory = chatMessageStoreFactory;
     private readonly Func<int, IChatClient, AIContextProvider> _memoryContextProviderFactory = memoryContextProviderFactory;
 
@@ -277,76 +279,12 @@ public class AiOrchestrationService(
 
     public async Task<IEnumerable<AiToolDto>> GetAvailableToolsAsync()
     {
-        // Tool definitions are now managed by the Microsoft Agent Framework MCP server
-        // This method provides a summary view for the AI orchestration service
-        _logger.LogInformation("Returning tool summary from unified MCP architecture");
+        // Tool definitions are now managed by the centralized PortfolioToolRegistry
+        // This provides a summary view for the AI orchestration service
+        _logger.LogInformation("Returning tool summary from centralized portfolio tool registry");
         
         await Task.CompletedTask;
-
-        return new[]
-        {
-            new AiToolDto(
-                Name: "GetPortfolioHoldings",
-                Description: "Retrieve portfolio holdings for a specific account and date",
-                Parameters: new Dictionary<string, object>
-                {
-                    ["accountId"] = new { type = "integer", description = "Account ID" },
-                    ["date"] = new { type = "string", description = "Date in YYYY-MM-DD format" }
-                },
-                Category: "Portfolio Data"
-            ),
-            new AiToolDto(
-                Name: "AnalyzePortfolioPerformance",
-                Description: "Analyze portfolio performance and generate insights for a specific date",
-                Parameters: new Dictionary<string, object>
-                {
-                    ["accountId"] = new { type = "integer", description = "Account ID" },
-                    ["analysisDate"] = new { type = "string", description = "Analysis date in YYYY-MM-DD format" }
-                },
-                Category: "Portfolio Analysis"
-            ),
-            new AiToolDto(
-                Name: "ComparePortfolioPerformance",
-                Description: "Compare portfolio performance between two dates",
-                Parameters: new Dictionary<string, object>
-                {
-                    ["accountId"] = new { type = "integer", description = "Account ID" },
-                    ["startDate"] = new { type = "string", description = "Start date in YYYY-MM-DD format" },
-                    ["endDate"] = new { type = "string", description = "End date in YYYY-MM-DD format" }
-                },
-                Category: "Portfolio Analysis"
-            ),
-            new AiToolDto(
-                Name: "GetMarketContext",
-                Description: "Get market context and news for specific stock tickers",
-                Parameters: new Dictionary<string, object>
-                {
-                    ["tickers"] = new { type = "array", description = "List of stock tickers" },
-                    ["date"] = new { type = "string", description = "Date for market analysis in YYYY-MM-DD format" }
-                },
-                Category: "Market Intelligence"
-            ),
-            new AiToolDto(
-                Name: "SearchFinancialNews",
-                Description: "Search for financial news related to specific tickers within a date range",
-                Parameters: new Dictionary<string, object>
-                {
-                    ["tickers"] = new { type = "array", description = "List of stock tickers" },
-                    ["fromDate"] = new { type = "string", description = "Start date in YYYY-MM-DD format" },
-                    ["toDate"] = new { type = "string", description = "End date in YYYY-MM-DD format" }
-                },
-                Category: "Market Intelligence"
-            ),
-            new AiToolDto(
-                Name: "GetMarketSentiment",
-                Description: "Get overall market sentiment and indicators for a specific date",
-                Parameters: new Dictionary<string, object>
-                {
-                    ["date"] = new { type = "string", description = "Date for sentiment analysis in YYYY-MM-DD format" }
-                },
-                Category: "Market Intelligence"
-            )
-        };
+        return PortfolioToolRegistry.GetAiToolDtos();
     }
 
     /// <summary>
@@ -354,43 +292,9 @@ public class AiOrchestrationService(
     /// </summary>
     private IEnumerable<AITool> CreatePortfolioMcpFunctions()
     {
-        // Create AI functions that map to our MCP server endpoints
+        // Create AI functions from the centralized tool registry
         // These will be used by the AI agent to call our MCP tools
-        var functions = new List<AITool>
-        {
-            AIFunctionFactory.Create(
-                method: (int accountId, string date) => CallMcpTool("GetPortfolioHoldings", new { accountId, date }),
-                name: "GetPortfolioHoldings",
-                description: "Retrieve portfolio holdings for a specific account and date"),
-
-            AIFunctionFactory.Create(
-                method: (int accountId, string analysisDate) => CallMcpTool("AnalyzePortfolioPerformance", new { accountId, analysisDate }),
-                name: "AnalyzePortfolioPerformance",
-                description: "Analyze portfolio performance and generate insights for a specific date"),
-
-            AIFunctionFactory.Create(
-                method: (int accountId, string startDate, string endDate) => CallMcpTool("ComparePortfolioPerformance", new { accountId, startDate, endDate }),
-                name: "ComparePortfolioPerformance",
-                description: "Compare portfolio performance between two dates"),
-
-            AIFunctionFactory.Create(
-                method: (string[] tickers, string date) => CallMcpTool("GetMarketContext", new { tickers, date }),
-                name: "GetMarketContext",
-                description: "Get market context and news for specific stock tickers"),
-
-            AIFunctionFactory.Create(
-                method: (string[] tickers, string fromDate, string toDate) => CallMcpTool("SearchFinancialNews", new { tickers, fromDate, toDate }),
-                name: "SearchFinancialNews",
-                description: "Search for financial news related to specific tickers within a date range"),
-
-            AIFunctionFactory.Create(
-                method: (string date) => CallMcpTool("GetMarketSentiment", new { date }),
-                name: "GetMarketSentiment",
-                description: "Get overall market sentiment and indicators for a specific date"),
-
-        };
-
-        return functions;
+        return PortfolioToolRegistry.CreateAiFunctions(CallMcpTool);
     }
 
     /// <summary>
@@ -398,76 +302,36 @@ public class AiOrchestrationService(
     /// </summary>
     private string CreateAgentInstructions(int accountId)
     {
-        return $@"You are a friendly financial advisor helping the owner of Account ID {accountId}. Think of yourself as their personal finance assistant - knowledgeable but approachable, professional but not stuffy.
+        try
+        {
+            return _agentPromptService.GetPortfolioAdvisorPrompt(accountId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error loading agent instructions for account {AccountId}, using fallback", accountId);
+            
+            // Fallback prompt in case the service fails
+            return $@"You are a friendly financial advisor helping the owner of Account ID {accountId}. 
+            
+Provide clear, helpful analysis of their portfolio data. Use conversational language rather than dry technical jargon. 
+Format monetary amounts as £1,234.56 and use British date formats. Focus on actionable insights they can understand.
 
-WHEN TO USE YOUR TOOLS:
-You have some great tools at your disposal, but only use them when someone actually wants portfolio or market information:
-
-✅ Perfect times to use tools:
-- ""Show me my portfolio"" or ""What do I own?""
-- ""How am I doing this month?"" or ""What's my performance?""
-- ""Any news on Apple stock?"" or ""What's happening with Tesla?""
-- ""How's the market looking today?""
-
-❌ Just have a normal chat for:
-- Greetings like ""Hi there!"" or ""How are you?""
-- General questions like ""What can you help me with?""
-- Personal introductions like ""My name is Sarah""
-- Casual conversation
-
-COMMUNICATION STYLE:
-Think conversational, not corporate. Instead of dry bullet points, weave information into flowing paragraphs that feel natural to read. Here's the difference:
-
-❌ Avoid this robotic style:
-## Portfolio Summary:
-- Current Value: £45,678.90
-- Daily Change: +£234.56
-- Performance: +1.23%
-
-✅ Go for this friendly approach:
-## How Your Portfolio's Looking Today
-
-Your portfolio is sitting at £45,678.90 right now, which is actually up £234.56 from yesterday - that's a nice 1.23% boost! The market's been pretty kind to you today.
-
-FORMATTING THAT FEELS NATURAL:
-- Use ## for main sections (like ## How Your Portfolio's Looking Today)
-- Write in paragraphs rather than bullet lists where possible
-- When you do need lists, make them feel conversational: ""Here's what caught my eye in your holdings...""
-- Always format money as £1,234.56 (this is a UK portfolio)
-- Dates should feel British: 15th March 2024 or 15/03/2024
-- Percentages like +1.23% or -2.45%
-
-TABLES WHEN NEEDED:
-Sometimes a table is the clearest way to show information:
-
-| Ticker | Company | Value | Today's Change |
-|--------|---------|--------|----------------|
-| AAPL.LSE | Apple Inc | £1,234.56 | +1.01% |
-
-REMEMBER:
-- Everything in £ (pounds), never $ (dollars) - this is a UK account
-- Use the date provided in user messages for ""current"" or ""today"" checks
-- When analyzing stocks, always grab market context and news to give them the full picture
-- Focus on insights they can actually use, not just raw numbers
-- If something's complex, explain it in plain English
-
-You're here to help them understand their investments and make sense of the markets, not to overwhelm them with jargon. Be the advisor they'd actually want to grab a coffee with!";
+When they ask about portfolio data or market information, use your available tools to get current information.
+For casual conversation, respond naturally without using tools.";
+        }
     }
 
     /// <summary>
     /// Call an MCP tool through our local MCP server
     /// </summary>
-    private async Task<object> CallMcpTool(string toolName, object parameters)
+    private async Task<object> CallMcpTool(string toolName, Dictionary<string, object> parameters)
     {
         try
         {
             _logger.LogInformation("Calling MCP tool: {ToolName} with parameters: {@Parameters}", toolName, parameters);
             
-            // Convert parameters object to dictionary format expected by MCP server
-            var parameterDict = ConvertParametersToDict(parameters);
-            
             // Call our MCP server service directly (more efficient than HTTP calls)
-            var result = await _mcpServerService.ExecuteToolAsync(toolName, parameterDict);
+            var result = await _mcpServerService.ExecuteToolAsync(toolName, parameters);
             
             _logger.LogInformation("Successfully executed MCP tool: {ToolName}", toolName);
             return result;
@@ -477,32 +341,6 @@ You're here to help them understand their investments and make sense of the mark
             _logger.LogError(ex, "Error calling MCP tool: {ToolName}", toolName);
             throw;
         }
-    }
-
-    /// <summary>
-    /// Convert anonymous object parameters to dictionary format
-    /// </summary>
-    private Dictionary<string, object> ConvertParametersToDict(object parameters)
-    {
-        if (parameters is Dictionary<string, object> dict)
-        {
-            return dict;
-        }
-
-        // Use reflection to convert anonymous object to dictionary
-        var paramDict = new Dictionary<string, object>();
-        var properties = parameters.GetType().GetProperties();
-        
-        foreach (var prop in properties)
-        {
-            var value = prop.GetValue(parameters);
-            if (value != null)
-            {
-                paramDict[prop.Name] = value;
-            }
-        }
-        
-        return paramDict;
     }
 
     /// <summary>

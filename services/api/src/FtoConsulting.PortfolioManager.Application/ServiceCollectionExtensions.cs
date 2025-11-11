@@ -102,6 +102,9 @@ public static class ServiceCollectionExtensions
         });
         services.AddScoped<EodMarketDataTool>();
         
+        // Register AI services
+        services.AddSingleton<IAgentPromptService, AgentPromptService>();
+        
         // Register MarketIntelligenceService with HttpClient factory
         services.AddScoped<IMarketIntelligenceService>(serviceProvider =>
         {
