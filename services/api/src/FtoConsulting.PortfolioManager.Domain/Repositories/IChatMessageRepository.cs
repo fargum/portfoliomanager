@@ -8,4 +8,5 @@ namespace FtoConsulting.PortfolioManager.Domain.Repositories;
 public interface IChatMessageRepository
 {
     Task<IEnumerable<ChatMessage>> GetMessagesByDateRangeAsync(int threadId, DateTime startDate, DateTime endDate, CancellationToken cancellationToken = default);
+    Task<IEnumerable<ChatMessage>> GetByThreadIdAsync(int threadId, CancellationToken cancellationToken = default);
 }

@@ -80,6 +80,7 @@ public static class ServiceCollectionExtensions
         
         // Register memory services
         services.AddScoped<IConversationThreadService, ConversationThreadService>();
+        services.AddScoped<IMemoryExtractionService, MemoryExtractionService>();
         
         // Register MCP Tools first (to avoid circular dependencies)
         services.AddScoped<PortfolioHoldingsTool>();

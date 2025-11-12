@@ -29,4 +29,15 @@ public class ChatMessageRepository : IChatMessageRepository
             .OrderBy(cm => cm.MessageTimestamp)
             .ToListAsync(cancellationToken);
     }
+
+    /// <summary>
+    /// Get all messages for a specific thread
+    /// </summary>
+    public async Task<IEnumerable<ChatMessage>> GetByThreadIdAsync(int threadId, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.ChatMessages
+            .Where(cm => cm.ConversationThreadId == threadId)
+            .OrderBy(cm => cm.MessageTimestamp)
+            .ToListAsync(cancellationToken);
+    }
 }

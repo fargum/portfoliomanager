@@ -9,4 +9,5 @@ public interface IMemorySummaryRepository
 {
     Task<MemorySummary?> GetByThreadAndDateAsync(int threadId, DateOnly summaryDate, CancellationToken cancellationToken = default);
     Task<MemorySummary> AddAsync(MemorySummary summary, CancellationToken cancellationToken = default);
+    Task<IEnumerable<MemorySummary>> GetRecentSummariesByAccountAsync(int accountId, int limit, CancellationToken cancellationToken = default);
 }

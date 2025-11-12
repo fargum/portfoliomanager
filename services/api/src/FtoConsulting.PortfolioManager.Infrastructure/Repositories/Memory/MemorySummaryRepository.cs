@@ -35,4 +35,18 @@ public class MemorySummaryRepository : IMemorySummaryRepository
         await _dbContext.SaveChangesAsync(cancellationToken);
         return summary;
     }
+
+    /// <summary>
+    /// Get recent memory summaries for an account (across all threads)
+    /// </summary>
+    public async Task<IEnumerable<MemorySummary>> GetRecentSummariesByAccountAsync(int accountId, int limit, CancellationToken cancellationToken = default)
+    {
+        return await _dbContext.MemorySummaries
+            .Include(ms => ms.ConversationThread)
+            .Where(ms => ms.ConversationThread.AccountId == accountId)
+            .OrderByDescending(ms => ms.SummaryDate)
+            .ThenByDescending(ms => ms.CreatedAt)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+    }
 }

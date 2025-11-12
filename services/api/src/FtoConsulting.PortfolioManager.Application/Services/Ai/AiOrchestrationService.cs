@@ -125,10 +125,10 @@ public class AiOrchestrationService(
             _logger.LogInformation("Processing portfolio query with memory for account {AccountId}, thread {ThreadId}: {Query}", 
                 accountId, threadId, query);
             
-            // Get or create conversation thread
+            // Get or create conversation thread - use session-based approach when no threadId provided
             var thread = threadId.HasValue 
                 ? await _conversationThreadService.GetThreadByIdAsync(threadId.Value, accountId, cancellationToken)
-                : await _conversationThreadService.GetOrCreateActiveThreadAsync(accountId, cancellationToken);
+                : await _conversationThreadService.CreateNewSessionAsync(accountId, cancellationToken);
 
             if (thread == null)
             {
@@ -444,18 +444,35 @@ For casual conversation, respond naturally without using tools.";
             var existingMessages = await messageStore.GetMessagesAsync(cancellationToken);
             var conversationHistory = existingMessages.ToList();
 
-            // Add the new user query to the conversation
+            // Load relevant memories from previous sessions for context continuity
+            var relevantMemories = await _conversationThreadService.GetRelevantMemoriesAsync(accountId, cancellationToken);
+            
+            // Inject memories as system context if this is a new conversation or we have relevant memories
+            if (relevantMemories.Any() && conversationHistory.Count == 0)
+            {
+                var memoryContext = string.Join("\n", relevantMemories.Select(m => $"- {m}"));
+                var memoryMessage = new ChatMessage(ChatRole.System, 
+                    $"Relevant information from previous conversations:\n{memoryContext}\n\nUse this information to provide personalized responses when relevant.");
+                conversationHistory.Add(memoryMessage);
+                
+                _logger.LogInformation("Injected {MemoryCount} relevant memories into new conversation for account {AccountId}", 
+                    relevantMemories.Count, accountId);
+            }
+
+            // Create the new user query message but don't add it to history yet
+            // Let the agent framework handle message storage automatically
             var currentDataDate = DateUtilities.GetPreviousWorkingDayForApi();
             var newUserMessage = new ChatMessage(ChatRole.User, $"User Query: {query}\nAccount ID: {accountId}\nThread ID: {threadId}\nData Available As Of: {currentDataDate} (use this date for 'current' or 'today' portfolio checks)");
-            conversationHistory.Add(newUserMessage);
 
             _logger.LogInformation("Loaded {HistoryCount} previous messages for thread {ThreadId}, processing with full conversation context", 
                 existingMessages.Count(), threadId);
             
             _logger.LogInformation("Processing with memory-aware agent for thread {ThreadId}", threadId);
             
-            // Run the agent with full conversation history
-            var response = await agent.RunAsync(conversationHistory, cancellationToken: cancellationToken);
+            // Run the agent with conversation history + new message
+            // The framework will automatically store both the user message and response
+            var allMessages = conversationHistory.Append(newUserMessage).ToList();
+            var response = await agent.RunAsync(allMessages, cancellationToken: cancellationToken);
 
             var cleanedResponse = CleanupMarkdownFormatting(response.Text);
 
@@ -513,18 +530,20 @@ For casual conversation, respond naturally without using tools.";
             var existingMessages = await messageStore.GetMessagesAsync(cancellationToken);
             var conversationHistory = existingMessages.ToList();
 
-            // Add the new user query to the conversation
+            // Create the new user query message but don't add it to history yet
+            // Let the agent framework handle message storage automatically
             var currentDataDate = DateUtilities.GetPreviousWorkingDayForApi();
             var newUserMessage = new ChatMessage(ChatRole.User, $"User Query: {query}\nAccount ID: {accountId}\nThread ID: {threadId}\nData Available As Of: {currentDataDate} (use this date for 'current' or 'today' portfolio checks)");
-            conversationHistory.Add(newUserMessage);
 
             _logger.LogInformation("Loaded {HistoryCount} previous messages for streaming on thread {ThreadId}", 
                 existingMessages.Count(), threadId);
             
             _logger.LogInformation("Processing streaming with memory-aware agent for thread {ThreadId}", threadId);
             
-            // Use streaming response from the memory-aware agent with full conversation history
-            await foreach (var streamingUpdate in agent.RunStreamingAsync(conversationHistory, cancellationToken: cancellationToken))
+            // Use streaming response from the memory-aware agent with conversation history + new message
+            // The framework will automatically store both the user message and response
+            var allMessages = conversationHistory.Append(newUserMessage).ToList();
+            await foreach (var streamingUpdate in agent.RunStreamingAsync(allMessages, cancellationToken: cancellationToken))
             {
                 if (cancellationToken.IsCancellationRequested)
                     break;

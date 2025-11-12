@@ -125,18 +125,22 @@ public class PortfolioMemoryContextProvider : AIContextProvider
     /// </summary>
     private async Task LoadRecentSummariesAsync(StringBuilder instructions, CancellationToken cancellationToken)
     {
+        // Load consolidated long-term memories first
+        await LoadConsolidatedMemoriesAsync(instructions, cancellationToken);
+        
+        // Then load recent summaries for immediate context
         var recentSummaries = await _dbContext.MemorySummaries
             .Include(ms => ms.ConversationThread)
             .Where(ms => ms.ConversationThread.AccountId == _accountId)
             .OrderByDescending(ms => ms.SummaryDate)
-            .Take(7) // Last week of summaries
+            .Take(5) // Recent context only
             .ToListAsync(cancellationToken);
 
         if (recentSummaries.Any())
         {
             instructions.AppendLine("## Recent Conversation Context:");
             
-            foreach (var summary in recentSummaries)
+            foreach (var summary in recentSummaries.OrderBy(s => s.SummaryDate))
             {
                 instructions.AppendLine($"**{summary.SummaryDate:MMM dd}:** {summary.Summary}");
                 
@@ -145,10 +149,39 @@ public class PortfolioMemoryContextProvider : AIContextProvider
                 {
                     try
                     {
-                        var topics = JsonSerializer.Deserialize<string[]>(summary.KeyTopics);
+                        // Try parsing as new format first (object with keyTopics property)
+                        string[]? topics = null;
+                        string[]? importantFacts = null;
+                        
+                        if (summary.KeyTopics.TrimStart().StartsWith('{'))
+                        {
+                            // New format: {"keyTopics": ["topic1", "topic2"], "importantFacts": [...], "confidenceScore": 0.85}
+                            var keyTopicsObject = JsonSerializer.Deserialize<JsonElement>(summary.KeyTopics);
+                            
+                            if (keyTopicsObject.TryGetProperty("keyTopics", out var keyTopicsArray))
+                            {
+                                topics = JsonSerializer.Deserialize<string[]>(keyTopicsArray.GetRawText());
+                            }
+                            
+                            if (keyTopicsObject.TryGetProperty("importantFacts", out var importantFactsArray))
+                            {
+                                importantFacts = JsonSerializer.Deserialize<string[]>(importantFactsArray.GetRawText());
+                            }
+                        }
+                        else
+                        {
+                            // Legacy format: ["topic1", "topic2"]
+                            topics = JsonSerializer.Deserialize<string[]>(summary.KeyTopics);
+                        }
+                        
                         if (topics?.Length > 0)
                         {
                             instructions.AppendLine($"Key topics: {string.Join(", ", topics)}");
+                        }
+                        
+                        if (importantFacts?.Length > 0)
+                        {
+                            instructions.AppendLine($"Important facts: {string.Join("; ", importantFacts)}");
                         }
                     }
                     catch (JsonException ex)
@@ -160,6 +193,153 @@ public class PortfolioMemoryContextProvider : AIContextProvider
             
             instructions.AppendLine();
         }
+    }
+
+    /// <summary>
+    /// Load and consolidate long-term memories that should persist across all conversations
+    /// </summary>
+    private async Task LoadConsolidatedMemoriesAsync(StringBuilder instructions, CancellationToken cancellationToken)
+    {
+        // Get ALL summaries for this account to extract persistent information
+        var allSummaries = await _dbContext.MemorySummaries
+            .Include(ms => ms.ConversationThread)
+            .Where(ms => ms.ConversationThread.AccountId == _accountId)
+            .OrderBy(ms => ms.SummaryDate) // Chronological order for proper precedence
+            .ToListAsync(cancellationToken);
+
+        if (!allSummaries.Any())
+            return;
+
+        // Consolidate core facts and preferences from all summaries
+        var consolidatedFacts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var consolidatedPreferences = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var persistentTopics = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var summary in allSummaries)
+        {
+            // Extract important facts
+            if (!string.IsNullOrEmpty(summary.KeyTopics))
+            {
+                try
+                {
+                    if (summary.KeyTopics.TrimStart().StartsWith('{'))
+                    {
+                        var summaryData = JsonSerializer.Deserialize<JsonElement>(summary.KeyTopics);
+                        
+                        // Extract important facts
+                        if (summaryData.TryGetProperty("importantFacts", out var factsArray))
+                        {
+                            var facts = JsonSerializer.Deserialize<string[]>(factsArray.GetRawText());
+                            if (facts != null)
+                            {
+                                foreach (var fact in facts)
+                                {
+                                    if (IsPersistentFact(fact))
+                                    {
+                                        consolidatedFacts.Add(fact);
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Extract persistent topics
+                        if (summaryData.TryGetProperty("keyTopics", out var topicsArray))
+                        {
+                            var topics = JsonSerializer.Deserialize<string[]>(topicsArray.GetRawText());
+                            if (topics != null)
+                            {
+                                foreach (var topic in topics)
+                                {
+                                    persistentTopics.Add(topic);
+                                }
+                            }
+                        }
+                    }
+                }
+                catch (JsonException ex)
+                {
+                    _logger.LogWarning(ex, "Failed to parse summary data for consolidation from summary {SummaryId}", summary.Id);
+                }
+            }
+
+            // Extract user preferences
+            if (!string.IsNullOrEmpty(summary.UserPreferences))
+            {
+                try
+                {
+                    var preferences = JsonSerializer.Deserialize<Dictionary<string, string>>(summary.UserPreferences);
+                    if (preferences != null)
+                    {
+                        foreach (var pref in preferences)
+                        {
+                            // Later preferences override earlier ones
+                            consolidatedPreferences[pref.Key] = pref.Value;
+                        }
+                    }
+                }
+                catch (JsonException ex)
+                {
+                    _logger.LogWarning(ex, "Failed to parse user preferences from summary {SummaryId}", summary.Id);
+                }
+            }
+        }
+
+        // Add consolidated information to instructions
+        if (consolidatedFacts.Any() || consolidatedPreferences.Any())
+        {
+            instructions.AppendLine("## Long-term User Profile:");
+            
+            if (consolidatedFacts.Any())
+            {
+                instructions.AppendLine("**Core Facts About This User:**");
+                foreach (var fact in consolidatedFacts.OrderBy(f => f))
+                {
+                    instructions.AppendLine($"- {fact}");
+                }
+                instructions.AppendLine();
+            }
+
+            if (consolidatedPreferences.Any())
+            {
+                instructions.AppendLine("**User Preferences:**");
+                foreach (var pref in consolidatedPreferences.OrderBy(p => p.Key))
+                {
+                    instructions.AppendLine($"- {pref.Key}: {pref.Value}");
+                }
+                instructions.AppendLine();
+            }
+
+            if (persistentTopics.Any())
+            {
+                instructions.AppendLine($"**Recurring Topics:** {string.Join(", ", persistentTopics.OrderBy(t => t))}");
+                instructions.AppendLine();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Determine if a fact should be considered persistent (long-term memory)
+    /// </summary>
+    private static bool IsPersistentFact(string fact)
+    {
+        if (string.IsNullOrWhiteSpace(fact))
+            return false;
+            
+        var lowerFact = fact.ToLowerInvariant();
+        
+        // Personal identity information
+        var persistentIndicators = new[]
+        {
+            "name", "called", "i'm", "i am", "my wife", "my husband", "my partner",
+            "my children", "my kids", "my daughter", "my son", "my family",
+            "work in", "work for", "job", "career", "profession", "retired",
+            "age", "years old", "born in", "live in", "from", "originally",
+            "investment goal", "financial goal", "saving for", "planning for",
+            "risk tolerance", "conservative", "aggressive", "moderate risk",
+            "time horizon", "retirement", "university", "college", "education"
+        };
+
+        return persistentIndicators.Any(indicator => lowerFact.Contains(indicator));
     }
 
     /// <summary>

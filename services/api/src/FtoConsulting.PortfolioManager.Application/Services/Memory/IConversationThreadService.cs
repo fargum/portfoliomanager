@@ -11,8 +11,11 @@ public interface IConversationThreadService
     Task<ConversationThread?> GetThreadByIdAsync(int threadId, int accountId, CancellationToken cancellationToken = default);
     Task<IEnumerable<ConversationThread>> GetActiveThreadsForAccountAsync(int accountId, CancellationToken cancellationToken = default);
     Task<ConversationThread> CreateNewThreadAsync(int accountId, string title, CancellationToken cancellationToken = default);
+    Task<ConversationThread> CreateNewSessionAsync(int accountId, CancellationToken cancellationToken = default);
     Task<ConversationThread> UpdateThreadTitleAsync(int threadId, int accountId, string title, CancellationToken cancellationToken = default);
     Task DeactivateThreadAsync(int threadId, int accountId, CancellationToken cancellationToken = default);
+    Task CloseThreadAsync(int threadId, int accountId, CancellationToken cancellationToken = default);
     Task<MemorySummary> CreateDailySummaryAsync(int threadId, DateOnly summaryDate, CancellationToken cancellationToken = default);
+    Task<List<string>> GetRelevantMemoriesAsync(int accountId, CancellationToken cancellationToken = default);
     Task CleanupOldThreadsAsync(int accountId, TimeSpan retentionPeriod, CancellationToken cancellationToken = default);
 }

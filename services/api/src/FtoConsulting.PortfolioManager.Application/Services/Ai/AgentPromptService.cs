@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using System.Text;
+using System.Reflection;
 
 namespace FtoConsulting.PortfolioManager.Application.Services.Ai;
 
@@ -146,16 +147,79 @@ public class AgentPromptService : IAgentPromptService
 
     public string GetPrompt(string promptName, Dictionary<string, object>? parameters = null)
     {
-        // For now, only handle PortfolioAdvisor
-        // This can be extended for other prompt types in the future
+        // Handle PortfolioAdvisor prompt
         if (promptName == "PortfolioAdvisor" && parameters?.ContainsKey("accountId") == true)
         {
             var accountId = Convert.ToInt32(parameters["accountId"]);
             return GetPortfolioAdvisorPrompt(accountId);
         }
 
+        // Handle MemoryExtractionAgent prompt
+        if (promptName == "MemoryExtractionAgent")
+        {
+            return GetMemoryExtractionPrompt(parameters);
+        }
+
         _logger.LogWarning("Unknown prompt name: {PromptName}", promptName);
         return "You are a helpful AI assistant.";
+    }
+
+    /// <summary>
+    /// Get the memory extraction agent prompt
+    /// </summary>
+    /// <param name="parameters">Parameters for substitution (accountId, currentDate)</param>
+    /// <returns>Complete prompt text for memory extraction</returns>
+    private string GetMemoryExtractionPrompt(Dictionary<string, object>? parameters = null)
+    {
+        var config = LoadPromptConfiguration();
+        
+        // Get the memory extraction config
+        if (!config.AdditionalAgents.ContainsKey("MemoryExtractionAgent"))
+        {
+            _logger.LogError("MemoryExtractionAgent configuration not found in AgentPrompts.json");
+            return "You are a helpful assistant that extracts information from conversations.";
+        }
+
+        var memoryConfigElement = config.AdditionalAgents["MemoryExtractionAgent"];
+        
+        // Convert JsonElement to formatted prompt string
+        var promptBuilder = new StringBuilder();
+        
+        // Build a comprehensive prompt from the JSON structure
+        if (memoryConfigElement.TryGetProperty("BaseInstructions", out var baseInstructions))
+        {
+            var instructions = baseInstructions.GetString() ?? "";
+            
+            // Apply parameter substitution
+            if (parameters != null)
+            {
+                foreach (var param in parameters)
+                {
+                    instructions = instructions.Replace($"{{{param.Key}}}", param.Value?.ToString() ?? "");
+                }
+            }
+            
+            promptBuilder.AppendLine(instructions);
+            promptBuilder.AppendLine();
+        }
+
+        // Add the critical output instruction
+        if (memoryConfigElement.TryGetProperty("CRITICAL_OUTPUT_INSTRUCTION", out var criticalInstruction))
+        {
+            promptBuilder.AppendLine("CRITICAL OUTPUT REQUIREMENT:");
+            promptBuilder.AppendLine(criticalInstruction.GetString());
+            promptBuilder.AppendLine();
+        }
+
+        // Add the output format example
+        if (memoryConfigElement.TryGetProperty("OutputFormat", out var outputFormat) && 
+            outputFormat.TryGetProperty("Example", out var example))
+        {
+            promptBuilder.AppendLine("REQUIRED OUTPUT FORMAT (example):");
+            promptBuilder.AppendLine(example.GetRawText());
+        }
+
+        return promptBuilder.ToString();
     }
 
     /// <summary>
@@ -178,18 +242,28 @@ public class AgentPromptService : IAgentPromptService
             using var reader = new StreamReader(stream);
             var jsonContent = reader.ReadToEnd();
             
-            var config = JsonSerializer.Deserialize<AgentPromptConfiguration>(jsonContent, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            });
+            // Parse as JsonDocument first to handle dynamic structure
+            using var document = JsonDocument.Parse(jsonContent);
+            var config = new AgentPromptConfiguration();
             
-            if (config == null)
+            foreach (var property in document.RootElement.EnumerateObject())
             {
-                _logger.LogWarning("Failed to deserialize prompt configuration, using fallback");
-                return CreateFallbackConfiguration();
+                if (property.Name == "PortfolioAdvisor")
+                {
+                    // Handle PortfolioAdvisor with strongly typed deserialization
+                    config.PortfolioAdvisor = JsonSerializer.Deserialize<PortfolioAdvisorPromptConfig>(
+                        property.Value.GetRawText(), 
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? new();
+                }
+                else
+                {
+                    // Handle other agents dynamically
+                    config.AdditionalAgents[property.Name] = property.Value.Clone();
+                }
             }
             
-            _logger.LogInformation("Successfully loaded agent prompt configuration");
+            _logger.LogInformation("Successfully loaded agent prompt configuration with {AgentCount} agents", 
+                config.AdditionalAgents.Count + 1);
             return config;
         }
         catch (Exception ex)
@@ -247,6 +321,7 @@ public class AgentPromptService : IAgentPromptService
 public class AgentPromptConfiguration
 {
     public PortfolioAdvisorPromptConfig PortfolioAdvisor { get; set; } = new();
+    public Dictionary<string, JsonElement> AdditionalAgents { get; set; } = new();
 }
 
 public class PortfolioAdvisorPromptConfig

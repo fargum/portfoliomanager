@@ -5,24 +5,27 @@ using Microsoft.Extensions.Logging;
 namespace FtoConsulting.PortfolioManager.Application.Services.Memory;
 
 /// <summary>
-/// Implementation of conversation thread service
+/// Service for managing conversation threads and memory operations with AI-powered summarization
 /// </summary>
 public class ConversationThreadService : IConversationThreadService
 {
     private readonly IConversationThreadRepository _threadRepository;
     private readonly IChatMessageRepository _messageRepository;
     private readonly IMemorySummaryRepository _summaryRepository;
+    private readonly IMemoryExtractionService _memoryExtractionService;
     private readonly ILogger<ConversationThreadService> _logger;
 
     public ConversationThreadService(
         IConversationThreadRepository threadRepository,
         IChatMessageRepository messageRepository,
         IMemorySummaryRepository summaryRepository,
+        IMemoryExtractionService memoryExtractionService,
         ILogger<ConversationThreadService> logger)
     {
         _threadRepository = threadRepository ?? throw new ArgumentNullException(nameof(threadRepository));
         _messageRepository = messageRepository ?? throw new ArgumentNullException(nameof(messageRepository));
         _summaryRepository = summaryRepository ?? throw new ArgumentNullException(nameof(summaryRepository));
+        _memoryExtractionService = memoryExtractionService ?? throw new ArgumentNullException(nameof(memoryExtractionService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -38,6 +41,23 @@ public class ConversationThreadService : IConversationThreadService
 
             if (activeThread != null)
             {
+                // Check if the thread should be closed due to inactivity (older than 30 minutes)
+                var inactivityThreshold = TimeSpan.FromMinutes(30);
+                if (DateTime.UtcNow - activeThread.LastActivity > inactivityThreshold)
+                {
+                    _logger.LogInformation("Closing inactive thread {ThreadId} for account {AccountId} (last activity: {LastActivity})", 
+                        activeThread.Id, accountId, activeThread.LastActivity);
+                    
+                    // Create memory summary before closing - use thread object to avoid lookup
+                    await CreateMemorySummaryForClosedThread(activeThread, cancellationToken);
+                    
+                    // Deactivate the old thread
+                    await CloseThreadAsync(activeThread.Id, accountId, cancellationToken);
+                    
+                    // Create a new thread for this session
+                    return await CreateNewThreadAsync(accountId, $"Conversation {DateTime.UtcNow:yyyy-MM-dd HH:mm}", cancellationToken);
+                }
+
                 _logger.LogDebug("Found existing active thread {ThreadId} for account {AccountId}", 
                     activeThread.Id, accountId);
                 return activeThread;
@@ -49,6 +69,37 @@ public class ConversationThreadService : IConversationThreadService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting or creating active thread for account {AccountId}", accountId);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Create a new session-based conversation thread (when UI doesn't provide threadId)
+    /// </summary>
+    public async Task<ConversationThread> CreateNewSessionAsync(int accountId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // Close any existing active thread and create memory summary
+            var existingActiveThread = await _threadRepository.GetMostRecentActiveThreadAsync(accountId, cancellationToken);
+            if (existingActiveThread != null)
+            {
+                _logger.LogInformation("Starting new session for account {AccountId}, closing previous thread {ThreadId}", 
+                    accountId, existingActiveThread.Id);
+                
+                // Create memory summary before closing
+                await CreateMemorySummaryForClosedThread(existingActiveThread, cancellationToken);
+                
+                // Close the previous thread
+                await CloseThreadAsync(existingActiveThread.Id, accountId, cancellationToken);
+            }
+
+            // Create a new session thread
+            return await CreateNewThreadAsync(accountId, $"Session {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}", cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating new session for account {AccountId}", accountId);
             throw;
         }
     }
@@ -175,7 +226,7 @@ public class ConversationThreadService : IConversationThreadService
     }
 
     /// <summary>
-    /// Create a daily summary for a conversation thread
+    /// Create a daily summary for conversation messages on a specific date using AI-powered memory extraction
     /// </summary>
     public async Task<MemorySummary> CreateDailySummaryAsync(int threadId, DateOnly summaryDate, CancellationToken cancellationToken = default)
     {
@@ -203,31 +254,45 @@ public class ConversationThreadService : IConversationThreadService
                 throw new InvalidOperationException($"No messages found for thread {threadId} on {summaryDate}");
             }
 
-            // Create a simple summary (this could be enhanced with AI summarization)
-            var userMessages = messageList.Where(m => m.Role == "user").Count();
-            var assistantMessages = messageList.Where(m => m.Role == "assistant").Count();
+            // Get the thread to determine account ID
+            var thread = await _threadRepository.GetByIdWithDetailsAsync(threadId, 0, cancellationToken);
+            if (thread == null)
+            {
+                throw new InvalidOperationException($"Thread {threadId} not found for daily summary creation");
+            }
+
+            // Use AI-powered memory extraction
+            var extractionResult = await _memoryExtractionService.ExtractMemoriesFromConversationAsync(
+                messageList, 
+                thread.AccountId, 
+                cancellationToken);
+
+            var userMessages = messageList.Count(m => m.Role == "user");
+            var assistantMessages = messageList.Count(m => m.Role == "assistant");
             var totalTokens = messageList.Sum(m => m.TokenCount);
 
-            var summary = $"Conversation on {summaryDate:yyyy-MM-dd} with {userMessages} user messages and {assistantMessages} assistant responses. " +
-                         $"Total tokens: {totalTokens}. " +
-                         $"Topics discussed: {string.Join(", ", ExtractKeyTopics(messageList))}";
-
-            var keyTopics = System.Text.Json.JsonSerializer.Serialize(ExtractKeyTopics(messageList));
-            var userPreferences = System.Text.Json.JsonSerializer.Serialize(new Dictionary<string, string>());
+            var enhancedSummary = $"Daily Summary ({summaryDate:yyyy-MM-dd}): {extractionResult.Summary} " +
+                                $"({userMessages} user messages, {assistantMessages} assistant responses, " +
+                                $"confidence: {extractionResult.ConfidenceScore:P0})";
 
             var memorySummary = new MemorySummary(
                 threadId, 
                 summaryDate, 
-                summary, 
-                keyTopics, 
-                userPreferences, 
+                enhancedSummary, 
+                System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    keyTopics = extractionResult.KeyTopics,
+                    importantFacts = extractionResult.ImportantFacts,
+                    confidenceScore = extractionResult.ConfidenceScore
+                }), 
+                System.Text.Json.JsonSerializer.Serialize(extractionResult.UserPreferences), 
                 messageList.Count, 
                 totalTokens);
 
             var createdSummary = await _summaryRepository.AddAsync(memorySummary, cancellationToken);
 
-            _logger.LogInformation("Created daily summary for thread {ThreadId} on {Date} with {MessageCount} messages", 
-                threadId, summaryDate, messageList.Count);
+            _logger.LogInformation("Created AI-powered daily summary for thread {ThreadId} on {Date} with {MessageCount} messages and {FactCount} facts", 
+                threadId, summaryDate, messageList.Count, extractionResult.ImportantFacts.Count);
 
             return createdSummary;
         }
@@ -266,27 +331,313 @@ public class ConversationThreadService : IConversationThreadService
     }
 
     /// <summary>
-    /// Extract key topics from conversation messages (simple keyword extraction)
+    /// Close a conversation thread and mark it as inactive
     /// </summary>
-    private static string[] ExtractKeyTopics(List<ChatMessage> messages)
+    public async Task CloseThreadAsync(int threadId, int accountId, CancellationToken cancellationToken = default)
     {
-        var commonWords = new HashSet<string> { "the", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by", "a", "an" };
-        var topics = new HashSet<string>();
+        try
+        {
+            var thread = await _threadRepository.GetByIdWithDetailsAsync(threadId, accountId, cancellationToken);
+            if (thread == null)
+            {
+                _logger.LogWarning("Thread {ThreadId} not found for account {AccountId} when attempting to close", 
+                    threadId, accountId);
+                return;
+            }
 
+            // Deactivate the thread
+            thread.Deactivate();
+            await _threadRepository.UpdateAsync(thread, cancellationToken);
+
+            _logger.LogInformation("Closed thread {ThreadId} for account {AccountId}", threadId, accountId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error closing thread {ThreadId} for account {AccountId}", threadId, accountId);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Create a memory summary for a thread that's being closed using AI-powered extraction
+    /// </summary>
+    // Overload that accepts thread object directly (when we already have it)
+    private async Task CreateMemorySummaryForClosedThread(ConversationThread thread, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            _logger.LogInformation("MEMORY EXTRACTION: Starting CreateMemorySummaryForClosedThread for thread {ThreadId}", thread.Id);
+            
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            
+            // Check if we already have a summary for today
+            var existingSummary = await _summaryRepository.GetByThreadAndDateAsync(thread.Id, today, cancellationToken);
+            if (existingSummary != null)
+            {
+                _logger.LogDebug("Memory summary already exists for thread {ThreadId} on {Date}", thread.Id, today);
+                return;
+            }
+
+            // Get messages from the thread to summarize
+            var messages = await _messageRepository.GetByThreadIdAsync(thread.Id, cancellationToken);
+            var messageList = messages.ToList();
+
+            _logger.LogInformation("MEMORY EXTRACTION: Found {MessageCount} messages for thread {ThreadId}", messageList.Count, thread.Id);
+
+            if (!messageList.Any())
+            {
+                _logger.LogDebug("No messages found to summarize for thread {ThreadId}", thread.Id);
+                return;
+            }
+
+            _logger.LogInformation("MEMORY EXTRACTION: Found thread {ThreadId} for account {AccountId}, starting AI extraction", thread.Id, thread.AccountId);
+
+            // Use AI-powered memory extraction
+            _logger.LogInformation("Starting AI-powered memory extraction for thread {ThreadId} with {MessageCount} messages", 
+                thread.Id, messageList.Count);
+
+            var extractionResult = await _memoryExtractionService.ExtractMemoriesFromConversationAsync(
+                messageList.AsEnumerable(), 
+                thread.AccountId, 
+                cancellationToken);
+
+            // Calculate total tokens (approximation: words * 1.3)
+            var totalTokens = messageList.Sum(m => (m.Content?.Split(' ').Length ?? 0)) * 1.3;
+            
+            // Create enhanced summary combining AI analysis with basic stats
+            var enhancedSummary = $"{extractionResult.Summary} " +
+                                  $"[Conversation: {messageList.Count} messages, " +
+                                  $"{extractionResult.ImportantFacts.Count} key facts, " +
+                                  $"{extractionResult.UserPreferences.Count} preferences noted]";
+
+            var memorySummary = new MemorySummary(
+                thread.Id, 
+                today, 
+                enhancedSummary, 
+                System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    keyTopics = extractionResult.KeyTopics,
+                    importantFacts = extractionResult.ImportantFacts,
+                    confidenceScore = extractionResult.ConfidenceScore
+                }), 
+                System.Text.Json.JsonSerializer.Serialize(extractionResult.UserPreferences), 
+                messageList.Count, 
+                (int)totalTokens);
+
+            await _summaryRepository.AddAsync(memorySummary, cancellationToken);
+
+            _logger.LogInformation("Created AI-powered memory summary for thread {ThreadId} with {FactCount} important facts and {PreferenceCount} preferences (confidence: {Confidence:P0})", 
+                thread.Id, 
+                extractionResult.ImportantFacts.Count, 
+                extractionResult.UserPreferences.Count,
+                extractionResult.ConfidenceScore);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to create memory summary for thread {ThreadId}", thread.Id);
+            // Don't throw - summarization failure shouldn't break thread closure
+        }
+    }
+
+    // Overload that accepts thread ID (for backward compatibility)
+    private async Task CreateMemorySummaryForClosedThread(int threadId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            _logger.LogInformation("MEMORY EXTRACTION: Starting CreateMemorySummaryForClosedThread for thread {ThreadId}", threadId);
+            
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            
+            // Check if we already have a summary for today
+            var existingSummary = await _summaryRepository.GetByThreadAndDateAsync(threadId, today, cancellationToken);
+            if (existingSummary != null)
+            {
+                _logger.LogDebug("Memory summary already exists for thread {ThreadId} on {Date}", threadId, today);
+                return;
+            }
+
+            // Get messages from the thread to summarize
+            var messages = await _messageRepository.GetByThreadIdAsync(threadId, cancellationToken);
+            var messageList = messages.ToList();
+
+            _logger.LogInformation("MEMORY EXTRACTION: Found {MessageCount} messages for thread {ThreadId}", messageList.Count, threadId);
+
+            if (!messageList.Any())
+            {
+                _logger.LogDebug("No messages found to summarize for thread {ThreadId}", threadId);
+                return;
+            }
+
+            // Get the thread to determine account ID
+            var thread = await _threadRepository.GetByIdWithDetailsAsync(threadId, 0, cancellationToken);
+            if (thread == null)
+            {
+                _logger.LogWarning("Thread {ThreadId} not found when creating memory summary", threadId);
+                return;
+            }
+
+            _logger.LogInformation("MEMORY EXTRACTION: Found thread {ThreadId} for account {AccountId}, starting AI extraction", threadId, thread.AccountId);
+
+            // Use AI-powered memory extraction
+            _logger.LogInformation("Starting AI-powered memory extraction for thread {ThreadId} with {MessageCount} messages", 
+                threadId, messageList.Count);
+
+            var extractionResult = await _memoryExtractionService.ExtractMemoriesFromConversationAsync(
+                messageList.AsEnumerable(), 
+                thread.AccountId, 
+                cancellationToken);
+
+            _logger.LogInformation("MEMORY EXTRACTION: AI extraction completed for thread {ThreadId}. Facts: {FactCount}, Preferences: {PreferenceCount}, Confidence: {Confidence}", 
+                threadId, extractionResult.ImportantFacts.Count, extractionResult.UserPreferences.Count, extractionResult.ConfidenceScore);
+
+            // Create enhanced memory summary with AI-extracted data
+            var totalTokens = messageList.Sum(m => m.TokenCount);
+            var userMessages = messageList.Count(m => m.Role == "user");
+            var assistantMessages = messageList.Count(m => m.Role == "assistant");
+
+            var enhancedSummary = $"{extractionResult.Summary} " +
+                                $"({userMessages} user messages, {assistantMessages} assistant responses, " +
+                                $"confidence: {extractionResult.ConfidenceScore:P0})";
+
+            var memorySummary = new MemorySummary(
+                threadId, 
+                today, 
+                enhancedSummary, 
+                System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    keyTopics = extractionResult.KeyTopics,
+                    importantFacts = extractionResult.ImportantFacts,
+                    confidenceScore = extractionResult.ConfidenceScore
+                }), 
+                System.Text.Json.JsonSerializer.Serialize(extractionResult.UserPreferences), 
+                messageList.Count, 
+                totalTokens);
+
+            await _summaryRepository.AddAsync(memorySummary, cancellationToken);
+
+            _logger.LogInformation("Created AI-powered memory summary for thread {ThreadId} with {FactCount} important facts and {PreferenceCount} preferences (confidence: {Confidence:P0})", 
+                threadId, 
+                extractionResult.ImportantFacts.Count, 
+                extractionResult.UserPreferences.Count,
+                extractionResult.ConfidenceScore);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to create memory summary for thread {ThreadId}", threadId);
+            // Don't throw - summarization failure shouldn't break thread closure
+        }
+    }
+
+    /// <summary>
+    /// Extract important facts from conversation (e.g., user name, preferences, goals)
+    /// </summary>
+    private static List<string> ExtractImportantFacts(List<ChatMessage> messages)
+    {
+        var facts = new List<string>();
+        
         foreach (var message in messages.Where(m => m.Role == "user"))
         {
-            var words = message.Content
-                .Split(' ', StringSplitOptions.RemoveEmptyEntries)
-                .Select(w => w.Trim('.', '?', '!', ',', ';', ':').ToLowerInvariant())
-                .Where(w => w.Length > 3 && !commonWords.Contains(w))
-                .Take(5);
-
-            foreach (var word in words)
+            var content = message.Content.ToLowerInvariant();
+            
+            // Extract name mentions
+            if (content.Contains("my name is ") || content.Contains("i'm ") || content.Contains("i am "))
             {
-                topics.Add(word);
+                var namePatterns = new[]
+                {
+                    @"my name is (\w+)",
+                    @"i'?m (\w+)",
+                    @"i am (\w+)"
+                };
+                
+                foreach (var pattern in namePatterns)
+                {
+                    var match = System.Text.RegularExpressions.Regex.Match(content, pattern);
+                    if (match.Success && match.Groups[1].Value.Length > 1)
+                    {
+                        facts.Add($"User name: {match.Groups[1].Value}");
+                        break;
+                    }
+                }
+            }
+            
+            // Extract portfolio goals
+            if (content.Contains("goal") || content.Contains("objective") || content.Contains("want to"))
+            {
+                if (content.Length < 200) // Only short, clear statements
+                {
+                    facts.Add($"Goal: {content.Trim()}");
+                }
+            }
+            
+            // Extract risk tolerance mentions
+            if (content.Contains("risk") && (content.Contains("toleranc") || content.Contains("averse") || content.Contains("aggressive")))
+            {
+                if (content.Length < 200)
+                {
+                    facts.Add($"Risk preference: {content.Trim()}");
+                }
             }
         }
+        
+        return facts.Distinct().Take(10).ToList();
+    }
 
-        return topics.Take(10).ToArray();
+    /// <summary>
+    /// Extract user preferences from conversation
+    /// </summary>
+    private static Dictionary<string, string> ExtractUserPreferences(List<ChatMessage> messages)
+    {
+        var preferences = new Dictionary<string, string>();
+        
+        // This is a simple implementation - could be enhanced with NLP
+        foreach (var message in messages.Where(m => m.Role == "user"))
+        {
+            var content = message.Content.ToLowerInvariant();
+            
+            if (content.Contains("prefer"))
+            {
+                preferences["communication_style"] = "prefers detailed explanations";
+            }
+            
+            if (content.Contains("daily") || content.Contains("frequent"))
+            {
+                preferences["update_frequency"] = "daily updates preferred";
+            }
+        }
+        
+        return preferences;
+    }
+
+    /// <summary>
+    /// Get memory summaries to include in new conversations for context continuity
+    /// </summary>
+    public async Task<List<string>> GetRelevantMemoriesAsync(int accountId, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // Get recent memory summaries from closed threads for this account
+            var recentSummaries = await _summaryRepository.GetRecentSummariesByAccountAsync(accountId, 5, cancellationToken);
+            
+            var memories = new List<string>();
+            
+            foreach (var summary in recentSummaries)
+            {
+                // Extract important facts from the summary
+                if (!string.IsNullOrEmpty(summary.Summary))
+                {
+                    memories.Add(summary.Summary);
+                }
+            }
+            
+            _logger.LogDebug("Retrieved {MemoryCount} relevant memories for account {AccountId}", 
+                memories.Count, accountId);
+            
+            return memories;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to retrieve relevant memories for account {AccountId}", accountId);
+            return new List<string>();
+        }
     }
 }
