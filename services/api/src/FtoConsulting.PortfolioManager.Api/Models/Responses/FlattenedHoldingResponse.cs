@@ -49,6 +49,18 @@ public class FlattenedHoldingResponse
     /// <example>9.97</example>
     public decimal GainLossPercentage { get; set; }
 
+    /// <summary>
+    /// Daily profit or loss in absolute terms
+    /// </summary>
+    /// <example>25.50</example>
+    public decimal? DailyProfitLoss { get; set; }
+
+    /// <summary>
+    /// Daily profit or loss as a percentage
+    /// </summary>
+    /// <example>1.55</example>
+    public decimal? DailyProfitLossPercentage { get; set; }
+
     // Portfolio Information
     /// <summary>
     /// Unique identifier for the portfolio

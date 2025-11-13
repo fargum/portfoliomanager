@@ -51,7 +51,7 @@ public class EodMarketDataTool
             }
 
             // Clean ticker symbols - just remove exchange suffixes
-            var cleanedTickers = tickers.Select(ticker => 
+/*             var cleanedTickers = tickers.Select(ticker => 
             {
                 // Remove any exchange suffix (.LSE, .US, .L, etc.)
                 var dotIndex = ticker.LastIndexOf('.');
@@ -66,13 +66,19 @@ public class EodMarketDataTool
             {
                 _logger.LogWarning("No valid tickers for news fetch");
                 return Array.Empty<NewsItemDto>();
+            } */
+
+            if (!tickers.Any())
+            {
+                _logger.LogWarning("No valid tickers for news fetch");
+                return Array.Empty<NewsItemDto>();
             }
 
             using var httpClient = new HttpClient();
             httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
 
             // Use EOD's news API: https://eodhd.com/api/news?api_token=TOKEN&s=TICKER&from=DATE&to=DATE&limit=10&fmt=json
-            var tickerParam = string.Join(",", cleanedTickers);
+            var tickerParam = string.Join(",", tickers);
             var url = $"{_eodApiOptions.BaseUrl}/news?api_token={_eodApiOptions.Token}&s={tickerParam}&from={fromDate:yyyy-MM-dd}&to={toDate:yyyy-MM-dd}&limit=10&fmt=json";
             
             _logger.LogInformation("Fetching news from URL: {Url}", url.Replace(_eodApiOptions.Token, "***"));

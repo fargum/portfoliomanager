@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { HoldingResponse } from '@/types/api';
 import { apiClient } from '@/lib/api-client';
-import { getHoldingsColumnDefs, getGridOptions, calculateTotalValue, formatCurrency } from '@/lib/grid-utils';
+import { getHoldingsColumnDefs, getGridOptions, calculateTotalValue, calculateTotalDailyPnL, calculateAverageDailyPnLPercentage, formatCurrency } from '@/lib/grid-utils';
 import { Calendar, Search, TrendingUp, PoundSterling, PieChart, RefreshCw } from 'lucide-react';
 
 // AG Grid CSS imports (we'll handle these in the layout)
@@ -98,6 +98,8 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = ({ accountId }) => {
   }, [fetchHoldings]);
 
   const totalValue = calculateTotalValue(holdings);
+  const totalDailyPnL = calculateTotalDailyPnL(holdings);
+  const avgDailyPnLPercentage = calculateAverageDailyPnLPercentage(holdings);
   const holdingsCount = holdings.length;
 
   return (
@@ -126,18 +128,26 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = ({ accountId }) => {
             </div>
             
             {/* Stats */}
-            <div className="text-right">
-              <p className="text-xs text-primary-100">
-                {filteredCount !== holdings.length ? 'Filtered' : 'Total'} Value
-              </p>
-              <p className="text-lg font-bold">
-                {formatCurrency(filteredTotalValue > 0 ? filteredTotalValue : totalValue)}
-              </p>
-              {filteredCount !== holdings.length && (
-                <p className="text-xs text-primary-200">
-                  Total: {formatCurrency(totalValue)}
+            <div className="text-right space-y-1">
+              <div>
+                <p className="text-xs text-primary-100">
+                  {filteredCount !== holdings.length ? 'Filtered' : 'Total'} Value
                 </p>
-              )}
+                <p className="text-lg font-bold">
+                  {formatCurrency(filteredTotalValue > 0 ? filteredTotalValue : totalValue)}
+                </p>
+                {filteredCount !== holdings.length && (
+                  <p className="text-xs text-primary-200">
+                    Total: {formatCurrency(totalValue)}
+                  </p>
+                )}
+              </div>
+              <div>
+                <p className="text-xs text-primary-100">Daily P&L</p>
+                <p className={`text-sm font-bold ${totalDailyPnL >= 0 ? 'text-green-200' : 'text-red-200'}`}>
+                  {formatCurrency(totalDailyPnL)} ({avgDailyPnLPercentage >= 0 ? '+' : ''}{avgDailyPnLPercentage.toFixed(2)}%)
+                </p>
+              </div>
             </div>
             
             <button

@@ -165,6 +165,8 @@ public class PortfolioMappingService : IPortfolioMappingService
             CurrentValue = holding.CurrentValue,
             GainLoss = gainLoss,
             GainLossPercentage = Math.Round(gainLossPercentage, 2),
+            DailyProfitLoss = holding.DailyProfitLoss,
+            DailyProfitLossPercentage = holding.DailyProfitLossPercentage,
 
             // Portfolio Information
             PortfolioId = holding.PortfolioId,

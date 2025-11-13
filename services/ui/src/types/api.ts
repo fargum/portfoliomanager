@@ -8,6 +8,8 @@ export interface HoldingResponse {
   currentValue: number;
   gainLoss: number;
   gainLossPercentage: number;
+  dailyProfitLoss: number;
+  dailyProfitLossPercentage: number;
   
   // Portfolio info
   portfolioId: number;

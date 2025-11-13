@@ -137,10 +137,14 @@ public class HoldingsRetrievalService : IHoldingsRetrieval
             var updatedCount = 0;
             foreach (var holding in holdings)
             {
-                // Skip CASH holdings - they don't need real-time pricing
+                // Skip CASH holdings - they don't need real-time pricing, but we should ensure their daily P&L is zero for today
                 if (holding.Instrument?.Ticker?.Equals(ExchangeConstants.CASH_TICKER, StringComparison.OrdinalIgnoreCase) == true)
                 {
-                    _logger.LogInformation("Skipping real-time pricing for CASH holding {HoldingId} - keeping original value {CurrentValue:C}", 
+                    // For real-time requests, CASH holdings should have zero daily P&L since cash value doesn't change
+                    holding.SetDailyProfitLoss(0m, 0m);
+                    holding.UpdateValuation(DateTime.UtcNow, holding.CurrentValue); // Update valuation date to today
+                    
+                    _logger.LogInformation("Updated CASH holding {HoldingId} for today - keeping value {CurrentValue:C}, setting daily P/L to zero", 
                         holding.Id, holding.CurrentValue);
                     continue;
                 }
@@ -160,12 +164,22 @@ public class HoldingsRetrievalService : IHoldingsRetrieval
                         _pricingCalculationService.GetCurrencyFromTicker(holding.Instrument.Ticker),
                         DateOnly.FromDateTime(DateTime.UtcNow));
                     
+                    // Calculate daily P&L based on the change from previous value to new real-time value
+                    var dailyChange = newCurrentValue - originalValue;
+                    var dailyChangePercentage = originalValue != 0 
+                        ? (dailyChange / originalValue) * 100 
+                        : 0;
+                    
                     // Update both current value and valuation date to today for real-time pricing
                     holding.UpdateValuation(DateTime.UtcNow, newCurrentValue);
+                    
+                    // Set the recalculated daily profit/loss
+                    holding.SetDailyProfitLoss(dailyChange, dailyChangePercentage);
+                    
                     updatedCount++;
                     
-                    _logger.LogInformation("Updated holding {HoldingId} for {Ticker}: Original value {OriginalValue:C} -> New value {NewValue:C} (Real-time price: {RealTimePrice}, Scaled price: {ScaledPrice}, Quote unit: {QuoteUnit})", 
-                        holding.Id, holding.Instrument.Ticker, originalValue, newCurrentValue, realTimePrice, scaledPrice, holding.Instrument.QuoteUnit ?? CurrencyConstants.DEFAULT_QUOTE_UNIT);
+                    _logger.LogInformation("Updated holding {HoldingId} for {Ticker}: Original value {OriginalValue:C} -> New value {NewValue:C}, Daily P/L: {DailyChange:C} ({DailyChangePercentage:F2}%) (Real-time price: {RealTimePrice}, Scaled price: {ScaledPrice}, Quote unit: {QuoteUnit})", 
+                        holding.Id, holding.Instrument.Ticker, originalValue, newCurrentValue, dailyChange, dailyChangePercentage, realTimePrice, scaledPrice, holding.Instrument.QuoteUnit ?? CurrencyConstants.DEFAULT_QUOTE_UNIT);
                 }
                 else
                 {

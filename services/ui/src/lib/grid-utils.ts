@@ -126,6 +126,38 @@ export const getHoldingsColumnDefs = (): ColDef<HoldingResponse>[] => [
     }),
   },
   {
+    field: 'dailyProfitLoss',
+    headerName: 'Daily P/L',
+    width: 120,
+    sortable: true,
+    filter: 'agNumberColumnFilter',
+    type: 'numericColumn',
+    valueFormatter: (params: any) => formatCurrency(params.value),
+    cellStyle: (params: any) => ({
+      textAlign: 'right',
+      fontFamily: 'monospace',
+      fontWeight: 'bold',
+      color: params.value >= 0 ? '#10b981' : '#ef4444',
+      backgroundColor: params.value >= 0 ? '#f0f9ff' : '#fef2f2',
+    }),
+  },
+  {
+    field: 'dailyProfitLossPercentage',
+    headerName: 'Daily P/L %',
+    width: 120,
+    sortable: true,
+    filter: 'agNumberColumnFilter',
+    type: 'numericColumn',
+    valueFormatter: (params: any) => `${formatNumber(params.value)}%`,
+    cellStyle: (params: any) => ({
+      textAlign: 'right',
+      fontFamily: 'monospace',
+      fontWeight: 'bold',
+      color: params.value >= 0 ? '#10b981' : '#ef4444',
+      backgroundColor: params.value >= 0 ? '#f0f9ff' : '#fef2f2',
+    }),
+  },
+  {
     field: 'valuationDate',
     headerName: 'Valuation Date',
     width: 140,
@@ -153,6 +185,17 @@ export const getGridOptions = () => ({
 // Utility for calculating totals
 export const calculateTotalValue = (holdings: HoldingResponse[]): number => {
   return holdings.reduce((sum, holding) => sum + holding.currentValue, 0);
+};
+
+export const calculateTotalDailyPnL = (holdings: HoldingResponse[]): number => {
+  return holdings.reduce((sum, holding) => sum + holding.dailyProfitLoss, 0);
+};
+
+export const calculateAverageDailyPnLPercentage = (holdings: HoldingResponse[]): number => {
+  if (holdings.length === 0) return 0;
+  const totalDailyPnL = calculateTotalDailyPnL(holdings);
+  const totalCurrentValue = calculateTotalValue(holdings);
+  return totalCurrentValue !== 0 ? (totalDailyPnL / totalCurrentValue) * 100 : 0;
 };
 
 export const groupHoldingsByPortfolio = (holdings: HoldingResponse[]) => {
