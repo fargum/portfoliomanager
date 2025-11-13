@@ -28,11 +28,12 @@ The memory system uses three primary entities in PostgreSQL:
   - Automatic timestamping
 
 #### MemorySummary
-- **Purpose**: Daily conversation summaries for long-term context
+- **Purpose**: AI-generated conversation summaries for long-term context
 - **Features**:
-  - Automatic daily summarization
-  - Key insights extraction
+  - Intelligent conversation summarization using dedicated AI agent
+  - Key insights and decision extraction
   - Performance optimization for large conversation histories
+  - Automatic trigger when conversation exceeds length thresholds
 
 ### 2. Microsoft Agent Framework Integration
 
@@ -52,8 +53,25 @@ The memory system uses three primary entities in PostgreSQL:
   - Conversation insights extraction
   - Memory state serialization
   - Context enhancement before AI invocation
+  - Integration with memory summarization agent
 
-### 3. Application Layer
+### 3. Memory Summarization Agent
+
+#### MemoryExtractionService
+- **Purpose**: AI-powered conversation summarization using dedicated agent
+- **Features**:
+  - Intelligent analysis of conversation threads
+  - Extraction of key decisions, preferences, and portfolio insights
+  - Structured summarization using dedicated AI agent
+  - Integration with Azure OpenAI for high-quality summaries
+
+#### Memory Summarization Flow
+- **Trigger**: Automatic when conversation exceeds configured message threshold
+- **Processing**: Dedicated AI agent analyzes conversation history
+- **Output**: Structured memory summary with key insights
+- **Storage**: Persisted to MemorySummary table for future context
+
+### 4. Application Layer
 
 #### ConversationThreadService
 - **Purpose**: Business logic for thread management
@@ -61,6 +79,7 @@ The memory system uses three primary entities in PostgreSQL:
   - Get or create active threads
   - Thread lifecycle management
   - Account-scoped thread operations
+  - Memory summarization trigger management
 
 #### AiOrchestrationService
 - **Purpose**: Coordinates AI interactions with memory
@@ -68,10 +87,19 @@ The memory system uses three primary entities in PostgreSQL:
   - Memory-aware agent creation
   - Graceful fallback to non-memory processing
   - Factory pattern for runtime component creation
+  - Integration with memory summarization workflow
+
+#### MemoryExtractionService
+- **Purpose**: AI-powered conversation analysis and summarization
+- **Features**:
+  - Dedicated AI agent for memory processing
+  - Intelligent conversation analysis
+  - Structured memory extraction
+  - Asynchronous processing with error handling
 
 ## Memory Persistence Flow
 
-### 1. Message Storage Timeline
+### 1. Message Storage and Summarization Timeline
 
 ```mermaid
 sequenceDiagram
@@ -79,6 +107,8 @@ sequenceDiagram
     participant API
     participant Agent
     participant ChatStore
+    participant MemoryService
+    participant SummaryAgent
     participant Database
 
     User->>API: Send chat message
@@ -89,25 +119,41 @@ sequenceDiagram
     AI-->>Agent: Generate response
     Agent->>ChatStore: Store AI response
     ChatStore->>Database: INSERT AI response
+    
+    Note over ChatStore,MemoryService: Check if summarization needed
+    ChatStore->>MemoryService: Trigger summarization check
+    MemoryService->>Database: Count messages in thread
+    alt Message count exceeds threshold
+        MemoryService->>SummaryAgent: Extract conversation memories
+        SummaryAgent->>Database: Fetch conversation history
+        SummaryAgent->>AI: Generate structured summary
+        AI-->>SummaryAgent: Return memory insights
+        SummaryAgent->>Database: Store MemorySummary
+    end
+    
     Agent-->>API: Return response
     API-->>User: Send response
 ```
 
-### 2. Context Retrieval
+### 2. Context Retrieval and Memory Integration
 
 When processing a new message:
 1. **Thread Resolution**: Get or create conversation thread for account
 2. **Message History**: Load last 50 messages from thread
-3. **Context Enhancement**: Extract conversation insights
-4. **AI Processing**: Provide enriched context to AI agent
-5. **Response Generation**: AI responds with full conversation context
+3. **Memory Summary**: Retrieve existing memory summaries for long-term context
+4. **Context Enhancement**: Extract conversation insights and combine with summaries
+5. **AI Processing**: Provide enriched context to AI agent
+6. **Response Generation**: AI responds with full conversation context
+7. **Summarization Check**: Trigger memory summarization if message threshold exceeded
 
-### 3. Automatic Thread Management
+### 3. Automatic Thread Management and Summarization
 
 - **New Conversations**: Automatically create threads with descriptive titles
 - **Thread Continuity**: Maintain context across multiple interactions
 - **Activity Tracking**: Update `last_activity` timestamp on each message
 - **Account Isolation**: Each account has separate conversation spaces
+- **Automatic Summarization**: Trigger memory extraction when conversations exceed configured length
+- **Memory Integration**: Incorporate previous summaries into new conversation context
 
 ## API Integration
 
@@ -160,26 +206,50 @@ services.AddTransient<Func<int, int?, JsonSerializerOptions?, ChatMessageStore>>
 services.AddTransient<Func<int, IChatClient, AIContextProvider>>(
     serviceProvider => (accountId, chatClient) => 
         new PortfolioMemoryContextProvider(/* ... */));
+
+// Memory Summarization Service
+services.AddScoped<MemoryExtractionService>();
+services.AddScoped<IAiChatService, AzureOpenAiChatService>();
 ```
 
-### Agent Creation
+### Agent Creation with Memory
 
 ```csharp
 var agent = chatClient.CreateAIAgent(new ChatClientAgentOptions
 {
-    Instructions = "You are a portfolio assistant...",
+    Instructions = "You are a portfolio assistant with access to conversation history...",
     ChatOptions = new ChatOptions { Tools = portfolioTools },
     ChatMessageStoreFactory = ctx => chatMessageStoreFactory(accountId, threadId, ctx.JsonSerializerOptions),
     AIContextProviderFactory = ctx => memoryContextProviderFactory(accountId, chatClient)
 });
 ```
 
+### Memory Summarization Configuration
+
+```csharp
+// Memory extraction configuration
+services.Configure<MemoryExtractionOptions>(options =>
+{
+    options.MessageThreshold = 50; // Trigger summarization after 50 messages
+    options.SummaryPrompt = "Analyze this conversation and extract key portfolio insights...";
+    options.MaxTokens = 2000;
+});
+```
+
 ## Performance Considerations
 
 ### Context Window Management
-- **Message Limit**: Only loads last 50 messages per thread
-- **Token Estimation**: Tracks approximate token usage
+- **Message Limit**: Only loads last 50 messages per thread for immediate context
+- **Memory Summaries**: Long-term context provided through AI-generated summaries
+- **Token Estimation**: Tracks approximate token usage across messages and summaries
 - **Automatic Cleanup**: Older messages remain in database but excluded from active context
+- **Smart Summarization**: Triggers only when conversation length exceeds thresholds
+
+### Memory Summarization Performance
+- **Asynchronous Processing**: Memory extraction runs in background
+- **Batched Analysis**: Processes conversation chunks efficiently
+- **Caching**: Summary results cached to avoid re-processing
+- **Fallback Handling**: Graceful degradation if summarization fails
 
 ### Database Optimization
 - **Indexes**: Optimized queries on `account_id`, `conversation_thread_id`, and timestamps
@@ -196,13 +266,15 @@ var agent = chatClient.CreateAIAgent(new ChatClientAgentOptions
 ### Logging Events
 - **Thread Creation**: New conversation thread establishment
 - **Memory Operations**: Message storage and retrieval
+- **Summarization Events**: Memory extraction triggers and completions
 - **Error Handling**: Memory component failures with fallback
-- **Performance**: Context loading and processing times
+- **Performance**: Context loading, summarization, and processing times
 
 ### Health Checks
 - **Database Connectivity**: PostgreSQL connection health
 - **Memory Components**: Factory registration validation
-- **AI Service**: Azure OpenAI service availability
+- **AI Service**: Azure OpenAI service availability for both chat and summarization
+- **Summarization Health**: Memory extraction service status
 
 ## Migration & Deployment
 
@@ -231,19 +303,30 @@ var agent = chatClient.CreateAIAgent(new ChatClientAgentOptions
 ## Future Enhancements
 
 ### Planned Features
-- **Conversation Search**: Full-text search across message history
-- **Memory Summarization**: Intelligent conversation summarization
-- **Context Prioritization**: Smart context selection based on relevance
+- **Conversation Search**: Full-text search across message history and summaries
+- **Advanced Memory Patterns**: Semantic clustering of related conversation topics
+- **Context Prioritization**: Smart context selection based on relevance scoring
 - **Multi-Modal Memory**: Support for images and documents in conversations
 - **Export/Import**: Conversation backup and migration tools
+- **Memory Analytics**: Insights into conversation patterns and user preferences
 
 ### Scalability Improvements
 - **Distributed Caching**: Redis integration for high-traffic scenarios
 - **Read Replicas**: Database read scaling for memory retrieval
-- **Async Processing**: Background memory summarization and optimization
+- **Async Processing**: Enhanced background memory summarization and optimization
+- **Parallel Summarization**: Concurrent processing of multiple conversation threads
+- **Memory Compression**: Advanced techniques for long-term memory storage optimization
 
 ---
 
 ## Technical Implementation Details
 
 This memory system represents a production-ready implementation of persistent AI conversation memory using industry-standard patterns and the Microsoft Agent Framework. The architecture ensures reliability, performance, and scalability while maintaining clean separation of concerns and comprehensive error handling.
+
+### Key Innovations
+
+- **AI-Powered Summarization**: Uses dedicated AI agents for intelligent memory extraction
+- **Hybrid Context**: Combines immediate message history with long-term memory summaries  
+- **Automatic Optimization**: Self-managing system that triggers summarization based on conversation length
+- **Graceful Degradation**: Continues functioning even when summarization components fail
+- **Structured Memory**: AI-generated summaries provide structured insights rather than simple text compression
