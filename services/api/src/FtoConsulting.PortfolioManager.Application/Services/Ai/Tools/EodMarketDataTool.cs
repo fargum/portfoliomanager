@@ -77,9 +77,9 @@ public class EodMarketDataTool
             using var httpClient = new HttpClient();
             httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
 
-            // Use EOD's news API: https://eodhd.com/api/news?api_token=TOKEN&s=TICKER&from=DATE&to=DATE&limit=10&fmt=json
+            // Use EOD's news API: https://eodhd.com/api/news?s=gen.lse&offset=0&limit=10&api_token=TOKEN&fmt=json
             var tickerParam = string.Join(",", tickers);
-            var url = $"{_eodApiOptions.BaseUrl}/news?api_token={_eodApiOptions.Token}&s={tickerParam}&from={fromDate:yyyy-MM-dd}&to={toDate:yyyy-MM-dd}&limit=10&fmt=json";
+            var url = $"{_eodApiOptions.BaseUrl}/news?s={tickerParam}&api_token={_eodApiOptions.Token}&offset=0&limit=10&fmt=json";
             
             _logger.LogInformation("Fetching news from URL: {Url}", url.Replace(_eodApiOptions.Token, "***"));
 

@@ -91,7 +91,10 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = ({ accountId }) => {
     updateFilteredTotals();
   }, [updateFilteredTotals]);
 
-
+  // Update filtered totals when holdings data changes (e.g., after date change)
+  useEffect(() => {
+    updateFilteredTotals();
+  }, [holdings, updateFilteredTotals]);
 
   useEffect(() => {
     fetchHoldings();

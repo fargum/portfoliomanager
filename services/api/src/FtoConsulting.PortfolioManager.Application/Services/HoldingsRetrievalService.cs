@@ -56,15 +56,16 @@ public class HoldingsRetrievalService : IHoldingsRetrieval
                 var latestDate = await _holdingRepository.GetLatestValuationDateAsync(cancellationToken);
                 if (latestDate.HasValue)
                 {
-                    var latestDateTime = DateTime.SpecifyKind(latestDate.Value.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
-                    holdings = await _holdingRepository.GetHoldingsByAccountAndDateAsync(accountId, latestDateTime, cancellationToken);
+                    // Get ALL holdings from the latest date, then filter by account
+                    var allLatestHoldings = await _holdingRepository.GetHoldingsByValuationDateWithInstrumentsAsync(latestDate.Value, cancellationToken);
+                    holdings = allLatestHoldings.Where(h => h.Portfolio.AccountId == accountId).ToList();
                     _logger.LogInformation("Retrieved {Count} latest holdings for account {AccountId} from date {LatestDate} for real-time pricing", 
                         holdings.Count(), accountId, latestDate.Value);
 
                     if (_eodMarketDataToolFactory != null)
                     {
                         _logger.LogInformation("Applying real-time pricing for today's date: {Date}", valuationDate);
-                        holdings = await ApplyRealTimePricing(holdings.ToList(), cancellationToken);
+                        holdings = await ApplyRealTimePricing(holdings.ToList(), valuationDate, cancellationToken);
                     }
                     else
                     {
@@ -94,9 +95,9 @@ public class HoldingsRetrievalService : IHoldingsRetrieval
     }
 
     /// <summary>
-    /// Apply real-time pricing to holdings using EOD market data
+    /// Apply real-time pricing to holdings using EOD market data (no persistence)
     /// </summary>
-    private async Task<IEnumerable<Holding>> ApplyRealTimePricing(List<Holding> holdings, CancellationToken cancellationToken)
+    private async Task<IEnumerable<Holding>> ApplyRealTimePricing(List<Holding> holdings, DateOnly valuationDate, CancellationToken cancellationToken)
     {
         try
         {
@@ -114,41 +115,34 @@ public class HoldingsRetrievalService : IHoldingsRetrieval
                 .Distinct()
                 .ToList();
 
-            if (!tickers.Any())
+            // Fetch real-time prices if we have tickers
+            Dictionary<string, decimal> prices = new Dictionary<string, decimal>();
+            if (tickers.Any())
             {
-                _logger.LogInformation("No tickers found for real-time pricing");
-                return holdings;
+                var eodTool = _eodMarketDataToolFactory();
+                prices = await eodTool.GetRealTimePricesAsync(null, tickers, cancellationToken);
+
+                _logger.LogInformation("Fetched {Count} real-time prices for {TotalTickers} tickers", 
+                    prices.Count, tickers.Count);
+
             }
 
-            // Fetch real-time prices
-            var eodTool = _eodMarketDataToolFactory();
-            var prices = await eodTool.GetRealTimePricesAsync(null, tickers, cancellationToken);
-
-            _logger.LogInformation("Fetched {Count} real-time prices for {TotalTickers} tickers", 
-                prices.Count, tickers.Count);
-
-            // Log the actual prices fetched for debugging
-            foreach (var price in prices)
-            {
-                _logger.LogInformation("Real-time price: {Ticker} = {Price:C}", price.Key, price.Value);
-            }
-
-            // Apply real-time prices to holdings
+            // Apply real-time prices to ALL holdings (including those without real-time prices)
             var updatedCount = 0;
             foreach (var holding in holdings)
             {
-                // Skip CASH holdings - they don't need real-time pricing, but we should ensure their daily P&L is zero for today
+                // Handle CASH holdings - update date but keep same value with zero daily P&L
                 if (holding.Instrument?.Ticker?.Equals(ExchangeConstants.CASH_TICKER, StringComparison.OrdinalIgnoreCase) == true)
                 {
-                    // For real-time requests, CASH holdings should have zero daily P&L since cash value doesn't change
                     holding.SetDailyProfitLoss(0m, 0m);
-                    holding.UpdateValuation(DateTime.UtcNow, holding.CurrentValue); // Update valuation date to today
+                    holding.UpdateValuation(DateTime.UtcNow, holding.CurrentValue);
                     
                     _logger.LogInformation("Updated CASH holding {HoldingId} for today - keeping value {CurrentValue:C}, setting daily P/L to zero", 
                         holding.Id, holding.CurrentValue);
                     continue;
                 }
 
+                // Handle holdings with real-time prices available
                 if (holding.Instrument?.Ticker != null && prices.TryGetValue(holding.Instrument.Ticker, out var realTimePrice))
                 {
                     var originalValue = holding.CurrentValue;
@@ -181,15 +175,11 @@ public class HoldingsRetrievalService : IHoldingsRetrieval
                     _logger.LogInformation("Updated holding {HoldingId} for {Ticker}: Original value {OriginalValue:C} -> New value {NewValue:C}, Daily P/L: {DailyChange:C} ({DailyChangePercentage:F2}%) (Real-time price: {RealTimePrice}, Scaled price: {ScaledPrice}, Quote unit: {QuoteUnit})", 
                         holding.Id, holding.Instrument.Ticker, originalValue, newCurrentValue, dailyChange, dailyChangePercentage, realTimePrice, scaledPrice, holding.Instrument.QuoteUnit ?? CurrencyConstants.DEFAULT_QUOTE_UNIT);
                 }
-                else
-                {
-                    _logger.LogWarning("No real-time price found for holding {HoldingId} with ticker {Ticker}", 
-                        holding.Id, holding.Instrument?.Ticker ?? "NULL");
-                }
+
             }
 
-            _logger.LogInformation("Successfully updated {UpdatedCount} out of {TotalCount} holdings with real-time pricing", 
-                updatedCount, holdings.Count);
+            _logger.LogInformation("Successfully updated {UpdatedCount} holdings with real-time pricing, {UnchangedCount} holdings kept with original dates", 
+                updatedCount, holdings.Count - updatedCount);
 
             return holdings;
         }

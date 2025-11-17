@@ -90,11 +90,11 @@ public class HoldingRevaluationService : IHoldingRevaluationService
 
     private async Task<List<Holding>?> GetSourceHoldingsAsync(HoldingRevaluationResult result, CancellationToken cancellationToken)
     {
-        // Get the latest available valuation date
-        var latestValuationDate = await _holdingRepository.GetLatestValuationDateAsync(cancellationToken);
+        // Get the latest available valuation date that is before the target revaluation date
+        var latestValuationDate = await _holdingRepository.GetLatestValuationDateBeforeAsync(result.ValuationDate, cancellationToken);
         if (latestValuationDate == null)
         {
-            _logger.LogWarning("No holdings found in database - cannot perform revaluation");
+            _logger.LogWarning("No holdings found in database before {TargetDate} - cannot perform revaluation", result.ValuationDate);
             return null;
         }
 

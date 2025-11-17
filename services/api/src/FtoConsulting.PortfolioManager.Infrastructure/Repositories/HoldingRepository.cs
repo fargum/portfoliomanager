@@ -113,6 +113,19 @@ public class HoldingRepository : Repository<Holding>, IHoldingRepository
         return latestDate == default ? null : DateOnly.FromDateTime(latestDate);
     }
 
+    public async Task<DateOnly?> GetLatestValuationDateBeforeAsync(DateOnly beforeDate, CancellationToken cancellationToken = default)
+    {
+        var beforeDateTime = DateTime.SpecifyKind(beforeDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
+        
+        var latestDate = await _dbSet
+            .Where(h => h.ValuationDate.Date < beforeDateTime.Date)
+            .OrderByDescending(h => h.ValuationDate)
+            .Select(h => h.ValuationDate)
+            .FirstOrDefaultAsync(cancellationToken);
+        
+        return latestDate == default ? null : DateOnly.FromDateTime(latestDate);
+    }
+
     public async Task<IEnumerable<Holding>> GetHoldingsByValuationDateWithInstrumentsAsync(DateOnly valuationDate, CancellationToken cancellationToken = default)
     {
         var targetDate = DateTime.SpecifyKind(valuationDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
