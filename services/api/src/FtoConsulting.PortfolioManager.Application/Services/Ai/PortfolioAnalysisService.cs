@@ -1,7 +1,8 @@
 using FtoConsulting.PortfolioManager.Application.DTOs.Ai;
-using FtoConsulting.PortfolioManager.Application.Services.Ai;
 using FtoConsulting.PortfolioManager.Application.Services;
 using Microsoft.Extensions.Logging;
+using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
+
 
 namespace FtoConsulting.PortfolioManager.Application.Services.Ai;
 
@@ -178,7 +179,8 @@ public class PortfolioAnalysisService : IPortfolioAnalysisService
         var startDict = startHoldings.ToDictionary(
             h => $"{h.Instrument?.Ticker ?? "UNKNOWN"}|{h.Platform?.Name ?? "UNKNOWN"}", 
             h => h);
-        var endDict = endHoldings.ToDictionary(
+        
+var endDict = endHoldings.ToDictionary(
             h => $"{h.Instrument?.Ticker ?? "UNKNOWN"}|{h.Platform?.Name ?? "UNKNOWN"}", 
             h => h);
 

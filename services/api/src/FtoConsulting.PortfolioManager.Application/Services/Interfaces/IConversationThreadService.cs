@@ -1,6 +1,6 @@
 using FtoConsulting.PortfolioManager.Domain.Entities;
 
-namespace FtoConsulting.PortfolioManager.Application.Services.Memory;
+namespace FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 
 /// <summary>
 /// Service for managing conversation threads and memory operations

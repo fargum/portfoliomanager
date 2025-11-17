@@ -1,5 +1,7 @@
 using FtoConsulting.PortfolioManager.Application.DTOs.Ai;
 using Microsoft.Extensions.AI;
+using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
+
 
 namespace FtoConsulting.PortfolioManager.Application.Services.Ai;
 

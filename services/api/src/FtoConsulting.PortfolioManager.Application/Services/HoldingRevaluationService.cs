@@ -4,6 +4,8 @@ using FtoConsulting.PortfolioManager.Domain.Repositories;
 using FtoConsulting.PortfolioManager.Domain.Constants;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
+
 
 namespace FtoConsulting.PortfolioManager.Application.Services;
 
@@ -102,7 +104,8 @@ public class HoldingRevaluationService : IHoldingRevaluationService
         _logger.LogInformation("Using source valuation date {SourceDate} for revaluation to {TargetDate}", 
             latestValuationDate, result.ValuationDate);
 
-        // Get holdings from the latest valuation date
+        
+// Get holdings from the latest valuation date
         var sourceHoldings = await _holdingRepository.GetHoldingsByValuationDateWithInstrumentsAsync(
             latestValuationDate.Value, cancellationToken);
         var sourceHoldingsList = sourceHoldings.ToList();
@@ -252,7 +255,8 @@ public class HoldingRevaluationService : IHoldingRevaluationService
         // Apply scaling factor for proxy instruments using shared service
         var scaledPrice = _pricingCalculationService.ApplyScalingFactor(instrumentPrice.Price, sourceHolding.Instrument.Ticker);
 
-        // Calculate current value considering quote unit and currency conversion
+        
+// Calculate current value considering quote unit and currency conversion
         var currentValue = await _pricingCalculationService.CalculateCurrentValueAsync(
             sourceHolding.UnitAmount, 
             scaledPrice, // Use scaled price instead of raw price
@@ -371,7 +375,8 @@ public class HoldingRevaluationService : IHoldingRevaluationService
 
             // Step 2: Revalue holdings using the fetched prices
             _logger.LogInformation("Step 2: Revaluing holdings for {ValuationDate}", valuationDate);
-            result.HoldingRevaluationResult = await RevalueHoldingsAsync(valuationDate, cancellationToken);
+            
+result.HoldingRevaluationResult = await RevalueHoldingsAsync(valuationDate, cancellationToken);
 
             _logger.LogInformation("Revaluation completed: Success={Success}, Failed={Failed}, Duration={Duration}ms",
                 result.HoldingRevaluationResult.SuccessfulRevaluations,

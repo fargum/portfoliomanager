@@ -1,5 +1,7 @@
 using FtoConsulting.PortfolioManager.Application.Services;
 using Microsoft.Extensions.Logging;
+using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
+
 
 namespace FtoConsulting.PortfolioManager.Application.Examples;
 

@@ -1,6 +1,8 @@
 using FtoConsulting.PortfolioManager.Domain.Entities;
 using FtoConsulting.PortfolioManager.Domain.Repositories;
 using Microsoft.Extensions.Logging;
+using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
+
 
 namespace FtoConsulting.PortfolioManager.Application.Services.Memory;
 
@@ -235,7 +237,8 @@ public class ConversationThreadService : IConversationThreadService
             // Check if summary already exists for this date
             var existingSummary = await _summaryRepository.GetByThreadAndDateAsync(threadId, summaryDate, cancellationToken);
 
-            if (existingSummary != null)
+            
+if (existingSummary != null)
             {
                 _logger.LogDebug("Summary already exists for thread {ThreadId} on {Date}", threadId, summaryDate);
                 return existingSummary;
@@ -368,7 +371,8 @@ public class ConversationThreadService : IConversationThreadService
         {
             _logger.LogInformation("MEMORY EXTRACTION: Starting CreateMemorySummaryForClosedThread for thread {ThreadId}", thread.Id);
             
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            
+var today = DateOnly.FromDateTime(DateTime.UtcNow);
             
             // Check if we already have a summary for today
             var existingSummary = await _summaryRepository.GetByThreadAndDateAsync(thread.Id, today, cancellationToken);

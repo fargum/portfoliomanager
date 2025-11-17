@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
 using OpenAI.Chat;
+using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 
 namespace FtoConsulting.PortfolioManager.Application.Tests.Services;
 

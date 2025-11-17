@@ -4,6 +4,8 @@ using FtoConsulting.PortfolioManager.Domain.Entities;
 using FtoConsulting.PortfolioManager.Domain.Repositories;
 using FtoConsulting.PortfolioManager.Domain.Constants;
 using Microsoft.Extensions.Logging;
+using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
+
 
 namespace FtoConsulting.PortfolioManager.Application.Services;
 
@@ -41,20 +43,35 @@ public class HoldingsRetrievalService : IHoldingsRetrieval
         {
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
             IEnumerable<Holding> holdings;
-
+            var dateTime = DateTime.SpecifyKind(valuationDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
             if (valuationDate < today)
             {
                 // Historical data - get holdings for the specific date
-                var dateTime = DateTime.SpecifyKind(valuationDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
                 holdings = await _holdingRepository.GetHoldingsByAccountAndDateAsync(accountId, dateTime, cancellationToken);
                 _logger.LogInformation("Retrieved {Count} historical holdings for account {AccountId} on date {ValuationDate}", 
                     holdings.Count(), accountId, valuationDate);
+                return holdings;
             }
-            else if (valuationDate == today)
+
+            if(valuationDate > today)
             {
-                // Real-time data - get the most recent holdings and apply real-time pricing
-                var latestDate = await _holdingRepository.GetLatestValuationDateAsync(cancellationToken);
-                if (latestDate.HasValue)
+                // Future date - not supported, return empty
+                _logger.LogWarning("Future date {ValuationDate} requested, returning empty holdings", valuationDate);
+                holdings = Enumerable.Empty<Holding>();
+                return holdings;
+            }
+
+            holdings = await _holdingRepository.GetHoldingsByAccountAndDateAsync(accountId, dateTime, cancellationToken);
+            if(holdings.Any())
+            {
+                _logger.LogInformation("Retrieved {Count} holdings for account {AccountId} on today's date {ValuationDate}", 
+                    holdings.Count(), accountId, valuationDate);
+                    return holdings;
+            }
+
+            // Real-time data - get the most recent holdings and apply real-time pricing
+            var latestDate = await _holdingRepository.GetLatestValuationDateAsync(cancellationToken);
+            if (latestDate.HasValue)
                 {
                     // Get ALL holdings from the latest date, then filter by account
                     var allLatestHoldings = await _holdingRepository.GetHoldingsByValuationDateWithInstrumentsAsync(latestDate.Value, cancellationToken);
@@ -71,20 +88,14 @@ public class HoldingsRetrievalService : IHoldingsRetrieval
                     {
                         _logger.LogWarning("EOD market data tool not available for real-time pricing, returning latest holdings with historical prices");
                     }
+                        
                 }
-                else
-                {
-                    _logger.LogWarning("No historical holdings found for account {AccountId}, returning empty holdings", accountId);
-                    holdings = Enumerable.Empty<Holding>();
-                }
-            }
             else
             {
-                // Future date - not supported, return empty
-                _logger.LogWarning("Future date {ValuationDate} requested, returning empty holdings", valuationDate);
-                holdings = Enumerable.Empty<Holding>();
+                    _logger.LogWarning("No historical holdings found for account {AccountId}, returning empty holdings", accountId);
+                    holdings = Enumerable.Empty<Holding>();
             }
-            
+                      
             return holdings;
         }
         catch (Exception ex)
@@ -104,7 +115,8 @@ public class HoldingsRetrievalService : IHoldingsRetrieval
             if (_eodMarketDataToolFactory == null)
             {
                 _logger.LogWarning("EOD market data tool not available for real-time pricing");
-                return holdings;
+                
+return holdings;
             }
 
             // Extract tickers from holdings (excluding CASH)
@@ -150,7 +162,8 @@ public class HoldingsRetrievalService : IHoldingsRetrieval
                     // Apply scaling factor for proxy instruments using shared service
                     var scaledPrice = _pricingCalculationService.ApplyScalingFactor(realTimePrice, holding.Instrument.Ticker);
                     
-                    // Use the shared pricing calculation service
+                    
+// Use the shared pricing calculation service
                     var newCurrentValue = await _pricingCalculationService.CalculateCurrentValueAsync(
                         holding.UnitAmount, 
                         scaledPrice, // Use scaled price instead of raw price

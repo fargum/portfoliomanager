@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
-using FtoConsulting.PortfolioManager.Application.Services.Ai;
+using FtoConsulting.PortfolioManager.Application.Services;
+using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 
 namespace FtoConsulting.PortfolioManager.Api.Controllers.Ai;
 

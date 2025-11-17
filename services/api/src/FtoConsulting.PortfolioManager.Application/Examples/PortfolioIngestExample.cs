@@ -1,5 +1,7 @@
 using FtoConsulting.PortfolioManager.Application.Services;
 using FtoConsulting.PortfolioManager.Domain.Entities;
+using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
+
 
 namespace FtoConsulting.PortfolioManager.Application.Examples;
 
@@ -26,16 +28,19 @@ public class PortfolioIngestExample
 
         // Create sample instruments (using ticker as the primary business identifier)
         var appleStock = new Instrument("Apple Inc", "AAPL", equityTypeId, "Apple Inc Common Stock", "USD", "USD");
-        var microsoftStock = new Instrument("Microsoft Corporation", "MSFT", equityTypeId, "Microsoft Corporation Common Stock", "USD", "USD");
+        
+var microsoftStock = new Instrument("Microsoft Corporation", "MSFT", equityTypeId, "Microsoft Corporation Common Stock", "USD", "USD");
         var treasuryBond = new Instrument("US Treasury Bond 2.75% 2025", "UST25", bondTypeId, "US Treasury Bond maturing 2025", "USD", "USD");
 
         // Create sample platforms (using integers instead of GUIDs)
         var fidelityPlatformId = 1;
-        var schwabPlatformId = 2;
+        
+var schwabPlatformId = 2;
 
         // Create sample account and portfolio (using integers instead of GUIDs)
         var accountId = 1;
-        var portfolio = new Portfolio("My Investment Portfolio", accountId);
+        
+var portfolio = new Portfolio("My Investment Portfolio", accountId);
 
         // Create holdings for the portfolio
         var holdings = new List<Holding>

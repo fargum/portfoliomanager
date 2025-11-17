@@ -1,6 +1,6 @@
 using FtoConsulting.PortfolioManager.Domain.Entities;
 
-namespace FtoConsulting.PortfolioManager.Application.Services;
+namespace FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 
 /// <summary>
 /// Service for retrieving holdings data with related entities

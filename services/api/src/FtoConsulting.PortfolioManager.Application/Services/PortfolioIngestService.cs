@@ -2,6 +2,8 @@ using FtoConsulting.PortfolioManager.Application.Services;
 using FtoConsulting.PortfolioManager.Domain.Entities;
 using FtoConsulting.PortfolioManager.Domain.Repositories;
 using Microsoft.Extensions.Logging;
+using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
+
 
 namespace FtoConsulting.PortfolioManager.Application.Services;
 
@@ -80,7 +82,8 @@ public class PortfolioIngestService : IPortfolioIngest
                 resultPortfolio = existingPortfolio;
                 _logger.LogInformation("Using existing portfolio {PortfolioName} with ID {PortfolioId}", resultPortfolio.Name, resultPortfolio.Id);
                 
-                // Process holdings with the existing portfolio ID
+                
+// Process holdings with the existing portfolio ID
                 if (portfolio.Holdings?.Any() == true)
                 {
                     await ProcessHoldingsAsync(portfolio.Holdings, resultPortfolio.Id, cancellationToken);

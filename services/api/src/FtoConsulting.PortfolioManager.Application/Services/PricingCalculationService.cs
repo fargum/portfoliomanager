@@ -1,5 +1,7 @@
 using Microsoft.Extensions.Logging;
 using FtoConsulting.PortfolioManager.Domain.Constants;
+using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
+
 
 namespace FtoConsulting.PortfolioManager.Application.Services;
 
@@ -76,7 +78,8 @@ public class PricingCalculationService : IPricingCalculationService
                 _logger.LogWarning(ex, "Failed to convert {GrossValue} {Currency} to GBP for {ValuationDate}, using unconverted value", 
                     grossValue, actualCurrency, valuationDate);
                 
-                // Fallback: return unconverted value (may not be accurate but allows processing to continue)
+                
+// Fallback: return unconverted value (may not be accurate but allows processing to continue)
                 return grossValue;
             }
         }

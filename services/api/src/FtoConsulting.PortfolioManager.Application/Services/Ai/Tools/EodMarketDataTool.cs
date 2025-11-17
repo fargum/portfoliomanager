@@ -1,9 +1,11 @@
 using FtoConsulting.PortfolioManager.Application.DTOs.Ai;
-using FtoConsulting.PortfolioManager.Application.Services.Ai;
+using FtoConsulting.PortfolioManager.Application.Services;
 using FtoConsulting.PortfolioManager.Application.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
+using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
+
 
 namespace FtoConsulting.PortfolioManager.Application.Services.Ai.Tools;
 
@@ -75,7 +77,8 @@ public class EodMarketDataTool
             }
 
             using var httpClient = new HttpClient();
-            httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
+            
+httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
 
             // Use EOD's news API: https://eodhd.com/api/news?s=gen.lse&offset=0&limit=10&api_token=TOKEN&fmt=json
             var tickerParam = string.Join(",", tickers);
@@ -121,7 +124,8 @@ public class EodMarketDataTool
         {
             _logger.LogInformation("Fetching market sentiment from EOD for tickers: {Tickers}", string.Join(", ", tickers));
 
-            if (string.IsNullOrEmpty(_eodApiOptions.Token))
+            
+if (string.IsNullOrEmpty(_eodApiOptions.Token))
             {
                 _logger.LogWarning("EOD API token not configured, returning default sentiment");
                 return CreateDefaultSentimentResponse(date);
@@ -143,7 +147,8 @@ public class EodMarketDataTool
             _logger.LogInformation("Fetching sentiment data from EOD API for ticker {Ticker}", ticker);
             
             using var httpClient = new HttpClient();
-            httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
+            
+httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
             
             var response = await httpClient.GetAsync(url, cancellationToken);
             response.EnsureSuccessStatusCode();
@@ -201,7 +206,8 @@ public class EodMarketDataTool
 
             var priceDict = new Dictionary<string, decimal>();
             using var httpClient = new HttpClient();
-            httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
+            
+httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
 
             // Process each ticker individually for real-time pricing
             foreach (var ticker in tickers)

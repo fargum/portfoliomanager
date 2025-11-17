@@ -1,6 +1,6 @@
 using FtoConsulting.PortfolioManager.Application.Models;
 
-namespace FtoConsulting.PortfolioManager.Application.Services;
+namespace FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 
 /// <summary>
 /// Service for fetching market prices and exchange rates using external data providers

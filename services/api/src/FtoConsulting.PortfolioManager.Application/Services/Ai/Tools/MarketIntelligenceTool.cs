@@ -1,6 +1,8 @@
 using System.ComponentModel;
-using FtoConsulting.PortfolioManager.Application.Services.Ai;
+using FtoConsulting.PortfolioManager.Application.Services;
 using FtoConsulting.PortfolioManager.Application.Utilities;
+using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
+
 
 namespace FtoConsulting.PortfolioManager.Application.Services.Ai.Tools;
 

@@ -4,6 +4,7 @@ using FtoConsulting.PortfolioManager.Domain.Repositories;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
+using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 
 namespace FtoConsulting.PortfolioManager.Application.Tests.Services;
 

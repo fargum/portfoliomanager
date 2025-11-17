@@ -1,4 +1,4 @@
-namespace FtoConsulting.PortfolioManager.Application.Services.Ai;
+namespace FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 
 /// <summary>
 /// Service interface for MCP (Model Context Protocol) server functionality

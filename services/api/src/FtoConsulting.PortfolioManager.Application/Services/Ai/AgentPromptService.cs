@@ -2,29 +2,10 @@ using Microsoft.Extensions.Logging;
 using System.Text.Json;
 using System.Text;
 using System.Reflection;
+using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
+
 
 namespace FtoConsulting.PortfolioManager.Application.Services.Ai;
-
-/// <summary>
-/// Service for managing AI agent prompts from configuration
-/// </summary>
-public interface IAgentPromptService
-{
-    /// <summary>
-    /// Get the portfolio advisor prompt for a specific account
-    /// </summary>
-    /// <param name="accountId">Account ID to include in the prompt</param>
-    /// <returns>Complete prompt text</returns>
-    string GetPortfolioAdvisorPrompt(int accountId);
-    
-    /// <summary>
-    /// Get a custom prompt by name with parameter substitution
-    /// </summary>
-    /// <param name="promptName">Name of the prompt configuration</param>
-    /// <param name="parameters">Parameters for substitution</param>
-    /// <returns>Complete prompt text</returns>
-    string GetPrompt(string promptName, Dictionary<string, object>? parameters = null);
-}
 
 /// <summary>
 /// Implementation of agent prompt service that loads prompts from JSON configuration
@@ -233,18 +214,21 @@ public class AgentPromptService : IAgentPromptService
             var resourceName = "FtoConsulting.PortfolioManager.Application.Configuration.AgentPrompts.json";
             
             using var stream = assembly.GetManifestResourceStream(resourceName);
-            if (stream == null)
+            
+if (stream == null)
             {
                 _logger.LogWarning("Could not find embedded prompt configuration resource: {ResourceName}", resourceName);
                 return CreateFallbackConfiguration();
             }
             
             using var reader = new StreamReader(stream);
-            var jsonContent = reader.ReadToEnd();
+            
+var jsonContent = reader.ReadToEnd();
             
             // Parse as JsonDocument first to handle dynamic structure
             using var document = JsonDocument.Parse(jsonContent);
-            var config = new AgentPromptConfiguration();
+            
+var config = new AgentPromptConfiguration();
             
             foreach (var property in document.RootElement.EnumerateObject())
             {
@@ -269,7 +253,8 @@ public class AgentPromptService : IAgentPromptService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error loading prompt configuration, using fallback");
-            return CreateFallbackConfiguration();
+            
+return CreateFallbackConfiguration();
         }
     }
 

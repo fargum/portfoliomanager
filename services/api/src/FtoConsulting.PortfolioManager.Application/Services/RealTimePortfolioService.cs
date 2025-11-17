@@ -1,8 +1,10 @@
 using FtoConsulting.PortfolioManager.Application.DTOs;
-using FtoConsulting.PortfolioManager.Application.Services.Ai;
+using FtoConsulting.PortfolioManager.Application.Services;
 using FtoConsulting.PortfolioManager.Application.Services.Ai.Tools;
 using FtoConsulting.PortfolioManager.Domain.Repositories;
 using Microsoft.Extensions.Logging;
+using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
+
 
 namespace FtoConsulting.PortfolioManager.Application.Services;
 

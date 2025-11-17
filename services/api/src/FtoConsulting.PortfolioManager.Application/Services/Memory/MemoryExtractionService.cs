@@ -1,9 +1,10 @@
 using System.Text.Json;
-using FtoConsulting.PortfolioManager.Application.Services.Ai;
+using FtoConsulting.PortfolioManager.Application.Services;
 using FtoConsulting.PortfolioManager.Domain.Entities;
 using Microsoft.Extensions.Logging;
 using OpenAI.Chat;
 using DomainChatMessage = FtoConsulting.PortfolioManager.Domain.Entities.ChatMessage;
+using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 
 namespace FtoConsulting.PortfolioManager.Application.Services.Memory;
 

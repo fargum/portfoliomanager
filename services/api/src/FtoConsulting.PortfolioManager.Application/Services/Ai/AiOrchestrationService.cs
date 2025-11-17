@@ -1,5 +1,5 @@
 using FtoConsulting.PortfolioManager.Application.DTOs.Ai;
-using FtoConsulting.PortfolioManager.Application.Services.Memory;
+using FtoConsulting.PortfolioManager.Application.Services;
 using FtoConsulting.PortfolioManager.Application.Configuration;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.AI;
@@ -8,6 +8,8 @@ using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;
 using OpenAI;
 using Microsoft.Extensions.Logging;
+using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
+
 
 namespace FtoConsulting.PortfolioManager.Application.Services.Ai;
 

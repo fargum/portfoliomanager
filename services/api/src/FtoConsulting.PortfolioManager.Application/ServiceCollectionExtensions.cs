@@ -2,6 +2,7 @@ using FtoConsulting.PortfolioManager.Application.Services;
 using FtoConsulting.PortfolioManager.Application.Services.Ai;
 using FtoConsulting.PortfolioManager.Application.Services.Ai.Tools;
 using FtoConsulting.PortfolioManager.Application.Services.Memory;
+using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 using FtoConsulting.PortfolioManager.Application.Configuration;
 using FtoConsulting.PortfolioManager.Domain.Repositories;
 using Microsoft.Extensions.DependencyInjection;

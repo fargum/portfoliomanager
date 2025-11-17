@@ -3,6 +3,8 @@ using OpenAI.Chat;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using FtoConsulting.PortfolioManager.Application.Configuration;
+using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
+
 
 namespace FtoConsulting.PortfolioManager.Application.Services.Ai;
 

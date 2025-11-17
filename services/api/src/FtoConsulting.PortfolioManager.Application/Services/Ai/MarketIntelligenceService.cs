@@ -1,8 +1,10 @@
 using FtoConsulting.PortfolioManager.Application.DTOs.Ai;
-using FtoConsulting.PortfolioManager.Application.Services.Ai;
+using FtoConsulting.PortfolioManager.Application.Services;
 using FtoConsulting.PortfolioManager.Application.Services.Ai.Tools;
 using Microsoft.Extensions.Logging;
 using OpenAI.Chat;
+using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
+
 
 namespace FtoConsulting.PortfolioManager.Application.Services.Ai;
 
@@ -128,7 +130,8 @@ public class MarketIntelligenceService : IMarketIntelligenceService
         {
             _logger.LogInformation("Generating AI market summary for tickers: {Tickers}", string.Join(", ", tickers));
 
-            // Check if AI chat service is available
+            
+// Check if AI chat service is available
             if (_aiChatService == null)
             {
                 _logger.LogError("AI chat service not configured");
@@ -236,7 +239,8 @@ Keep the response professional, accurate, and useful for portfolio management de
         if (_eodMarketDataToolFactory == null)
         {
             _logger.LogWarning("EOD market data tool not configured, using neutral sentiment");
-            return CreateFallbackSentiment();
+            
+return CreateFallbackSentiment();
         }
 
         try
@@ -251,13 +255,15 @@ Keep the response professional, accurate, and useful for portfolio management de
             else
             {
                 _logger.LogWarning("No sentiment data returned from EOD for date: {Date}, using fallback", date);
-                return CreateFallbackSentiment();
+                
+return CreateFallbackSentiment();
             }
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "Failed to retrieve sentiment data from EOD (possibly rate limited), using fallback");
-            return CreateFallbackSentiment();
+            
+return CreateFallbackSentiment();
         }
     }
 

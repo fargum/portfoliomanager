@@ -1,6 +1,8 @@
 using FtoConsulting.PortfolioManager.Domain.Repositories;
 using FtoConsulting.PortfolioManager.Domain.Constants;
 using Microsoft.Extensions.Logging;
+using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
+
 
 namespace FtoConsulting.PortfolioManager.Application.Services;
 
@@ -60,7 +62,8 @@ public class CurrencyConversionService : ICurrencyConversionService
             _logger.LogDebug("Converted {Amount} {FromCurrency} to {ConvertedAmount} {ToCurrency} using rate {Rate} from {Source}", 
                 amount, fromCurrency, convertedAmount, toCurrency, exchangeRate.Rate, exchangeRate.Source);
             
-            return (convertedAmount, exchangeRate.Rate, exchangeRate.Source);
+            
+return (convertedAmount, exchangeRate.Rate, exchangeRate.Source);
         }
 
         // Try inverse rate (e.g., if we need USD/GBP but only have GBP/USD)
@@ -73,7 +76,8 @@ public class CurrencyConversionService : ICurrencyConversionService
             _logger.LogDebug("Converted {Amount} {FromCurrency} to {ConvertedAmount} {ToCurrency} using inverse rate {Rate} from {Source}", 
                 amount, fromCurrency, convertedAmount, toCurrency, rate, inverseRate.Source);
             
-            return (convertedAmount, rate, $"INVERSE_{inverseRate.Source}");
+            
+return (convertedAmount, rate, $"INVERSE_{inverseRate.Source}");
         }
 
         // No exchange rate available

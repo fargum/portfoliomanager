@@ -1,4 +1,4 @@
-namespace FtoConsulting.PortfolioManager.Application.Services;
+namespace FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 
 /// <summary>
 /// Service for calculating pricing with proper currency conversion and unit handling

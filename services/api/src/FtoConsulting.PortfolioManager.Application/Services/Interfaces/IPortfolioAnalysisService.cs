@@ -1,6 +1,6 @@
 using FtoConsulting.PortfolioManager.Application.DTOs.Ai;
 
-namespace FtoConsulting.PortfolioManager.Application.Services.Ai;
+namespace FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 
 /// <summary>
 /// Service for analyzing portfolio performance and generating insights

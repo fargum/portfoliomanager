@@ -9,7 +9,7 @@ using Microsoft.Extensions.Options;
 using System.Diagnostics;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-
+using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 
 namespace FtoConsulting.PortfolioManager.Application.Services;
 
@@ -81,7 +81,8 @@ public class PriceFetchingService : IPriceFetching, IDisposable
                     // Use the EOD Historical Data client to fetch real-time price
                     var priceData = await FetchPriceForInstrument(instrument.Ticker, instrument.Ticker, valuationDate, cancellationToken);
                     
-                    if (priceData != null)
+                    
+if (priceData != null)
                     {
                         // Convert to InstrumentPrice entity for persistence
                         var instrumentPrice = new InstrumentPrice
@@ -322,7 +323,8 @@ public class PriceFetchingService : IPriceFetching, IDisposable
             _logger.LogInformation("Calling EOD API for specific date {ValuationDate}: {Url}", valuationDate, url.Replace(_eodApiOptions.Token, "***"));
             
             using var httpClient = new HttpClient();
-            httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
+            
+httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
             
             try
             {
@@ -356,7 +358,8 @@ public class PriceFetchingService : IPriceFetching, IDisposable
                 var requestedDatePrice = priceData.FirstOrDefault(p => 
                     DateTime.Parse(p.Date).Date == valuationDate.ToDateTime(TimeOnly.MinValue).Date);
                 
-                if (requestedDatePrice == null)
+                
+if (requestedDatePrice == null)
                 {
                     _logger.LogWarning("No price data available for the specific date {ValuationDate} for {Ticker}. Available dates: {AvailableDates}",
                         valuationDate, ticker, string.Join(", ", priceData.Select(p => p.Date)));
@@ -524,7 +527,8 @@ public class PriceFetchingService : IPriceFetching, IDisposable
                 baseCurrency, targetCurrency, valuationDate, url.Replace(_eodApiOptions.Token, "***"));
 
             using var httpClient = new HttpClient();
-            httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
+            
+httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
 
             var response = await httpClient.GetStringAsync(url, cancellationToken);
             _logger.LogInformation("EOD FOREX API response for {BaseCurrency}/{TargetCurrency}: {Response}", 

@@ -1,6 +1,6 @@
 using OpenAI.Chat;
 
-namespace FtoConsulting.PortfolioManager.Application.Services.Ai;
+namespace FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 
 /// <summary>
 /// Interface for AI chat completion to enable easier testing

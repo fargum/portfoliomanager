@@ -1,6 +1,6 @@
 using FtoConsulting.PortfolioManager.Application.DTOs;
 
-namespace FtoConsulting.PortfolioManager.Application.Services;
+namespace FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 
 /// <summary>
 /// Service for real-time portfolio valuation using live market data

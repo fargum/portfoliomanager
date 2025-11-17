@@ -1,4 +1,4 @@
-using FtoConsulting.PortfolioManager.Application.Services.Ai;
+using FtoConsulting.PortfolioManager.Application.Services;
 using FtoConsulting.PortfolioManager.Application.Services;
 using FtoConsulting.PortfolioManager.Application.Configuration;
 using FtoConsulting.PortfolioManager.Application.Services.Ai.Tools;
@@ -15,6 +15,7 @@ using System.ComponentModel;
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
+using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 
 namespace FtoConsulting.PortfolioManager.Application.Services.Ai;
 
@@ -78,7 +79,8 @@ public class McpServerService : IMcpServerService
         {
             _logger.LogInformation("Initializing MCP server with portfolio tools using Microsoft Agent Framework");
 
-            // For now, create a simpler implementation that works with the current packages
+            
+// For now, create a simpler implementation that works with the current packages
             // TODO: Enhance with proper Agent Framework integration when APIs are stable
 
             _logger.LogInformation("MCP server initialized successfully");
@@ -236,7 +238,8 @@ public class McpServerService : IMcpServerService
         try
         {
             using var httpClient = new HttpClient();
-            httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
+            
+httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
             
             // Build the EOD MCP server URL with API key parameter
             var eodServerUrl = $"{_eodApiOptions.McpServerUrl}?apikey={_eodApiOptions.Token}";
@@ -412,7 +415,8 @@ public class McpServerService : IMcpServerService
             }
 
             using var httpClient = new HttpClient();
-            httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
+            
+httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
             
             // Build the EOD MCP server URL with API key parameter
             var eodServerUrl = $"{_eodApiOptions.McpServerUrl}?apikey={_eodApiOptions.Token}";
