@@ -125,13 +125,11 @@ httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
             _logger.LogInformation("Fetching market sentiment from EOD for tickers: {Tickers}", string.Join(", ", tickers));
 
             
-if (string.IsNullOrEmpty(_eodApiOptions.Token))
+            if (string.IsNullOrEmpty(_eodApiOptions.Token))
             {
-                _logger.LogWarning("EOD API token not configured, returning default sentiment");
+                _logger.LogWarning("EOD API token not configured. Please configure a valid EOD Historical Data API token to get real market sentiment data. Currently returning neutral default sentiment.");
                 return CreateDefaultSentimentResponse(date);
-            }
-
-            if (!tickers.Any())
+            }            if (!tickers.Any())
             {
                 _logger.LogWarning("No tickers provided for sentiment analysis");
                 return CreateDefaultSentimentResponse(date);
@@ -144,33 +142,40 @@ if (string.IsNullOrEmpty(_eodApiOptions.Token))
             
             var url = $"https://eodhd.com/api/sentiments?s={ticker}&from={fromDate}&to={toDate}&api_token={_eodApiOptions.Token}&fmt=json";
             
-            _logger.LogInformation("Fetching sentiment data from EOD API for ticker {Ticker}", ticker);
+            _logger.LogInformation("Fetching sentiment data from EOD API for ticker {Ticker} from URL: {Url}", ticker, url.Replace(_eodApiOptions.Token, "***TOKEN***"));
             
             using var httpClient = new HttpClient();
             
 httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
             
             var response = await httpClient.GetAsync(url, cancellationToken);
+            
+            _logger.LogInformation("EOD API response status: {StatusCode} for ticker {Ticker}", response.StatusCode, ticker);
+            
             response.EnsureSuccessStatusCode();
             
             var jsonContent = await response.Content.ReadAsStringAsync();
             
-            if (string.IsNullOrWhiteSpace(jsonContent))
+            _logger.LogInformation("EOD API response content length: {Length} characters for ticker {Ticker}. Content preview: {ContentPreview}", 
+                jsonContent?.Length ?? 0, ticker, jsonContent?.Substring(0, Math.Min(200, jsonContent?.Length ?? 0)) ?? "null");
+            
+            if (string.IsNullOrWhiteSpace(jsonContent) || jsonContent.Trim() == "[]")
             {
-                _logger.LogWarning("Empty sentiment response from EOD API for ticker {Ticker}", ticker);
-                return CreateDefaultSentimentResponse(date);
+                _logger.LogWarning("Empty or no sentiment data from EOD API for ticker {Ticker}. Attempting price-based sentiment analysis.", ticker);
+                return await CreatePriceBasedSentimentAsync(ticker, date);
             }
 
             var sentimentData = ParseSentimentResponse(jsonContent, date);
             if (sentimentData != null)
             {
-                _logger.LogInformation("Successfully retrieved sentiment data for ticker {Ticker}", ticker);
+                _logger.LogInformation("Successfully retrieved sentiment data for ticker {Ticker}. Score: {Score}, Label: {Label}, FearGreed: {FearGreed}", 
+                    ticker, sentimentData.OverallSentimentScore, sentimentData.SentimentLabel, sentimentData.FearGreedIndex);
                 return sentimentData;
             }
             else
             {
-                _logger.LogWarning("Failed to parse sentiment data for ticker {Ticker}", ticker);
-                return CreateDefaultSentimentResponse(date);
+            _logger.LogWarning("Failed to parse sentiment data for ticker {Ticker}, using default neutral response", ticker);
+            return CreateDefaultSentimentResponse(date);
             }
         }
         catch (Exception ex)
@@ -501,11 +506,171 @@ httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
         return new MarketSentimentDto(
             Date: date,
             OverallSentimentScore: 0.5m,
-            SentimentLabel: "Neutral (EOD unavailable)",
+            SentimentLabel: "Neutral - EOD API token not configured or data unavailable",
             FearGreedIndex: 50m,
             SectorSentiments: Array.Empty<SectorSentimentDto>(),
-            Indicators: Array.Empty<MarketIndicatorDto>()
+            Indicators: new MarketIndicatorDto[]
+            {
+                new("Data Source", 0.5m, "Not Available", "EOD Historical Data API requires configuration", date)
+            }
         );
+    }
+
+    /// <summary>
+    /// Create sentiment analysis based on recent price movements when sentiment data is unavailable
+    /// </summary>
+    private async Task<MarketSentimentDto> CreatePriceBasedSentimentAsync(string ticker, DateTime date)
+    {
+        try
+        {
+            _logger.LogInformation("Creating price-based sentiment for {Ticker} using recent price data", ticker);
+            
+            // Get recent price data for the last 5 trading days
+            var toDate = date.ToString("yyyy-MM-dd");
+            var fromDate = date.AddDays(-10).ToString("yyyy-MM-dd"); // Get more days to account for weekends
+            
+            var priceUrl = $"https://eodhd.com/api/eod/{ticker}?from={fromDate}&to={toDate}&api_token={_eodApiOptions.Token}&fmt=json&period=d";
+            
+            _logger.LogInformation("Fetching price data for sentiment analysis from: {Url}", priceUrl.Replace(_eodApiOptions.Token, "***TOKEN***"));
+            
+            using var httpClient = new HttpClient();
+            httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
+            
+            var response = await httpClient.GetAsync(priceUrl);
+            if (!response.IsSuccessStatusCode)
+            {
+                _logger.LogWarning("Failed to fetch price data for {Ticker}, status: {StatusCode}", ticker, response.StatusCode);
+                return CreateDefaultSentimentResponse(date);
+            }
+            
+            var priceData = await response.Content.ReadAsStringAsync();
+            _logger.LogInformation("Price data length: {Length} for {Ticker}", priceData.Length, ticker);
+            
+            if (string.IsNullOrWhiteSpace(priceData) || priceData.Trim() == "[]")
+            {
+                _logger.LogWarning("No price data available for {Ticker}", ticker);
+                return CreateDefaultSentimentResponse(date);
+            }
+            
+            // Parse price data and calculate sentiment based on recent performance
+            var sentiment = AnalyzePriceMovement(priceData, ticker, date);
+            _logger.LogInformation("Created price-based sentiment for {Ticker}: {Score} ({Label})", 
+                ticker, sentiment.OverallSentimentScore, sentiment.SentimentLabel);
+            
+            return sentiment;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating price-based sentiment for {Ticker}", ticker);
+            return CreateDefaultSentimentResponse(date);
+        }
+    }
+
+    /// <summary>
+    /// Analyze price movement to derive sentiment
+    /// </summary>
+    private MarketSentimentDto AnalyzePriceMovement(string priceDataJson, string ticker, DateTime date)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(priceDataJson);
+            var prices = doc.RootElement.EnumerateArray().ToArray();
+            
+            if (prices.Length < 2)
+            {
+                return CreateDefaultSentimentResponse(date);
+            }
+            
+            // Get the most recent prices
+            var recent = prices.TakeLast(5).ToArray();
+            var latest = recent.Last();
+            var previous = recent[^2]; // Second to last
+            
+            if (!latest.TryGetProperty("close", out var latestClose) ||
+                !previous.TryGetProperty("close", out var previousClose))
+            {
+                return CreateDefaultSentimentResponse(date);
+            }
+            
+            var latestPrice = latestClose.GetDecimal();
+            var previousPrice = previousClose.GetDecimal();
+            
+            // Calculate percentage change
+            var changePercent = previousPrice != 0 ? ((latestPrice - previousPrice) / previousPrice) * 100 : 0;
+            
+            // Calculate multi-day trend
+            var firstPrice = recent.First().GetProperty("close").GetDecimal();
+            var overallChangePercent = firstPrice != 0 ? ((latestPrice - firstPrice) / firstPrice) * 100 : 0;
+            
+            // Determine sentiment based on price movement
+            decimal sentimentScore;
+            string sentimentLabel;
+            string trend;
+            
+            if (changePercent <= -10)
+            {
+                sentimentScore = 0.1m;
+                sentimentLabel = "Very Negative";
+                trend = "Sharp Decline";
+            }
+            else if (changePercent <= -5)
+            {
+                sentimentScore = 0.25m;
+                sentimentLabel = "Negative";
+                trend = "Declining";
+            }
+            else if (changePercent <= -2)
+            {
+                sentimentScore = 0.4m;
+                sentimentLabel = "Bearish";
+                trend = "Weak";
+            }
+            else if (changePercent <= 2)
+            {
+                sentimentScore = 0.5m;
+                sentimentLabel = "Neutral";
+                trend = "Stable";
+            }
+            else if (changePercent <= 5)
+            {
+                sentimentScore = 0.6m;
+                sentimentLabel = "Bullish";
+                trend = "Rising";
+            }
+            else if (changePercent <= 10)
+            {
+                sentimentScore = 0.75m;
+                sentimentLabel = "Positive";
+                trend = "Strong";
+            }
+            else
+            {
+                sentimentScore = 0.9m;
+                sentimentLabel = "Very Positive";
+                trend = "Surging";
+            }
+            
+            var fearGreedIndex = sentimentScore * 100;
+            
+            return new MarketSentimentDto(
+                Date: date,
+                OverallSentimentScore: sentimentScore,
+                SentimentLabel: $"{sentimentLabel} (Price-based analysis)",
+                FearGreedIndex: fearGreedIndex,
+                SectorSentiments: Array.Empty<SectorSentimentDto>(),
+                Indicators: new MarketIndicatorDto[]
+                {
+                    new("Price Change", Math.Abs(changePercent), trend, $"Recent price movement: {changePercent:F2}%", date),
+                    new("Multi-day Trend", Math.Abs(overallChangePercent), overallChangePercent >= 0 ? "Positive" : "Negative", $"5-day change: {overallChangePercent:F2}%", date),
+                    new("Data Source", sentimentScore, "Price Analysis", "Sentiment derived from recent price movements due to lack of sentiment data", date)
+                }
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error parsing price data for sentiment analysis");
+            return CreateDefaultSentimentResponse(date);
+        }
     }
 
     

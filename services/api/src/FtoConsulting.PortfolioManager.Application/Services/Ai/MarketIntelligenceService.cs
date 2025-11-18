@@ -275,10 +275,13 @@ return CreateFallbackSentiment();
         return new MarketSentimentDto(
             Date: DateTime.Now,
             OverallSentimentScore: 0.5m,
-            SentimentLabel: "Neutral (EOD unavailable)",
+            SentimentLabel: "Neutral - Market data source not configured",
             FearGreedIndex: 50,
             SectorSentiments: Array.Empty<SectorSentimentDto>(),
-            Indicators: Array.Empty<MarketIndicatorDto>()
+            Indicators: new MarketIndicatorDto[]
+            {
+                new("Configuration", 0.5m, "Required", "Please configure EOD Historical Data API for real market sentiment", DateTime.Now)
+            }
         );
     }
 }

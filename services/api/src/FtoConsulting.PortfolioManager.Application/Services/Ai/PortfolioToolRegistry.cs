@@ -44,8 +44,8 @@ public static class PortfolioToolRegistry
             Parameters: new Dictionary<string, ToolParameterDefinition>
             {
                 ["accountId"] = new ToolParameterDefinition("integer", "Account ID", true),
-                ["startDate"] = new ToolParameterDefinition("string", "Start date in YYYY-MM-DD format", true),
-                ["endDate"] = new ToolParameterDefinition("string", "End date in YYYY-MM-DD format", true)
+                ["startDate"] = new ToolParameterDefinition("string", "Start date in various formats (YYYY-MM-DD, DD/MM/YYYY, DD MMMM YYYY, etc.) or relative terms (today, yesterday, tomorrow)", true),
+                ["endDate"] = new ToolParameterDefinition("string", "End date in various formats (YYYY-MM-DD, DD/MM/YYYY, DD MMMM YYYY, etc.) or relative terms (today, yesterday, tomorrow)", true)
             },
             Category: "Portfolio Analysis"
         ),

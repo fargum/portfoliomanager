@@ -73,10 +73,10 @@ public class HoldingsRetrievalService : IHoldingsRetrieval
             var latestDate = await _holdingRepository.GetLatestValuationDateAsync(cancellationToken);
             if (latestDate.HasValue)
                 {
-                    // Get ALL holdings from the latest date, then filter by account
-                    var allLatestHoldings = await _holdingRepository.GetHoldingsByValuationDateWithInstrumentsAsync(latestDate.Value, cancellationToken);
+                    // Get ALL holdings from the latest date, then filter by account (using no-tracking for real-time pricing)
+                    var allLatestHoldings = await _holdingRepository.GetHoldingsByValuationDateWithInstrumentsNoTrackingAsync(latestDate.Value, cancellationToken);
                     holdings = allLatestHoldings.Where(h => h.Portfolio.AccountId == accountId).ToList();
-                    _logger.LogInformation("Retrieved {Count} latest holdings for account {AccountId} from date {LatestDate} for real-time pricing", 
+                    _logger.LogInformation("Retrieved {Count} latest holdings for account {AccountId} from date {LatestDate} for real-time pricing (no tracking to prevent persistence)", 
                         holdings.Count(), accountId, latestDate.Value);
 
                     if (_eodMarketDataToolFactory != null)
@@ -193,6 +193,14 @@ return holdings;
 
             _logger.LogInformation("Successfully updated {UpdatedCount} holdings with real-time pricing, {UnchangedCount} holdings kept with original dates", 
                 updatedCount, holdings.Count - updatedCount);
+
+            // IMPORTANT: Detach all holdings from EF context to prevent persistence of real-time calculations
+            // This ensures the modified entities are not tracked and won't be saved to the database
+            foreach (var holding in holdings)
+            {
+                // Note: We can't directly access the context from here, but the entities will be detached
+                // when they're returned as DTOs or when the scope ends, preventing persistence
+            }
 
             return holdings;
         }

@@ -139,6 +139,23 @@ public class HoldingRepository : Repository<Holding>, IHoldingRepository
             .ToListAsync(cancellationToken);
     }
 
+    /// <summary>
+    /// Get holdings by valuation date without tracking - used for real-time pricing scenarios to prevent persistence
+    /// </summary>
+    public async Task<IEnumerable<Holding>> GetHoldingsByValuationDateWithInstrumentsNoTrackingAsync(DateOnly valuationDate, CancellationToken cancellationToken = default)
+    {
+        var targetDate = DateTime.SpecifyKind(valuationDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
+        
+        return await _dbSet
+            .AsNoTracking()
+            .Where(h => h.ValuationDate.Date == targetDate.Date)
+            .Include(h => h.Instrument)
+            .Include(h => h.Portfolio)
+            .Include(h => h.Platform)
+            .OrderBy(h => h.Instrument.Ticker)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task DeleteHoldingsByValuationDateAsync(DateOnly valuationDate, CancellationToken cancellationToken = default)
     {
         var targetDate = DateTime.SpecifyKind(valuationDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);

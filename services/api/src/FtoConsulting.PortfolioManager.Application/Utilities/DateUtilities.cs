@@ -26,6 +26,7 @@ public static class DateUtilities
 
     /// <summary>
     /// Parse a date string using multiple formats with UK culture preference
+    /// Supports relative dates: 'today', 'yesterday', 'tomorrow'
     /// </summary>
     /// <param name="dateString">The date string to parse</param>
     /// <returns>Parsed DateOnly</returns>
@@ -34,6 +35,18 @@ public static class DateUtilities
     {
         if (string.IsNullOrWhiteSpace(dateString))
             throw new ArgumentException("Date string cannot be null or empty", nameof(dateString));
+
+        // Handle relative date terms
+        var normalizedDateString = dateString.Trim().ToLowerInvariant();
+        switch (normalizedDateString)
+        {
+            case "today":
+                return DateOnly.FromDateTime(DateTime.UtcNow);
+            case "yesterday":
+                return DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1));
+            case "tomorrow":
+                return DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1));
+        }
 
         // Try parsing with UK culture first (dd/MM/yyyy preference)
         var ukCulture = CultureInfo.GetCultureInfo("en-GB");
@@ -56,7 +69,7 @@ public static class DateUtilities
             return result;
         }
 
-        throw new FormatException($"Unable to parse date string '{dateString}'. Expected formats: {string.Join(", ", AcceptedDateFormats)}");
+        throw new FormatException($"Unable to parse date string '{dateString}'. Expected formats: {string.Join(", ", AcceptedDateFormats)}, or relative terms: today, yesterday, tomorrow");
     }
 
     /// <summary>

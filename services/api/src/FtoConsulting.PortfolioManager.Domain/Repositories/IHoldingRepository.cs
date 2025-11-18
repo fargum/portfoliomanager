@@ -16,5 +16,6 @@ public interface IHoldingRepository : IRepository<Holding>
     Task<DateOnly?> GetLatestValuationDateAsync(CancellationToken cancellationToken = default);
     Task<DateOnly?> GetLatestValuationDateBeforeAsync(DateOnly beforeDate, CancellationToken cancellationToken = default);
     Task<IEnumerable<Holding>> GetHoldingsByValuationDateWithInstrumentsAsync(DateOnly valuationDate, CancellationToken cancellationToken = default);
+    Task<IEnumerable<Holding>> GetHoldingsByValuationDateWithInstrumentsNoTrackingAsync(DateOnly valuationDate, CancellationToken cancellationToken = default);
     Task DeleteHoldingsByValuationDateAsync(DateOnly valuationDate, CancellationToken cancellationToken = default);
 }
