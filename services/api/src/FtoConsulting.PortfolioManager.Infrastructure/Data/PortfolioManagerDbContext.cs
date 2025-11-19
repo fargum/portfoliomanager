@@ -26,6 +26,9 @@ public class PortfolioManagerDbContext : DbContext
     public DbSet<ConversationThread> ConversationThreads { get; set; }
     public DbSet<ChatMessage> ChatMessages { get; set; }
     public DbSet<MemorySummary> MemorySummaries { get; set; }
+    
+    // Security entities for AI guardrail monitoring
+    public DbSet<SecurityIncident> SecurityIncidents { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

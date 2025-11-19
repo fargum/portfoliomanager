@@ -255,6 +255,27 @@ See [Docker Deployment Guide](docs/Docker-Deployment-Guide.md) for:
 - Troubleshooting
 - Integration with UI services
 
+## Documentation
+
+Comprehensive documentation is available in the `docs/` directory:
+
+### API & Development
+- [API Documentation](docs/API-Documentation.md) - REST API endpoints and usage
+- [Holdings API Documentation](docs/Holdings-API-Documentation.md) - Portfolio holdings management
+- [Docker Deployment Guide](docs/Docker-Deployment-Guide.md) - Container setup and deployment
+- [Portfolio Ingest Service](docs/PortfolioIngestService.md) - Data ingestion processes
+- [Holding Revaluation Service](docs/HoldingRevaluationService.md) - Portfolio valuation engine
+
+### AI & Intelligence
+- [AI Agent Architecture](docs/AI-Agent-Architecture.md) - AI agent design and implementation  
+- [AI Chat Testing](docs/AI-Chat-Testing.md) - Testing AI chat functionality
+- [AI Evaluation Framework](docs/AI-Evaluation-Framework.md) - Comprehensive AI testing and metrics
+- [Memory Architecture](docs/Memory-Architecture.md) - AI conversation memory system
+- [Security Incident Management](docs/Security-Incident-Management.md) - AI guardrails and security
+
+### Sample Files
+- [Sample Portfolio Request](docs/sample-portfolio-request.json) - Example API payload
+
 ## Security Notes
 
 - **Never commit database credentials to source control**

@@ -3,6 +3,7 @@ using System;
 using FtoConsulting.PortfolioManager.Infrastructure.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace FtoConsulting.PortfolioManager.Infrastructure.Migrations
 {
     [DbContext(typeof(PortfolioManagerDbContext))]
-    partial class PortfolioManagerDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251119203612_AddSecurityIncidentsTable")]
+    partial class AddSecurityIncidentsTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

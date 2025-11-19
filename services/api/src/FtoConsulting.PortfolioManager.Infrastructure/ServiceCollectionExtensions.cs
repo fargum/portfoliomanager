@@ -22,6 +22,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IHoldingRepository, HoldingRepository>();
         services.AddScoped<IInstrumentPriceRepository, InstrumentPriceRepository>();
         services.AddScoped<IExchangeRateRepository, ExchangeRateRepository>();
+        services.AddScoped<ISecurityIncidentRepository, SecurityIncidentRepository>();
         
         // Register memory repositories
         services.AddScoped<IConversationThreadRepository, ConversationThreadRepository>();

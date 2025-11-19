@@ -1,5 +1,6 @@
 using FtoConsulting.PortfolioManager.Application.Services;
 using FtoConsulting.PortfolioManager.Application.Services.Ai;
+using FtoConsulting.PortfolioManager.Application.Services.Ai.Guardrails;
 using FtoConsulting.PortfolioManager.Application.Services.Ai.Tools;
 using FtoConsulting.PortfolioManager.Application.Services.Memory;
 using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
@@ -78,6 +79,11 @@ public static class ServiceCollectionExtensions
         // Register AI services (now in correct Application layer)
         services.AddScoped<IAiOrchestrationService, AiOrchestrationService>();
         services.AddScoped<IPortfolioAnalysisService, PortfolioAnalysisService>();
+        
+        // Register AI Guardrails
+        services.AddScoped<InputValidationGuardrails>();
+        services.AddScoped<OutputValidationGuardrails>();
+        services.AddScoped<AgentFrameworkGuardrails>();
         
         // Register memory services
         services.AddScoped<IConversationThreadService, ConversationThreadService>();

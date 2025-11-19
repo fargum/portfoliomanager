@@ -9,12 +9,13 @@ using Microsoft.Agents.AI;
 using OpenAI;
 using Microsoft.Extensions.Logging;
 using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
+using FtoConsulting.PortfolioManager.Application.Services.Ai.Guardrails;
 
 
 namespace FtoConsulting.PortfolioManager.Application.Services.Ai;
 
 /// <summary>
-/// Implementation of AI orchestration service for portfolio queries
+/// Implementation of AI orchestration service for portfolio queries with enhanced guardrails
 /// </summary>
 public class AiOrchestrationService(
     ILogger<AiOrchestrationService> logger,
@@ -22,6 +23,7 @@ public class AiOrchestrationService(
     IMcpServerService mcpServerService,
     IConversationThreadService conversationThreadService,
     IAgentPromptService agentPromptService,
+    AgentFrameworkGuardrails guardrails,
     Func<int, int?, System.Text.Json.JsonSerializerOptions?, ChatMessageStore> chatMessageStoreFactory,
     Func<int, IChatClient, AIContextProvider> memoryContextProviderFactory) : IAiOrchestrationService
 {
@@ -30,6 +32,7 @@ public class AiOrchestrationService(
     private readonly IMcpServerService _mcpServerService = mcpServerService;
     private readonly IConversationThreadService _conversationThreadService = conversationThreadService;
     private readonly IAgentPromptService _agentPromptService = agentPromptService;
+    private readonly AgentFrameworkGuardrails _guardrails = guardrails;
     private readonly Func<int, int?, System.Text.Json.JsonSerializerOptions?, ChatMessageStore> _chatMessageStoreFactory = chatMessageStoreFactory;
     private readonly Func<int, IChatClient, AIContextProvider> _memoryContextProviderFactory = memoryContextProviderFactory;
 
@@ -45,6 +48,18 @@ public class AiOrchestrationService(
         {
             _logger.LogInformation("Processing portfolio query with memory for account {AccountId}, thread {ThreadId}: {Query}", 
                 accountId, threadId, query);
+            
+            // GUARDRAILS: Validate input before processing
+            var inputValidation = await _guardrails.ValidateInputAsync(query, accountId);
+            if (!inputValidation.IsValid)
+            {
+                await _guardrails.LogSecurityIncident(inputValidation, accountId, "ProcessPortfolioQueryWithMemoryAsync");
+                
+                return new ChatResponseDto(
+                    Response: _guardrails.CreateFallbackResponse(inputValidation, accountId),
+                    QueryType: "SecurityFiltered"
+                );
+            }
             
             // Get or create conversation thread - use session-based approach when no threadId provided
             var thread = threadId.HasValue 
@@ -241,14 +256,15 @@ For casual conversation, respond naturally without using tools.";
         // Get a chat client for the specific model
         var chatClient = azureOpenAIClient.GetChatClient(_azureFoundryOptions.ModelName);
         
-        // Create AI functions from our MCP tools
+        // Create memory-aware AI agent with ChatClientAgentOptions and enhanced security
         var portfolioTools = CreatePortfolioMcpFunctions();
+        var secureInstructions = _guardrails.CreateSecureAgentInstructions(CreateAgentInstructions(accountId), accountId);
+        var secureChatOptions = _guardrails.CreateSecureChatOptions(portfolioTools, accountId);
         
-        // Create memory-aware AI agent with ChatClientAgentOptions
         var agent = chatClient.CreateAIAgent(new ChatClientAgentOptions
         {
-            Instructions = CreateAgentInstructions(accountId),
-            ChatOptions = new ChatOptions { Tools = portfolioTools.ToList() },
+            Instructions = secureInstructions,
+            ChatOptions = secureChatOptions,
             ChatMessageStoreFactory = ctx => _chatMessageStoreFactory(accountId, threadId, ctx.JsonSerializerOptions),
             AIContextProviderFactory = ctx => _memoryContextProviderFactory(accountId, chatClient.AsIChatClient())
         });
@@ -267,15 +283,8 @@ For casual conversation, respond naturally without using tools.";
             .OrderBy(m => m.CreatedAt)
             .ToList();
 
-        // Create the new user query message
-        var currentDataDate = DateTime.UtcNow.ToString("yyyy-MM-dd");
-        var newUserMessage = new ChatMessage(ChatRole.User, $"User Query: {query}\nAccount ID: {accountId}\nThread ID: {threadId}\nData Available As Of: {currentDataDate} (use 'today' for current real-time portfolio data)");
-
-        _logger.LogInformation("Memory optimization: Using {RecentCount} recent messages (from {TotalCount} total) for immediate context on thread {ThreadId}. Long-term memory provided via MemoryContextProvider.", 
-            recentMessages.Count, allStoredMessages.Count(), threadId);
-
-        // Combine recent messages with new message
-        var messagesToSend = recentMessages.Append(newUserMessage).ToList();
+        // Combine recent messages with new message using secure preparation
+        var messagesToSend = await _guardrails.PrepareSecureMessagesAsync(recentMessages, query, accountId, threadId);
         
         return (agent, messagesToSend);
     }
@@ -293,6 +302,19 @@ For casual conversation, respond naturally without using tools.";
             
             // Run the agent with optimized messages
             var response = await agent.RunAsync(messagesToSend, cancellationToken: cancellationToken);
+
+            // GUARDRAILS: Validate output before returning
+            var outputValidation = await _guardrails.ValidateOutputAsync(response.Text, query, accountId);
+            
+            if (!outputValidation.IsValid)
+            {
+                await _guardrails.LogSecurityIncident(outputValidation, accountId, "ProcessWithMemoryComponents");
+                
+                return new ChatResponseDto(
+                    Response: _guardrails.CreateFallbackResponse(outputValidation, accountId),
+                    QueryType: "SecurityFiltered"
+                );
+            }
 
             var cleanedResponse = CleanupMarkdownFormatting(response.Text);
 

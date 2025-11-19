@@ -1,39 +1,10 @@
-# Portfolio Manager AI Evaluation
+# Portfolio Manager AI Evaluation Framework
 
-This directory contains the evaluation framework for testing the Portfolio Manager's AI capabilities using Azure AI Evaluation SDK.
+This document describes the comprehensive evaluation framework for testing the Portfolio Manager's AI capabilities using Azure AI Evaluation SDK.
 
-## Quick Start
+## Overview
 
-1. **Install dependencies**: `pip install -r requirements.txt`
-2. **Configure Azure OpenAI**: Set `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_DEPLOYMENT`
-3. **Start Portfolio Manager API**: Ensure running at `http://localhost:8080`
-4. **Run evaluation**: `python portfolio_evaluator.py`
-
-## Key Files
-
-- `portfolio_evaluator.py` - Main evaluation framework
-- `performance_analyzer.py` - Performance analysis tool
-- `requirements.txt` - Python dependencies
-- `setup.py` - Environment setup
-
-## Results
-
-Evaluation results are saved to `evaluation_results/` directory with detailed metrics for:
-- Tool call accuracy
-- Response relevance
-- Response personality
-
-## Full Documentation
-
-📖 **Complete documentation available at**: [`../docs/AI-Evaluation-Framework.md`](../docs/AI-Evaluation-Framework.md)
-
-The main documentation includes:
-- Detailed architecture overview
-- Configuration options
-- Troubleshooting guide
-- Advanced usage examples
-- CI/CD integration
-- Custom evaluator development
+The evaluation framework tests your .NET Portfolio Manager API by:
 
 1. **Creating test scenarios** - Portfolio analysis, comparison, and market intelligence queries
 2. **Calling your live API** - Makes HTTP requests to your running Portfolio Manager
@@ -65,6 +36,9 @@ The main documentation includes:
 ### 1. Setup Environment
 
 ```bash
+# Navigate to evaluation directory
+cd evaluation
+
 # Run the setup script
 python setup.py
 
@@ -93,12 +67,16 @@ dotnet run
 # Or using Docker
 docker-compose up
 
-# Verify API is running at http://localhost:5000
+# Verify API is running at http://localhost:8080
 ```
 
 ### 4. Run Evaluation
 
 ```bash
+# Navigate to evaluation directory
+cd evaluation
+
+# Run the complete evaluation suite
 python portfolio_evaluator.py
 ```
 
@@ -169,7 +147,7 @@ Detailed results include:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORTFOLIO_API_URL` | `http://localhost:5000` | Your Portfolio Manager API endpoint |
+| `PORTFOLIO_API_URL` | `http://localhost:8080` | Your Portfolio Manager API endpoint |
 | `TEST_ACCOUNT_ID` | `1` | Account ID to use for testing |
 | `AZURE_OPENAI_ENDPOINT` | None | Azure OpenAI resource endpoint |
 | `AZURE_OPENAI_DEPLOYMENT` | None | GPT model deployment name |
@@ -187,21 +165,47 @@ Edit `portfolio_evaluator.py` and modify the `test_scenarios` list in `create_te
 }
 ```
 
-## Files
+## Framework Components
+
+### Core Files
 
 | File | Purpose |
 |------|---------|
-| `portfolio_evaluator.py` | Main evaluation framework |
+| `portfolio_evaluator.py` | Main evaluation framework and orchestration |
+| `performance_analyzer.py` | Performance bottleneck analysis |
+| `read_evaluation_results.py` | Results parsing and display utilities |
 | `response_personality.prompty` | Custom personality evaluator prompt |
 | `requirements.txt` | Python dependencies |
 | `setup.py` | Environment setup script |
-| `README.md` | This documentation |
+
+### Generated Files
+
+| File | Purpose |
+|------|---------|
+| `portfolio_test_dataset.jsonl` | Generated test scenarios |
+| `portfolio_test_dataset_with_responses.jsonl` | Test scenarios with API responses |
+| `evaluation_results/` | Detailed evaluation metrics and analysis |
+
+## Performance Analysis
+
+The framework includes performance analysis capabilities:
+
+```bash
+# Analyze request performance across different query types
+python performance_analyzer.py
+```
+
+This provides:
+- Time to First Byte (TTFB) analysis
+- Response processing time breakdown
+- Bottleneck identification
+- Performance recommendations
 
 ## Troubleshooting
 
 ### API Connection Issues
 ```
-❌ Portfolio Manager API at http://localhost:5000 is not healthy
+❌ Portfolio Manager API at http://localhost:8080 is not healthy
 ```
 **Solution**: Ensure your .NET API is running and accessible
 
@@ -251,4 +255,46 @@ TEST_ACCOUNT_ID=42 python portfolio_evaluator.py
 PORTFOLIO_API_URL=https://staging-api.yoursite.com python portfolio_evaluator.py
 ```
 
-This evaluation framework provides comprehensive testing of your Portfolio Manager's AI capabilities, ensuring high-quality, accurate, and engaging responses for your portfolio management needs.
+## Integration with CI/CD
+
+The evaluation framework can be integrated into your CI/CD pipeline:
+
+```yaml
+# Example GitHub Actions workflow
+- name: Run AI Evaluation
+  run: |
+    cd evaluation
+    pip install -r requirements.txt
+    python portfolio_evaluator.py
+  env:
+    AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
+    AZURE_OPENAI_DEPLOYMENT: ${{ secrets.AZURE_OPENAI_DEPLOYMENT }}
+    PORTFOLIO_API_URL: http://localhost:8080
+```
+
+## Custom Evaluators
+
+You can extend the framework with custom evaluators:
+
+```python
+class CustomEvaluator:
+    def __call__(self, *, query: str, response: str, **kwargs):
+        # Your custom evaluation logic
+        return {
+            "custom_score": score,
+            "reasoning": "Explanation of scoring"
+        }
+
+# Register in portfolio_evaluator.py
+evaluators["custom_metric"] = CustomEvaluator()
+```
+
+## Best Practices
+
+1. **Regular Evaluation**: Run evaluations after significant code changes
+2. **Baseline Establishment**: Establish performance baselines for comparison
+3. **Scenario Coverage**: Ensure test scenarios cover all major use cases
+4. **Environment Consistency**: Use consistent test data and configurations
+5. **Results Analysis**: Regularly review and act on evaluation insights
+
+This comprehensive evaluation framework provides enterprise-grade testing and monitoring of your Portfolio Manager's AI capabilities, ensuring consistent quality and performance as your system evolves.
