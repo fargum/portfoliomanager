@@ -55,7 +55,7 @@ public class EodMarketDataTool : IDisposable
             }
 
             // Clean ticker symbols - just remove exchange suffixes
-/*             var cleanedTickers = tickers.Select(ticker => 
+             var cleanedTickers = tickers.Select(ticker => 
             {
                 // Remove any exchange suffix (.LSE, .US, .L, etc.)
                 var dotIndex = ticker.LastIndexOf('.');
@@ -70,7 +70,7 @@ public class EodMarketDataTool : IDisposable
             {
                 _logger.LogWarning("No valid tickers for news fetch");
                 return Array.Empty<NewsItemDto>();
-            } */
+            } 
 
             if (!tickers.Any())
             {

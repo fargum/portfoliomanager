@@ -8,15 +8,6 @@ namespace FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 public interface IAiOrchestrationService
 {
     /// <summary>
-    /// Process a natural language query about portfolio data
-    /// </summary>
-    /// <param name="query">The user's natural language query</param>
-    /// <param name="accountId">The account ID to query</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>AI-generated response based on portfolio data</returns>
-    Task<ChatResponseDto> ProcessPortfolioQueryAsync(string query, int accountId, CancellationToken cancellationToken = default);
-    
-    /// <summary>
     /// Process a natural language query about portfolio data with memory support
     /// </summary>
     /// <param name="query">The user's natural language query</param>
@@ -25,16 +16,6 @@ public interface IAiOrchestrationService
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>AI-generated response based on portfolio data with memory context</returns>
     Task<ChatResponseDto> ProcessPortfolioQueryWithMemoryAsync(string query, int accountId, int? threadId = null, CancellationToken cancellationToken = default);
-    
-    /// <summary>
-    /// Process a natural language query about portfolio data with streaming response
-    /// </summary>
-    /// <param name="query">The user's natural language query</param>
-    /// <param name="accountId">The account ID to query</param>
-    /// <param name="onTokenReceived">Callback for each streaming token received</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Task that completes when streaming is finished</returns>
-    Task ProcessPortfolioQueryStreamAsync(string query, int accountId, Func<string, Task> onTokenReceived, CancellationToken cancellationToken = default);
     
     /// <summary>
     /// Process a natural language query about portfolio data with streaming response and memory support
