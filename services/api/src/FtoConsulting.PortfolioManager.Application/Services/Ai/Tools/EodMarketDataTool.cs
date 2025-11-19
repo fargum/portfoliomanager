@@ -13,10 +13,11 @@ namespace FtoConsulting.PortfolioManager.Application.Services.Ai.Tools;
 /// MCP tool for fetching real time market data from EOD Data MCP server
 /// Uses the same EOD API configuration as the pricing service for consistency
 /// </summary>
-public class EodMarketDataTool
+public class EodMarketDataTool : IDisposable
 {
     private readonly ILogger<EodMarketDataTool> _logger;
     private readonly EodApiOptions _eodApiOptions;
+    private readonly SemaphoreSlim _httpSemaphore;
 
     public EodMarketDataTool(
         ILogger<EodMarketDataTool> logger,
@@ -24,6 +25,7 @@ public class EodMarketDataTool
     {
         _logger = logger;
         _eodApiOptions = eodApiOptions.Value;
+        _httpSemaphore = new SemaphoreSlim(20, 20); // Allow 20 concurrent HTTP requests - no EOD rate limits
     }
 
     /// <summary>
@@ -210,13 +212,21 @@ httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
             }
 
             var priceDict = new Dictionary<string, decimal>();
-            using var httpClient = new HttpClient();
-            
-httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
+            var tickerList = tickers.ToList();
 
-            // Process each ticker individually for real-time pricing
-            foreach (var ticker in tickers)
+            if (!tickerList.Any())
             {
+                _logger.LogWarning("No tickers provided for real-time pricing");
+                return priceDict;
+            }
+
+            using var httpClient = new HttpClient();
+            httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
+
+            // Process all tickers concurrently with semaphore protection
+            var priceTasks = tickerList.Select(async ticker =>
+            {
+                await _httpSemaphore.WaitAsync(cancellationToken);
                 try
                 {
                     // Use ticker as provided without formatting
@@ -233,7 +243,10 @@ httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
                         
                         if (price.HasValue)
                         {
-                            priceDict[ticker] = price.Value;
+                            lock (priceDict)
+                            {
+                                priceDict[ticker] = price.Value;
+                            }
                             _logger.LogInformation("Successfully fetched real-time price for {Ticker}: {Price:C}", ticker, price);
                         }
                         else
@@ -252,10 +265,17 @@ httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
                     _logger.LogError(ex, "Error fetching real-time price for ticker: {Ticker}", ticker);
                     // Continue with other tickers
                 }
-            }
+                finally
+                {
+                    _httpSemaphore.Release();
+                }
+            });
+
+            // Execute all price fetching tasks concurrently
+            await Task.WhenAll(priceTasks);
 
             _logger.LogInformation("Successfully fetched {Count} real-time prices out of {Total} requested", 
-                priceDict.Count, tickers.Count());
+                priceDict.Count, tickerList.Count);
 
             return priceDict;
         }
@@ -673,5 +693,9 @@ httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
         }
     }
 
+    public void Dispose()
+    {
+        _httpSemaphore?.Dispose();
+    }
     
 }

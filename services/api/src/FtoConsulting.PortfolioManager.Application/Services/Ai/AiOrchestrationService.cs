@@ -33,6 +33,12 @@ public class AiOrchestrationService(
     private readonly Func<int, int?, System.Text.Json.JsonSerializerOptions?, ChatMessageStore> _chatMessageStoreFactory = chatMessageStoreFactory;
     private readonly Func<int, IChatClient, AIContextProvider> _memoryContextProviderFactory = memoryContextProviderFactory;
 
+    // Lazy-loaded Azure OpenAI client to avoid creating it on every request
+    private readonly Lazy<AzureOpenAIClient> _azureOpenAIClient = new Lazy<AzureOpenAIClient>(() =>
+        new AzureOpenAIClient(
+            new Uri(azureFoundryOptions.Value.Endpoint),
+            new AzureKeyCredential(azureFoundryOptions.Value.ApiKey)));
+
     public async Task<ChatResponseDto> ProcessPortfolioQueryAsync(string query, int accountId, CancellationToken cancellationToken = default)
     {
         try
@@ -124,6 +130,11 @@ public class AiOrchestrationService(
                 ? await _conversationThreadService.GetThreadByIdAsync(threadId.Value, accountId, cancellationToken)
                 : await _conversationThreadService.CreateNewSessionAsync(accountId, cancellationToken);
 
+            if (thread == null)
+            {
+                throw new InvalidOperationException($"Failed to get or create conversation thread for account {accountId}");
+            }
+
              var response = await ProcessWithMemoryComponents(query, accountId, thread.Id, cancellationToken);
                 return response with { 
                     ThreadId = thread.Id, 
@@ -154,6 +165,11 @@ public class AiOrchestrationService(
                 ? await _conversationThreadService.GetThreadByIdAsync(threadId.Value, accountId, cancellationToken)
                 : await _conversationThreadService.GetOrCreateActiveThreadAsync(accountId, cancellationToken);
              
+            if (thread == null)
+            {
+                throw new InvalidOperationException($"Failed to get or create conversation thread for account {accountId}");
+            }
+
             await ProcessStreamingWithMemoryComponents(query, accountId, thread.Id, onTokenReceived, cancellationToken);
 
         }
@@ -366,7 +382,7 @@ For casual conversation, respond naturally without using tools.";
     }
 
     /// <summary>
-    /// Process portfolio query with Microsoft Agent Framework memory components
+    /// Process portfolio query with memory components (non-streaming)
     /// </summary>
     private async Task<ChatResponseDto> ProcessWithMemoryComponents(string query, int accountId, int threadId, CancellationToken cancellationToken)
     {
@@ -378,10 +394,8 @@ For casual conversation, respond naturally without using tools.";
                 throw new InvalidOperationException("Azure Foundry configuration is not valid for memory processing.");
             }
 
-            // Create Azure OpenAI client
-            var azureOpenAIClient = new AzureOpenAIClient(
-                new Uri(_azureFoundryOptions.Endpoint),
-                new AzureKeyCredential(_azureFoundryOptions.ApiKey));
+            // Use the lazy-loaded Azure OpenAI client (avoids cold start penalty)
+            var azureOpenAIClient = _azureOpenAIClient.Value;
 
             // Get a chat client for the specific model
             var chatClient = azureOpenAIClient.GetChatClient(_azureFoundryOptions.ModelName);
@@ -465,10 +479,8 @@ For casual conversation, respond naturally without using tools.";
                 throw new InvalidOperationException("Azure Foundry configuration is not valid for memory processing.");
             }
 
-            // Create Azure OpenAI client
-            var azureOpenAIClient = new AzureOpenAIClient(
-                new Uri(_azureFoundryOptions.Endpoint),
-                new AzureKeyCredential(_azureFoundryOptions.ApiKey));
+            // Use the lazy-loaded Azure OpenAI client (avoids cold start penalty)
+            var azureOpenAIClient = _azureOpenAIClient.Value;
 
             // Get a chat client for the specific model
             var chatClient = azureOpenAIClient.GetChatClient(_azureFoundryOptions.ModelName);
@@ -525,6 +537,23 @@ For casual conversation, respond naturally without using tools.";
             _logger.LogError(ex, "Error in memory-aware streaming processing for thread {ThreadId}", threadId);
             throw;
         }
+    }
+
+    /// <summary>
+    /// Get user-friendly feedback message for tool execution
+    /// </summary>
+    private static string GetToolFeedbackMessage(string toolName)
+    {
+        return toolName.ToLowerInvariant() switch
+        {
+            "get_portfolio_holdings" => "Retrieving your portfolio holdings...",
+            "get_real_time_prices" => "Fetching real-time market prices...",
+            "get_financial_news" => "Gathering latest financial news...",
+            "get_market_sentiment" => "Analyzing current market sentiment...",
+            "calculate_portfolio_value" => "Calculating your portfolio value...",
+            "compare_performance" => "Comparing portfolio performance...",
+            _ => $"Processing {toolName.Replace('_', ' ')}..."
+        };
     }
 
  }

@@ -82,7 +82,7 @@ public class PriceFetchingService : IPriceFetching, IDisposable
                     var priceData = await FetchPriceForInstrument(instrument.Ticker, instrument.Ticker, valuationDate, cancellationToken);
                     
                     
-if (priceData != null)
+                if (priceData != null)
                     {
                         // Convert to InstrumentPrice entity for persistence
                         var instrumentPrice = new InstrumentPrice
