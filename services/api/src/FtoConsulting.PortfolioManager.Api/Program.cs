@@ -7,6 +7,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using System.Globalization;
 using System.Reflection;
+using OpenTelemetry.Trace;
+using OpenTelemetry.Resources;
 
 // Configure culture for consistent date parsing
 var cultureInfo = new CultureInfo("en-GB"); // UK culture for dd/MM/yyyy preference
@@ -61,6 +63,24 @@ builder.Services.AddCors(options =>
 // Add health checks
 builder.Services.AddHealthChecks();
 
+// Configure OpenTelemetry
+builder.Services.AddOpenTelemetry()
+    .WithTracing(tracing =>
+    {
+        tracing
+            .SetResourceBuilder(ResourceBuilder.CreateDefault()
+                .AddService("PortfolioManager.API", "1.0.0"))
+            .AddSource("PortfolioManager.*")
+            .AddSource("Microsoft.Extensions.AI.*")
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddOtlpExporter(options =>
+            {
+                options.Endpoint = new Uri("http://host.docker.internal:18889");
+            })
+            .AddConsoleExporter();
+    });
+
 // Configure Swagger/OpenAPI
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
@@ -111,7 +131,21 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 
 // Map health checks endpoint
-app.MapHealthChecks("/health");
+// Add health checks endpoint with logging
+app.MapGet("/health", (ILogger<Program> logger) => 
+{
+    logger.LogInformation("Health check endpoint called at {Timestamp}", DateTime.UtcNow);
+    logger.LogInformation("Application is running with OpenTelemetry telemetry enabled");
+    
+    return Results.Ok(new { 
+        Status = "Healthy", 
+        Timestamp = DateTime.UtcNow,
+        Environment = app.Environment.EnvironmentName,
+        Telemetry = "OpenTelemetry with Aspire Dashboard"
+    });
+});
+
+app.MapHealthChecks("/health/detailed");
 
 app.MapControllers();
 

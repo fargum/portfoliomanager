@@ -5,6 +5,7 @@ using FtoConsulting.PortfolioManager.Application.Services;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
 using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
+using System.Diagnostics;
 
 namespace FtoConsulting.PortfolioManager.Api.Controllers;
 
@@ -16,6 +17,8 @@ namespace FtoConsulting.PortfolioManager.Api.Controllers;
 [Produces("application/json")]
 public class PortfoliosController : ControllerBase
 {
+    private static readonly ActivitySource s_activitySource = new("PortfolioManager.Portfolios");
+    
     private readonly IPortfolioIngest _portfolioIngest;
     private readonly IPortfolioMappingService _mappingService;
     private readonly ILogger<PortfoliosController> _logger;
@@ -84,10 +87,25 @@ public class PortfoliosController : ControllerBase
         [FromBody] IngestPortfolioRequest request,
         CancellationToken cancellationToken = default)
     {
+        using var activity = s_activitySource.StartActivity("IngestPortfolio");
+        activity?.SetTag("portfolio.name", request?.PortfolioName ?? "unknown");
+        activity?.SetTag("account.id", request?.AccountId.ToString() ?? "unknown");
+        activity?.SetTag("holdings.count", request?.Holdings?.Count.ToString() ?? "0");
+        
         try
         {
             _logger.LogInformation("Starting portfolio ingestion for portfolio '{PortfolioName}' with {HoldingCount} holdings", 
-                request.PortfolioName, request.Holdings?.Count ?? 0);
+                request?.PortfolioName ?? "Unknown", request?.Holdings?.Count ?? 0);
+
+            if (request == null)
+            {
+                activity?.SetTag("validation.result", "failed");
+                activity?.SetTag("validation.reason", "null_request");
+                return BadRequest(new ErrorResponse
+                {
+                    Message = "Request cannot be null"
+                });
+            }
 
             // Validate the request
             if (!ModelState.IsValid)
@@ -122,6 +140,8 @@ public class PortfoliosController : ControllerBase
         }
         catch (ArgumentException ex)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.SetTag("error.type", "validation");
             _logger.LogWarning(ex, "Invalid argument provided for portfolio ingestion");
             return BadRequest(new ErrorResponse
             {
@@ -131,6 +151,8 @@ public class PortfoliosController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.SetTag("error.type", "invalid_operation");
             _logger.LogWarning(ex, "Invalid operation during portfolio ingestion");
             return BadRequest(new ErrorResponse
             {
@@ -140,6 +162,8 @@ public class PortfoliosController : ControllerBase
         }
         catch (Exception ex)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.SetTag("error.type", "unexpected");
             _logger.LogError(ex, "Unexpected error during portfolio ingestion for portfolio '{PortfolioName}'", 
                 request?.PortfolioName ?? "Unknown");
             
@@ -177,6 +201,10 @@ public class PortfoliosController : ControllerBase
         [FromBody] List<IngestPortfolioRequest> requests,
         CancellationToken cancellationToken = default)
     {
+        using var activity = s_activitySource.StartActivity("IngestPortfoliosBatch");
+        activity?.SetTag("portfolios.count", requests?.Count.ToString() ?? "0");
+        activity?.SetTag("operation.type", "batch_ingest");
+        
         try
         {
             _logger.LogInformation("Starting batch portfolio ingestion for {PortfolioCount} portfolios", requests?.Count ?? 0);

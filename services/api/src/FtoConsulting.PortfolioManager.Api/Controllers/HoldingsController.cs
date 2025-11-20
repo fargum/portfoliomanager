@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
 using System.Net;
 using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
+using System.Diagnostics;
+using System.Diagnostics.Metrics;
 
 namespace FtoConsulting.PortfolioManager.Api.Controllers;
 
@@ -16,6 +18,12 @@ namespace FtoConsulting.PortfolioManager.Api.Controllers;
 [Produces("application/json")]
 public class HoldingsController : ControllerBase
 {
+    private static readonly ActivitySource s_activitySource = new("PortfolioManager.Holdings");
+    private static readonly Meter s_meter = new("PortfolioManager.Holdings");
+    private static readonly Counter<int> s_holdingsRequestCounter = s_meter.CreateCounter<int>("holdings_requests_total", "requests", "Number of holdings requests");
+    private static readonly Histogram<double> s_holdingsRequestDuration = s_meter.CreateHistogram<double>("holdings_request_duration", "ms", "Duration of holdings requests");
+    private static readonly Counter<int> s_holdingsCounter = s_meter.CreateCounter<int>("holdings_retrieved_total", "holdings", "Number of holdings retrieved");
+    
     private readonly IHoldingsRetrieval _holdingsRetrieval;
     private readonly IPortfolioMappingService _mappingService;
     private readonly ILogger<HoldingsController> _logger;
@@ -97,13 +105,29 @@ public class HoldingsController : ControllerBase
         [FromRoute] DateTime valuationDate,
         CancellationToken cancellationToken = default)
     {
+        using var activity = s_activitySource.StartActivity("GetHoldingsByAccountAndDate");
+        var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        
+        activity?.SetTag("account.id", accountId.ToString());
+        activity?.SetTag("valuation.date", valuationDate.ToString("yyyy-MM-dd"));
+        activity?.SetTag("is.real_time", (valuationDate.Date == DateTime.Today).ToString());
+        
+        // Record request metric
+        s_holdingsRequestCounter.Add(1, 
+            new KeyValuePair<string, object?>("account.id", accountId.ToString()),
+            new KeyValuePair<string, object?>("is.real_time", (valuationDate.Date == DateTime.Today).ToString()));
+        
         try
         {
-            _logger.LogInformation("Retrieving holdings for account {AccountId} on date {ValuationDate}", accountId, valuationDate);
-
+            _logger.LogInformation("Processing holdings request for account {AccountId} on date {ValuationDate}", accountId, valuationDate);
+            
             // Validate input parameters
             if (accountId <= 0)
             {
+                activity?.SetStatus(ActivityStatusCode.Error, "Invalid account ID");
+                activity?.SetTag("error.type", "validation");
+                activity?.SetTag("error.reason", "invalid_account_id");
+                
                 _logger.LogWarning("Invalid account ID provided: {AccountId}", accountId);
                 return BadRequest(new ProblemDetails
                 {
@@ -115,13 +139,20 @@ public class HoldingsController : ControllerBase
 
             // Convert DateTime to DateOnly for service call
             var dateOnly = DateOnly.FromDateTime(valuationDate);
+            _logger.LogDebug("Converted valuation date to {DateOnly} for service call", dateOnly);
 
             // Retrieve holdings from the service - it will handle both real-time and historical data automatically
+            _logger.LogInformation("Calling holdings retrieval service for account {AccountId}", accountId);
             var holdings = await _holdingsRetrieval.GetHoldingsByAccountAndDateAsync(accountId, dateOnly, cancellationToken);
 
             // Check if any holdings were found
             if (!holdings.Any())
             {
+                activity?.SetStatus(ActivityStatusCode.Error, "Holdings not found");
+                activity?.SetTag("error.type", "not_found");
+                activity?.SetTag("error.reason", "no_holdings");
+                activity?.SetTag("holdings.count", "0");
+                
                 _logger.LogInformation("No holdings found for account {AccountId} on date {ValuationDate}", accountId, dateOnly);
                 return NotFound(new ProblemDetails
                 {
@@ -134,6 +165,16 @@ public class HoldingsController : ControllerBase
             // Map to response DTO
             var response = _mappingService.MapToAccountHoldingsResponse(holdings, accountId, dateOnly);
 
+            activity?.SetTag("holdings.count", response.TotalHoldings.ToString());
+            activity?.SetTag("response.total_current_value", response.TotalCurrentValue.ToString());
+            activity?.SetTag("response.total_gain_loss", response.TotalGainLoss.ToString());
+            activity?.SetStatus(ActivityStatusCode.Ok);
+
+            // Record metrics
+            stopwatch.Stop();
+            s_holdingsRequestDuration.Record(stopwatch.ElapsedMilliseconds);
+            s_holdingsCounter.Add(response.TotalHoldings);
+
             _logger.LogInformation("Successfully retrieved {Count} holdings for account {AccountId} on date {ValuationDate}", 
                 response.TotalHoldings, accountId, dateOnly);
 
@@ -141,6 +182,10 @@ public class HoldingsController : ControllerBase
         }
         catch (FormatException ex)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.SetTag("error.type", "format");
+            activity?.SetTag("error.reason", "invalid_date");
+            
             _logger.LogWarning(ex, "Invalid date format provided: {ValuationDate}", valuationDate);
             return BadRequest(new ProblemDetails
             {
@@ -151,6 +196,11 @@ public class HoldingsController : ControllerBase
         }
         catch (Exception ex)
         {
+            stopwatch.Stop();
+            s_holdingsRequestDuration.Record(stopwatch.ElapsedMilliseconds);
+            
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.SetTag("error.type", "unexpected");
             _logger.LogError(ex, "Error retrieving holdings for account {AccountId} on date {ValuationDate}", accountId, valuationDate);
             return StatusCode((int)HttpStatusCode.InternalServerError, new ProblemDetails
             {

@@ -44,10 +44,6 @@ public class AgentFrameworkGuardrails
         {
             Tools = tools.ToList(),
             
-            // Safety configurations
-            Temperature = 0.2f,  // Lower temperature for more deterministic, safer responses
-            TopP = 0.9f,         // Nucleus sampling to avoid edge case outputs
-            
             // Response format - structured to prevent injection
             ResponseFormat = ChatResponseFormat.Text
         };

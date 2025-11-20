@@ -10,6 +10,7 @@ using OpenAI;
 using Microsoft.Extensions.Logging;
 using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 using FtoConsulting.PortfolioManager.Application.Services.Ai.Guardrails;
+using System.Diagnostics;
 
 
 namespace FtoConsulting.PortfolioManager.Application.Services.Ai;
@@ -27,6 +28,8 @@ public class AiOrchestrationService(
     Func<int, int?, System.Text.Json.JsonSerializerOptions?, ChatMessageStore> chatMessageStoreFactory,
     Func<int, IChatClient, AIContextProvider> memoryContextProviderFactory) : IAiOrchestrationService
 {
+    private static readonly ActivitySource s_activitySource = new("PortfolioManager.AI");
+    
     private readonly ILogger<AiOrchestrationService> _logger = logger;
     private readonly AzureFoundryOptions _azureFoundryOptions = azureFoundryOptions.Value;
     private readonly IMcpServerService _mcpServerService = mcpServerService;
@@ -44,6 +47,11 @@ public class AiOrchestrationService(
 
     public async Task<ChatResponseDto> ProcessPortfolioQueryWithMemoryAsync(string query, int accountId, int? threadId = null, CancellationToken cancellationToken = default)
     {
+        using var activity = s_activitySource.StartActivity("ProcessPortfolioQueryWithMemory");
+        activity?.SetTag("account.id", accountId.ToString());
+        activity?.SetTag("thread.id", threadId?.ToString() ?? "new");
+        activity?.SetTag("query.length", query.Length.ToString());
+        
         try
         {
             _logger.LogInformation("Processing portfolio query with memory for account {AccountId}, thread {ThreadId}: {Query}", 
@@ -53,6 +61,9 @@ public class AiOrchestrationService(
             var inputValidation = await _guardrails.ValidateInputAsync(query, accountId);
             if (!inputValidation.IsValid)
             {
+                activity?.SetTag("validation.result", "failed");
+                activity?.SetTag("validation.reason", inputValidation.Reason);
+                
                 await _guardrails.LogSecurityIncident(inputValidation, accountId, "ProcessPortfolioQueryWithMemoryAsync");
                 
                 return new ChatResponseDto(
@@ -60,6 +71,8 @@ public class AiOrchestrationService(
                     QueryType: "SecurityFiltered"
                 );
             }
+            
+            activity?.SetTag("validation.result", "passed");
             
             // Get or create conversation thread - use session-based approach when no threadId provided
             var thread = threadId.HasValue 
@@ -72,6 +85,11 @@ public class AiOrchestrationService(
             }
 
              var response = await ProcessWithMemoryComponents(query, accountId, thread.Id, cancellationToken);
+                
+                activity?.SetTag("query.type", response.QueryType);
+                activity?.SetTag("response.length", response.Response.Length.ToString());
+                activity?.SetTag("thread.title", response.ThreadTitle ?? "");
+                
                 return response with { 
                     ThreadId = thread.Id, 
                     ThreadTitle = thread.ThreadTitle 
@@ -80,6 +98,7 @@ public class AiOrchestrationService(
         }
         catch (Exception ex)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             _logger.LogError(ex, "Error processing portfolio query with memory for account {AccountId}", accountId);
             
             return new ChatResponseDto(
@@ -91,6 +110,12 @@ public class AiOrchestrationService(
 
     public async Task ProcessPortfolioQueryStreamWithMemoryAsync(string query, int accountId, Func<string, Task> onTokenReceived, int? threadId = null, CancellationToken cancellationToken = default)
     {
+        using var activity = s_activitySource.StartActivity("ProcessPortfolioQueryStreamWithMemory");
+        activity?.SetTag("account.id", accountId.ToString());
+        activity?.SetTag("thread.id", threadId?.ToString() ?? "new");
+        activity?.SetTag("query.length", query.Length.ToString());
+        activity?.SetTag("streaming", "true");
+        
         try
         {
             _logger.LogInformation("Processing streaming portfolio query with memory for account {AccountId}, thread {ThreadId}: {Query}", 
@@ -111,6 +136,7 @@ public class AiOrchestrationService(
         }
         catch (Exception ex)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             _logger.LogError(ex, "Error processing streaming portfolio query with memory for account {AccountId}", accountId);
             await onTokenReceived("I apologize, but I encountered an issue analyzing your portfolio. Please ensure your account ID is correct and try again.");
         }
@@ -253,8 +279,13 @@ For casual conversation, respond naturally without using tools.";
         // Use the lazy-loaded Azure OpenAI client (avoids cold start penalty)
         var azureOpenAIClient = _azureOpenAIClient.Value;
 
-        // Get a chat client for the specific model
-        var chatClient = azureOpenAIClient.GetChatClient(_azureFoundryOptions.ModelName);
+        // Get a chat client for the specific model and enable OpenTelemetry
+        var chatClient = azureOpenAIClient.GetChatClient(_azureFoundryOptions.ModelName)
+            .AsIChatClient()
+            .AsBuilder()
+            .UseOpenTelemetry(sourceName: "PortfolioManager.AI", 
+                             configure: cfg => cfg.EnableSensitiveData = false) // Disable sensitive data for production
+            .Build();
         
         // Create memory-aware AI agent with ChatClientAgentOptions and enhanced security
         var portfolioTools = CreatePortfolioMcpFunctions();
@@ -266,7 +297,7 @@ For casual conversation, respond naturally without using tools.";
             Instructions = secureInstructions,
             ChatOptions = secureChatOptions,
             ChatMessageStoreFactory = ctx => _chatMessageStoreFactory(accountId, threadId, ctx.JsonSerializerOptions),
-            AIContextProviderFactory = ctx => _memoryContextProviderFactory(accountId, chatClient.AsIChatClient())
+            AIContextProviderFactory = ctx => _memoryContextProviderFactory(accountId, chatClient)
         });
 
         _logger.LogInformation("Memory store and context provider configured for agent on thread {ThreadId}", threadId);

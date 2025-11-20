@@ -4,6 +4,7 @@ using FtoConsulting.PortfolioManager.Application.Services;
 using FtoConsulting.PortfolioManager.Application.DTOs.Ai;
 using FtoConsulting.PortfolioManager.Application.Configuration;
 using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
+using System.Diagnostics;
 
 
 namespace FtoConsulting.PortfolioManager.Api.Controllers.Ai;
@@ -16,6 +17,8 @@ namespace FtoConsulting.PortfolioManager.Api.Controllers.Ai;
 [Produces("application/json")]
 public class ChatController : ControllerBase
 {
+    private static readonly ActivitySource s_activitySource = new("PortfolioManager.AI.Controller");
+    
     private readonly IAiOrchestrationService _aiOrchestrationService;
     private readonly ILogger<ChatController> _logger;
     private readonly AzureFoundryOptions _azureFoundryOptions;
@@ -44,15 +47,25 @@ public class ChatController : ControllerBase
         [FromBody] ChatRequestDto request,
         CancellationToken cancellationToken = default)
     {
+        using var activity = s_activitySource.StartActivity("StreamPortfolioQuery");
+        activity?.SetTag("account.id", request.AccountId.ToString());
+        activity?.SetTag("thread.id", request.ThreadId?.ToString() ?? "none");
+        activity?.SetTag("query.length", request.Query?.Length.ToString() ?? "0");
+        activity?.SetTag("response.type", "streaming");
+        
         try
         {
             if (string.IsNullOrWhiteSpace(request.Query))
             {
+                activity?.SetStatus(ActivityStatusCode.Error, "Query cannot be empty");
+                activity?.SetTag("error.type", "validation");
                 return BadRequest("Query cannot be empty");
             }
 
             if (request.AccountId <= 0)
             {
+                activity?.SetStatus(ActivityStatusCode.Error, "Valid account ID is required");
+                activity?.SetTag("error.type", "validation");
                 return BadRequest("Valid account ID is required");
             }
 
@@ -82,10 +95,16 @@ public class ChatController : ControllerBase
             _logger.LogInformation("Successfully completed streaming AI chat query with memory for account {AccountId}", 
                 request.AccountId);
 
+            activity?.SetStatus(ActivityStatusCode.Ok);
+            activity?.SetTag("response.completed", "true");
+
             return new EmptyResult();
         }
         catch (Exception ex)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.SetTag("error.type", "unexpected");
+            
             _logger.LogError(ex, "Error processing streaming AI chat query with memory for account {AccountId}: {Query}", 
                 request.AccountId, request.Query);
             
@@ -111,15 +130,25 @@ public class ChatController : ControllerBase
         [FromBody] ChatRequestDto request,
         CancellationToken cancellationToken = default)
     {
+        using var activity = s_activitySource.StartActivity("QueryPortfolio");
+        activity?.SetTag("account.id", request.AccountId.ToString());
+        activity?.SetTag("thread.id", request.ThreadId?.ToString() ?? "none");
+        activity?.SetTag("query.length", request.Query?.Length.ToString() ?? "0");
+        activity?.SetTag("response.type", "direct");
+        
         try
         {
             if (string.IsNullOrWhiteSpace(request.Query))
             {
+                activity?.SetStatus(ActivityStatusCode.Error, "Query cannot be empty");
+                activity?.SetTag("error.type", "validation");
                 return BadRequest("Query cannot be empty");
             }
 
             if (request.AccountId <= 0)
             {
+                activity?.SetStatus(ActivityStatusCode.Error, "Valid account ID is required");
+                activity?.SetTag("error.type", "validation");
                 return BadRequest("Valid account ID is required");
             }
 
@@ -135,10 +164,16 @@ public class ChatController : ControllerBase
             _logger.LogInformation("Successfully processed AI chat query with memory for account {AccountId}", 
                 request.AccountId);
 
+            activity?.SetStatus(ActivityStatusCode.Ok);
+            activity?.SetTag("response.completed", "true");
+
             return Ok(response);
         }
         catch (Exception ex)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.SetTag("error.type", "unexpected");
+            
             _logger.LogError(ex, "Error processing AI chat query with memory for account {AccountId}: {Query}", 
                 request.AccountId, request.Query);
             return StatusCode(500, "An error occurred processing your request");

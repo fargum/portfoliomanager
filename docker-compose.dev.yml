@@ -13,7 +13,78 @@ services:
       - "5432:5432"
     volumes:
       - postgres_dev_data:/var/lib/postgresql/data
+    networks:
+      - portfoliomanager-dev-network
     restart: unless-stopped
+
+  # Aspire Dashboard for telemetry visualization
+  aspire-dashboard:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:9.0
+    container_name: aspire-dashboard-dev
+    environment:
+      # Configure OTLP endpoint for telemetry collection
+      - DOTNET_DASHBOARD_OTLP_ENDPOINT_URL=http://+:18889
+      # Allow anonymous access for development
+      - DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS=true
+      # Set frontend URL
+      - DOTNET_DASHBOARD_FRONTEND_URL=http://+:18888
+    ports:
+      - "18888:18888"  # Dashboard UI - Access at http://localhost:18888
+      - "18889:18889"  # OTLP endpoint for telemetry data
+    networks:
+      - portfoliomanager-dev-network
+    restart: unless-stopped
+
+  # Portfolio Manager API Service for Development
+  portfoliomanager-api-dev:
+    build: 
+      context: ./services/api
+      dockerfile: Dockerfile
+    image: portfoliomanager-api:dev
+    container_name: portfoliomanager-api-dev
+    environment:
+      # ASP.NET Core Configuration
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:8080
+      - ASPNETCORE_HTTP_PORTS=8080
+      
+      # Database Connection (local development database)
+      - ConnectionStrings__DefaultConnection=Host=postgres-dev;Port=5432;Database=portfolio_manager;Username=portfolio_user;Password=portfolio_pass;Include Error Detail=true
+      
+      # OpenTelemetry configuration for Aspire Dashboard
+      - OpenTelemetry__OtlpEndpoint=http://aspire-dashboard:18889
+      
+      # EOD Historical Data API Configuration
+      - EodApi__Token=${EOD_API_TOKEN}
+      - EodApi__McpServerUrl=${EOD_MCP_SERVER_URL:-https://mcp.eodhd.dev/mcp}
+      
+      # Azure Foundry Inference Endpoint Configuration
+      - AzureFoundry__Endpoint=${AZURE_FOUNDRY_ENDPOINT}
+      - AzureFoundry__ApiKey=${AZURE_FOUNDRY_API_KEY}
+      
+      # Enhanced logging for development
+      - Logging__LogLevel__Default=Information
+      - Logging__LogLevel__Microsoft.AspNetCore=Warning
+      - Logging__LogLevel__OpenTelemetry=Information
+      - Logging__LogLevel__PortfolioManager=Debug
+    ports:
+      - "8080:8080"
+    networks:
+      - portfoliomanager-dev-network
+    depends_on:
+      - postgres-dev
+      - aspire-dashboard
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+networks:
+  portfoliomanager-dev-network:
+    driver: bridge
 
 volumes:
   postgres_dev_data:

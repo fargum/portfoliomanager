@@ -4,6 +4,7 @@ using FtoConsulting.PortfolioManager.Application.Services;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
 using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
+using System.Diagnostics;
 
 namespace FtoConsulting.PortfolioManager.Api.Controllers;
 
@@ -15,6 +16,8 @@ namespace FtoConsulting.PortfolioManager.Api.Controllers;
 [Produces("application/json")]
 public class PricesController : ControllerBase
 {
+    private static readonly ActivitySource s_activitySource = new("PortfolioManager.Prices");
+    
     private readonly IPriceFetching _priceFetching;
     private readonly IPortfolioMappingService _mappingService;
     private readonly ILogger<PricesController> _logger;
@@ -75,6 +78,9 @@ public class PricesController : ControllerBase
         [FromRoute] DateTime valuationDate,
         CancellationToken cancellationToken = default)
     {
+        using var activity = s_activitySource.StartActivity("FetchPricesForDate");
+        activity?.SetTag("valuation.date", valuationDate.ToString("yyyy-MM-dd"));
+        
         try
         {
             _logger.LogInformation("Fetching market prices for holdings on date {ValuationDate}", valuationDate);
@@ -88,6 +94,12 @@ public class PricesController : ControllerBase
             // Check if any prices were successfully fetched and persisted
             if (pricesResult == null || pricesResult.SuccessfulPrices == 0)
             {
+                activity?.SetStatus(ActivityStatusCode.Error, "No prices available");
+                activity?.SetTag("error.type", "not_found");
+                activity?.SetTag("error.reason", "no_prices");
+                activity?.SetTag("prices.successful", "0");
+                activity?.SetTag("prices.failed", (pricesResult?.FailedPrices ?? 0).ToString());
+                
                 _logger.LogWarning("No prices could be fetched for valuation date {ValuationDate}. Failed ISINs: {FailedCount}", 
                     dateOnly, pricesResult?.FailedPrices ?? 0);
                 
@@ -114,6 +126,12 @@ public class PricesController : ControllerBase
                 FailedTickers = pricesResult.FailedTickers
             };
 
+            activity?.SetTag("prices.total_instruments", pricesResult.TotalTickers.ToString());
+            activity?.SetTag("prices.successful", pricesResult.SuccessfulPrices.ToString());
+            activity?.SetTag("prices.failed", pricesResult.FailedPrices.ToString());
+            activity?.SetTag("prices.fetch_duration_ms", ((long)pricesResult.FetchDuration.TotalMilliseconds).ToString());
+            activity?.SetStatus(ActivityStatusCode.Ok);
+
             _logger.LogInformation("Successfully persisted {SuccessCount} prices for date {ValuationDate}", 
                 pricesResult.SuccessfulPrices, dateOnly);
 
@@ -121,6 +139,10 @@ public class PricesController : ControllerBase
         }
         catch (FormatException ex)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.SetTag("error.type", "format");
+            activity?.SetTag("error.reason", "invalid_date");
+            
             _logger.LogWarning(ex, "Invalid date format provided: {ValuationDate}", valuationDate);
             return BadRequest(new ProblemDetails
             {
@@ -131,6 +153,9 @@ public class PricesController : ControllerBase
         }
         catch (Exception ex)
         {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.SetTag("error.type", "unexpected");
+            
             _logger.LogError(ex, "Error fetching prices for date {ValuationDate}", valuationDate);
             return StatusCode((int)HttpStatusCode.InternalServerError, new ProblemDetails
             {
