@@ -9,6 +9,7 @@ using System.Globalization;
 using System.Reflection;
 using OpenTelemetry.Trace;
 using OpenTelemetry.Resources;
+using OpenTelemetry.Logs;
 
 // Configure culture for consistent date parsing
 var cultureInfo = new CultureInfo("en-GB"); // UK culture for dd/MM/yyyy preference
@@ -16,6 +17,43 @@ CultureInfo.DefaultThreadCurrentCulture = cultureInfo;
 CultureInfo.DefaultThreadCurrentUICulture = cultureInfo;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Configure structured logging and OpenTelemetry integration
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
+builder.Logging.AddJsonConsole(options =>
+{
+    options.IncludeScopes = true;
+    options.TimestampFormat = "yyyy-MM-ddTHH:mm:ss.fffZ";
+    options.UseUtcTimestamp = true;
+});
+
+// Add OpenTelemetry logging provider
+builder.Logging.AddOpenTelemetry(options =>
+{
+    options.SetResourceBuilder(ResourceBuilder.CreateDefault()
+        .AddService("PortfolioManager.API", "1.0.0")
+        .AddAttributes(new Dictionary<string, object>
+        {
+            ["deployment.environment"] = builder.Environment.EnvironmentName,
+            ["service.instance.id"] = Environment.MachineName
+        }));
+        
+    options.AddOtlpExporter(otlpOptions =>
+    {
+        otlpOptions.Endpoint = new Uri("http://host.docker.internal:18889");
+    });
+    options.AddConsoleExporter();
+});
+
+if (builder.Environment.IsDevelopment())
+{
+    builder.Logging.SetMinimumLevel(LogLevel.Information);
+}
+else
+{
+    builder.Logging.SetMinimumLevel(LogLevel.Warning);
+}
 
 // Add services to the container
 builder.Services.AddControllers();
@@ -63,13 +101,18 @@ builder.Services.AddCors(options =>
 // Add health checks
 builder.Services.AddHealthChecks();
 
-// Configure OpenTelemetry
+// Configure OpenTelemetry tracing
 builder.Services.AddOpenTelemetry()
     .WithTracing(tracing =>
     {
         tracing
             .SetResourceBuilder(ResourceBuilder.CreateDefault()
-                .AddService("PortfolioManager.API", "1.0.0"))
+                .AddService("PortfolioManager.API", "1.0.0")
+                .AddAttributes(new Dictionary<string, object>
+                {
+                    ["deployment.environment"] = builder.Environment.EnvironmentName,
+                    ["service.instance.id"] = Environment.MachineName
+                }))
             .AddSource("PortfolioManager.*")
             .AddSource("Microsoft.Extensions.AI.*")
             .AddAspNetCoreInstrumentation()
@@ -134,14 +177,19 @@ app.UseAuthorization();
 // Add health checks endpoint with logging
 app.MapGet("/health", (ILogger<Program> logger) => 
 {
-    logger.LogInformation("Health check endpoint called at {Timestamp}", DateTime.UtcNow);
-    logger.LogInformation("Application is running with OpenTelemetry telemetry enabled");
+    using (logger.BeginScope("Health Check Request"))
+    {
+        logger.LogInformation("Health check endpoint called at {Timestamp} from environment {Environment} with telemetry {TelemetryEnabled}", 
+            DateTime.UtcNow, 
+            app.Environment.EnvironmentName, 
+            "OpenTelemetry+Aspire Dashboard");
+    }
     
     return Results.Ok(new { 
         Status = "Healthy", 
         Timestamp = DateTime.UtcNow,
         Environment = app.Environment.EnvironmentName,
-        Telemetry = "OpenTelemetry with Aspire Dashboard"
+        Telemetry = "OpenTelemetry with Aspire Dashboard and Structured Logging"
     });
 });
 

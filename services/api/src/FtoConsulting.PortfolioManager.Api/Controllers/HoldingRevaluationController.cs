@@ -49,6 +49,12 @@ public class HoldingRevaluationController : ControllerBase
         
         try
         {
+            using (_logger.BeginScope("Holdings revaluation on {ValuationDate}", valuationDate))
+            {
+                _logger.LogInformation("Starting holdings revaluation for ValuationDate={ValuationDate}",
+                    valuationDate);
+            }
+            
             // Parse the valuation date using DateUtilities for consistent parsing
             DateOnly parsedDate;
             try
@@ -133,6 +139,12 @@ public class HoldingRevaluationController : ControllerBase
         
         try
         {
+            using (_logger.BeginScope("Price fetch and revaluation on {ValuationDate}", valuationDate))
+            {
+                _logger.LogInformation("Starting price fetch and holdings revaluation for ValuationDate={ValuationDate}",
+                    valuationDate);
+            }
+            
             // Parse the valuation date using DateUtilities for consistent parsing
             DateOnly parsedDate;
             try

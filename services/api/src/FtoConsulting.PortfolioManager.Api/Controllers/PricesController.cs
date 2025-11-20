@@ -83,6 +83,11 @@ public class PricesController : ControllerBase
         
         try
         {
+            using (_logger.BeginScope("Price fetching on {ValuationDate}", valuationDate))
+            {
+                _logger.LogInformation("Fetching market prices for holdings on ValuationDate={ValuationDate}",
+                    valuationDate);
+            }
             _logger.LogInformation("Fetching market prices for holdings on date {ValuationDate}", valuationDate);
 
             // Convert DateTime to DateOnly for business logic

@@ -94,8 +94,11 @@ public class PortfoliosController : ControllerBase
         
         try
         {
-            _logger.LogInformation("Starting portfolio ingestion for portfolio '{PortfolioName}' with {HoldingCount} holdings", 
-                request?.PortfolioName ?? "Unknown", request?.Holdings?.Count ?? 0);
+            using (_logger.BeginScope("Portfolio ingestion for {PortfolioName} with {HoldingsCount} holdings", request?.PortfolioName ?? "Unknown", request?.Holdings?.Count ?? 0))
+            {
+                _logger.LogInformation("Starting portfolio ingestion for PortfolioName={PortfolioName}, AccountId={AccountId}, HoldingsCount={HoldingsCount}",
+                    request?.PortfolioName ?? "Unknown", request?.AccountId, request?.Holdings?.Count ?? 0);
+            }
 
             if (request == null)
             {
@@ -207,7 +210,11 @@ public class PortfoliosController : ControllerBase
         
         try
         {
-            _logger.LogInformation("Starting batch portfolio ingestion for {PortfolioCount} portfolios", requests?.Count ?? 0);
+            using (_logger.BeginScope("Batch portfolio ingestion with {PortfolioCount} portfolios", requests?.Count ?? 0))
+            {
+                _logger.LogInformation("Starting batch portfolio ingestion for PortfolioCount={PortfolioCount}, TotalHoldings={TotalHoldings}",
+                    requests?.Count ?? 0, requests?.Sum(p => p.Holdings?.Count ?? 0) ?? 0);
+            }
 
             if (requests == null || requests.Count == 0)
             {

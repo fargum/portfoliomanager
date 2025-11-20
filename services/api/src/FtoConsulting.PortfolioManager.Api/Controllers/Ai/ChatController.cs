@@ -55,6 +55,12 @@ public class ChatController : ControllerBase
         
         try
         {
+            using (_logger.BeginScope("AI streaming chat query for account {AccountId}", request.AccountId))
+            {
+                _logger.LogInformation("Processing streaming AI query with AccountId={AccountId}, ThreadId={ThreadId}, QueryLength={QueryLength}",
+                    request.AccountId, request.ThreadId, request.Query?.Length ?? 0);
+            }
+            
             if (string.IsNullOrWhiteSpace(request.Query))
             {
                 activity?.SetStatus(ActivityStatusCode.Error, "Query cannot be empty");
@@ -138,6 +144,12 @@ public class ChatController : ControllerBase
         
         try
         {
+            using (_logger.BeginScope("AI portfolio query for account {AccountId}", request.AccountId))
+            {
+                _logger.LogInformation("Processing AI portfolio query with AccountId={AccountId}, ThreadId={ThreadId}, QueryLength={QueryLength}",
+                    request.AccountId, request.ThreadId, request.Query?.Length ?? 0);
+            }
+            
             if (string.IsNullOrWhiteSpace(request.Query))
             {
                 activity?.SetStatus(ActivityStatusCode.Error, "Query cannot be empty");

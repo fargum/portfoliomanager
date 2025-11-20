@@ -119,7 +119,11 @@ public class HoldingsController : ControllerBase
         
         try
         {
-            _logger.LogInformation("Processing holdings request for account {AccountId} on date {ValuationDate}", accountId, valuationDate);
+            using (_logger.BeginScope("Holdings retrieval for account {AccountId} on {ValuationDate}", accountId, valuationDate))
+            {
+                _logger.LogInformation("Processing holdings request with parameters: AccountId={AccountId}, ValuationDate={ValuationDate}, IsRealTime={IsRealTime}",
+                    accountId, valuationDate, valuationDate.Date == DateTime.Today);
+            }
             
             // Validate input parameters
             if (accountId <= 0)
