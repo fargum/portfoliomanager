@@ -2,6 +2,7 @@ using Azure.AI.OpenAI;
 using OpenAI.Chat;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.AI;
 using FtoConsulting.PortfolioManager.Application.Configuration;
 using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 
@@ -27,13 +28,42 @@ public class AzureOpenAiChatService : IAiChatService
         _logger = logger;
     }
 
-    public async Task<string> CompleteChatAsync(ChatMessage[] messages, CancellationToken cancellationToken = default)
+    public async Task<string> CompleteChatAsync(OpenAI.Chat.ChatMessage[] messages, CancellationToken cancellationToken = default)
     {
         try
         {
-            var chatClient = _azureOpenAIClient.GetChatClient(_azureFoundryOptions.ModelName);
-            var response = await chatClient.CompleteChatAsync(messages, cancellationToken: cancellationToken);
-            return response.Value.Content[0].Text;
+            // Convert OpenAI.Chat.ChatMessage[] to Microsoft.Extensions.AI.ChatMessage[]
+            var aiMessages = messages.Select(m => {
+                var role = m switch
+                {
+                    SystemChatMessage _ => Microsoft.Extensions.AI.ChatRole.System,
+                    UserChatMessage _ => Microsoft.Extensions.AI.ChatRole.User,
+                    AssistantChatMessage _ => Microsoft.Extensions.AI.ChatRole.Assistant,
+                    _ => Microsoft.Extensions.AI.ChatRole.User
+                };
+
+                // Extract text content from the message
+                var content = m switch
+                {
+                    SystemChatMessage sys => sys.Content?.FirstOrDefault()?.Text ?? "",
+                    UserChatMessage user => user.Content?.FirstOrDefault()?.Text ?? "",
+                    AssistantChatMessage assistant => assistant.Content?.FirstOrDefault()?.Text ?? "",
+                    _ => ""
+                };
+
+                return new Microsoft.Extensions.AI.ChatMessage(role, content);
+            });
+
+            // Use instrumented chat client for telemetry
+            var instrumentedChatClient = _azureOpenAIClient.GetChatClient(_azureFoundryOptions.ModelName)
+                .AsIChatClient()
+                .AsBuilder()
+                .UseOpenTelemetry(sourceName: "PortfolioManager.AI.DirectChat", 
+                                 configure: cfg => cfg.EnableSensitiveData = true)
+                .Build();
+
+            var response = await instrumentedChatClient.GetResponseAsync(aiMessages, cancellationToken: cancellationToken);
+            return response.Text ?? string.Empty;
         }
         catch (Exception ex)
         {

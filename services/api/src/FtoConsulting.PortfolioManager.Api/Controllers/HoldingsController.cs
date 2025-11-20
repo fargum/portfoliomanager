@@ -6,7 +6,6 @@ using System.ComponentModel.DataAnnotations;
 using System.Net;
 using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 using System.Diagnostics;
-using System.Diagnostics.Metrics;
 
 namespace FtoConsulting.PortfolioManager.Api.Controllers;
 
@@ -19,13 +18,10 @@ namespace FtoConsulting.PortfolioManager.Api.Controllers;
 public class HoldingsController : ControllerBase
 {
     private static readonly ActivitySource s_activitySource = new("PortfolioManager.Holdings");
-    private static readonly Meter s_meter = new("PortfolioManager.Holdings");
-    private static readonly Counter<int> s_holdingsRequestCounter = s_meter.CreateCounter<int>("holdings_requests_total", "requests", "Number of holdings requests");
-    private static readonly Histogram<double> s_holdingsRequestDuration = s_meter.CreateHistogram<double>("holdings_request_duration", "ms", "Duration of holdings requests");
-    private static readonly Counter<int> s_holdingsCounter = s_meter.CreateCounter<int>("holdings_retrieved_total", "holdings", "Number of holdings retrieved");
     
     private readonly IHoldingsRetrieval _holdingsRetrieval;
     private readonly IPortfolioMappingService _mappingService;
+    private readonly MetricsService _metrics;
     private readonly ILogger<HoldingsController> _logger;
 
     /// <summary>
@@ -34,10 +30,12 @@ public class HoldingsController : ControllerBase
     public HoldingsController(
         IHoldingsRetrieval holdingsRetrieval,
         IPortfolioMappingService mappingService,
+        MetricsService metrics,
         ILogger<HoldingsController> logger)
     {
         _holdingsRetrieval = holdingsRetrieval;
         _mappingService = mappingService;
+        _metrics = metrics;
         _logger = logger;
     }
 
@@ -113,9 +111,7 @@ public class HoldingsController : ControllerBase
         activity?.SetTag("is.real_time", (valuationDate.Date == DateTime.Today).ToString());
         
         // Record request metric
-        s_holdingsRequestCounter.Add(1, 
-            new KeyValuePair<string, object?>("account.id", accountId.ToString()),
-            new KeyValuePair<string, object?>("is.real_time", (valuationDate.Date == DateTime.Today).ToString()));
+        _metrics.IncrementHoldingsRequests(accountId.ToString(), "requested");
         
         try
         {
@@ -176,8 +172,8 @@ public class HoldingsController : ControllerBase
 
             // Record metrics
             stopwatch.Stop();
-            s_holdingsRequestDuration.Record(stopwatch.ElapsedMilliseconds);
-            s_holdingsCounter.Add(response.TotalHoldings);
+            _metrics.RecordHoldingsRequestDuration(stopwatch.Elapsed.TotalSeconds, accountId.ToString(), "success");
+            _metrics.IncrementHoldingsRequests(accountId.ToString(), "success");
 
             _logger.LogInformation("Successfully retrieved {Count} holdings for account {AccountId} on date {ValuationDate}", 
                 response.TotalHoldings, accountId, dateOnly);
@@ -201,7 +197,8 @@ public class HoldingsController : ControllerBase
         catch (Exception ex)
         {
             stopwatch.Stop();
-            s_holdingsRequestDuration.Record(stopwatch.ElapsedMilliseconds);
+            _metrics.RecordHoldingsRequestDuration(stopwatch.Elapsed.TotalSeconds, accountId.ToString(), "error");
+            _metrics.IncrementHoldingsRequests(accountId.ToString(), "error");
             
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             activity?.SetTag("error.type", "unexpected");

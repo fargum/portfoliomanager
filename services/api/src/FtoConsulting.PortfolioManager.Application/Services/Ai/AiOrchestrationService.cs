@@ -284,7 +284,7 @@ For casual conversation, respond naturally without using tools.";
             .AsIChatClient()
             .AsBuilder()
             .UseOpenTelemetry(sourceName: "PortfolioManager.AI", 
-                             configure: cfg => cfg.EnableSensitiveData = false) // Disable sensitive data for production
+                             configure: cfg => cfg.EnableSensitiveData = true) // Enable sensitive data for token metrics
             .Build();
         
         // Create memory-aware AI agent with ChatClientAgentOptions and enhanced security

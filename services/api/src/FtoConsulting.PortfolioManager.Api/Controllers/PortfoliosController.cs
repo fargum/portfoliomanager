@@ -22,6 +22,7 @@ public class PortfoliosController : ControllerBase
     private readonly IPortfolioIngest _portfolioIngest;
     private readonly IPortfolioMappingService _mappingService;
     private readonly ILogger<PortfoliosController> _logger;
+    private readonly MetricsService _metrics;
 
     /// <summary>
     /// Initializes a new instance of the PortfoliosController
@@ -29,11 +30,13 @@ public class PortfoliosController : ControllerBase
     public PortfoliosController(
         IPortfolioIngest portfolioIngest,
         IPortfolioMappingService mappingService,
-        ILogger<PortfoliosController> logger)
+        ILogger<PortfoliosController> logger,
+        MetricsService metrics)
     {
         _portfolioIngest = portfolioIngest;
         _mappingService = mappingService;
         _logger = logger;
+        _metrics = metrics;
     }
 
     /// <summary>
@@ -88,8 +91,11 @@ public class PortfoliosController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         using var activity = s_activitySource.StartActivity("IngestPortfolio");
+        var stopwatch = Stopwatch.StartNew();
+        var accountId = request?.AccountId.ToString();
+        
         activity?.SetTag("portfolio.name", request?.PortfolioName ?? "unknown");
-        activity?.SetTag("account.id", request?.AccountId.ToString() ?? "unknown");
+        activity?.SetTag("account.id", accountId ?? "unknown");
         activity?.SetTag("holdings.count", request?.Holdings?.Count.ToString() ?? "0");
         
         try
@@ -139,12 +145,22 @@ public class PortfoliosController : ControllerBase
             _logger.LogInformation("Successfully ingested portfolio '{PortfolioName}' with ID {PortfolioId}", 
                 ingestedPortfolio.Name, ingestedPortfolio.Id);
 
+            // Record successful metrics
+            stopwatch.Stop();
+            _metrics.IncrementPortfolioIngestions(accountId, "success");
+            _metrics.RecordPortfolioIngestDuration(stopwatch.Elapsed.TotalSeconds, accountId, "success");
+
             return Ok(response);
         }
         catch (ArgumentException ex)
         {
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             activity?.SetTag("error.type", "validation");
+            
+            stopwatch.Stop();
+            _metrics.IncrementPortfolioIngestions(accountId, "validation_error");
+            _metrics.RecordPortfolioIngestDuration(stopwatch.Elapsed.TotalSeconds, accountId, "validation_error");
+            
             _logger.LogWarning(ex, "Invalid argument provided for portfolio ingestion");
             return BadRequest(new ErrorResponse
             {
@@ -156,6 +172,11 @@ public class PortfoliosController : ControllerBase
         {
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             activity?.SetTag("error.type", "invalid_operation");
+            
+            stopwatch.Stop();
+            _metrics.IncrementPortfolioIngestions(accountId, "operation_error");
+            _metrics.RecordPortfolioIngestDuration(stopwatch.Elapsed.TotalSeconds, accountId, "operation_error");
+            
             _logger.LogWarning(ex, "Invalid operation during portfolio ingestion");
             return BadRequest(new ErrorResponse
             {
@@ -167,6 +188,11 @@ public class PortfoliosController : ControllerBase
         {
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             activity?.SetTag("error.type", "unexpected");
+            
+            stopwatch.Stop();
+            _metrics.IncrementPortfolioIngestions(accountId, "system_error");
+            _metrics.RecordPortfolioIngestDuration(stopwatch.Elapsed.TotalSeconds, accountId, "system_error");
+            
             _logger.LogError(ex, "Unexpected error during portfolio ingestion for portfolio '{PortfolioName}'", 
                 request?.PortfolioName ?? "Unknown");
             
@@ -205,6 +231,8 @@ public class PortfoliosController : ControllerBase
         CancellationToken cancellationToken = default)
     {
         using var activity = s_activitySource.StartActivity("IngestPortfoliosBatch");
+        var stopwatch = Stopwatch.StartNew();
+        
         activity?.SetTag("portfolios.count", requests?.Count.ToString() ?? "0");
         activity?.SetTag("operation.type", "batch_ingest");
         
@@ -262,6 +290,11 @@ public class PortfoliosController : ControllerBase
             var responses = ingestedPortfolios.Select(p => _mappingService.MapToResponse(p)).ToList();
 
             _logger.LogInformation("Successfully ingested {PortfolioCount} portfolios in batch", responses.Count);
+
+            // Record successful batch metrics
+            stopwatch.Stop();
+            _metrics.IncrementPortfolioIngestions("batch", "success");
+            _metrics.RecordPortfolioIngestDuration(stopwatch.Elapsed.TotalSeconds, "batch", "success");
 
             return Ok(responses);
         }

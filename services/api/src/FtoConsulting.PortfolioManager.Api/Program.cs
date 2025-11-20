@@ -7,7 +7,9 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
 using System.Globalization;
 using System.Reflection;
+using OpenTelemetry;
 using OpenTelemetry.Trace;
+using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Logs;
 
@@ -86,6 +88,9 @@ builder.Services.Configure<AzureFoundryOptions>(
 // Register API services
 builder.Services.AddScoped<IPortfolioMappingService, PortfolioMappingService>();
 
+// Register custom metrics service
+builder.Services.AddSingleton<FtoConsulting.PortfolioManager.Api.Services.MetricsService>();
+
 // Add CORS
 builder.Services.AddCors(options =>
 {
@@ -101,18 +106,21 @@ builder.Services.AddCors(options =>
 // Add health checks
 builder.Services.AddHealthChecks();
 
-// Configure OpenTelemetry tracing
+// Configure OpenTelemetry following Microsoft Agent Framework patterns
+var resourceBuilder = ResourceBuilder.CreateDefault()
+    .AddService("PortfolioManager.API", "1.0.0")
+    .AddAttributes(new Dictionary<string, object>
+    {
+        ["deployment.environment"] = builder.Environment.EnvironmentName,
+        ["service.instance.id"] = Environment.MachineName
+    });
+
+// Configure tracing
 builder.Services.AddOpenTelemetry()
     .WithTracing(tracing =>
     {
         tracing
-            .SetResourceBuilder(ResourceBuilder.CreateDefault()
-                .AddService("PortfolioManager.API", "1.0.0")
-                .AddAttributes(new Dictionary<string, object>
-                {
-                    ["deployment.environment"] = builder.Environment.EnvironmentName,
-                    ["service.instance.id"] = Environment.MachineName
-                }))
+            .SetResourceBuilder(resourceBuilder)
             .AddSource("PortfolioManager.*")
             .AddSource("Microsoft.Extensions.AI.*")
             .AddAspNetCoreInstrumentation()
@@ -120,9 +128,48 @@ builder.Services.AddOpenTelemetry()
             .AddOtlpExporter(options =>
             {
                 options.Endpoint = new Uri("http://host.docker.internal:18889");
-            })
-            .AddConsoleExporter();
+            });
     });
+
+// Configure metrics separately using Sdk.CreateMeterProviderBuilder
+var meterProvider = Sdk.CreateMeterProviderBuilder()
+    .SetResourceBuilder(resourceBuilder)
+    .AddMeter("PortfolioManager.*")
+    .AddMeter("Microsoft.AspNetCore.Hosting")
+    .AddMeter("Microsoft.AspNetCore.Server.Kestrel")
+    .AddMeter("Microsoft.AspNetCore.Http.Connections")
+    .AddMeter("Microsoft.AspNetCore.Routing")
+    .AddMeter("Microsoft.AspNetCore.Diagnostics")
+    .AddMeter("Microsoft.EntityFrameworkCore")
+    .AddMeter("Microsoft.Extensions.AI")
+    .AddMeter("Microsoft.Extensions.AI.*")
+    .AddMeter("Microsoft.Agents.AI")
+    .AddMeter("Microsoft.Agents.AI.*")
+    .AddMeter("Azure.AI.OpenAI")
+    .AddMeter("OpenAI")
+    .AddMeter("System.Net.Http")
+    .AddMeter("System.Net.NameResolution")
+    .AddMeter("System.Runtime")
+    .AddMeter("Microsoft.Extensions.Hosting")
+    .AddOtlpExporter(options =>
+    {
+        options.Endpoint = new Uri("http://host.docker.internal:18889");
+    })
+    .Build();
+
+// Register the meter provider for dependency injection
+builder.Services.AddSingleton(meterProvider);
+
+// Configure logging to be exported via OpenTelemetry
+builder.Logging.AddOpenTelemetry(logging =>
+{
+    logging.IncludeFormattedMessage = true;
+    logging.IncludeScopes = true;
+    logging.AddOtlpExporter(options =>
+    {
+        options.Endpoint = new Uri("http://host.docker.internal:18889");
+    });
+});
 
 // Configure Swagger/OpenAPI
 builder.Services.AddEndpointsApiExplorer();
