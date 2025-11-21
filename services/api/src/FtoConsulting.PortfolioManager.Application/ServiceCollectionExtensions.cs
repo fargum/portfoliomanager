@@ -143,6 +143,9 @@ public static class ServiceCollectionExtensions
         // Register MediatR for CQRS
         services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(ServiceCollectionExtensions).Assembly));
         
+        // Register automated background services
+        services.AddHostedService<AutomatedRevaluationBackgroundService>();
+        
         return services;
     }
 }
