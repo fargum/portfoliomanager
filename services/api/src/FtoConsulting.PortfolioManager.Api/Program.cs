@@ -4,6 +4,7 @@ using FtoConsulting.PortfolioManager.Application.Configuration;
 using FtoConsulting.PortfolioManager.Infrastructure.Data;
 using FtoConsulting.PortfolioManager.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Identity.Web;
 using Microsoft.OpenApi.Models;
 using System.Globalization;
 using System.Reflection;
@@ -19,6 +20,32 @@ CultureInfo.DefaultThreadCurrentCulture = cultureInfo;
 CultureInfo.DefaultThreadCurrentUICulture = cultureInfo;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Add environment variables to configuration with mapping
+builder.Configuration.AddEnvironmentVariables();
+
+// Override Azure AD configuration with environment variables if available
+var azureAdConfig = builder.Configuration.GetSection("AzureAd");
+if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AZURE_AD_INSTANCE")))
+{
+    azureAdConfig["Instance"] = Environment.GetEnvironmentVariable("AZURE_AD_INSTANCE");
+}
+if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AZURE_AD_DOMAIN")))
+{
+    azureAdConfig["Domain"] = Environment.GetEnvironmentVariable("AZURE_AD_DOMAIN");
+}
+if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AZURE_AD_TENANT_ID")))
+{
+    azureAdConfig["TenantId"] = Environment.GetEnvironmentVariable("AZURE_AD_TENANT_ID");
+}
+if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AZURE_AD_CLIENT_ID")))
+{
+    azureAdConfig["ClientId"] = Environment.GetEnvironmentVariable("AZURE_AD_CLIENT_ID");
+}
+if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("AZURE_AD_AUDIENCE")))
+{
+    azureAdConfig["Audience"] = Environment.GetEnvironmentVariable("AZURE_AD_AUDIENCE");
+}
 
 // Configure structured logging and OpenTelemetry integration
 builder.Logging.ClearProviders();
@@ -90,6 +117,39 @@ builder.Services.AddScoped<IPortfolioMappingService, PortfolioMappingService>();
 
 // Register custom metrics service
 builder.Services.AddSingleton<FtoConsulting.PortfolioManager.Api.Services.MetricsService>();
+
+// Add Authentication - using environment variables through configuration binding
+builder.Services.AddAuthentication("Bearer")
+    .AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"));
+
+// Add Authorization - fixed scope checking
+builder.Services.AddAuthorizationBuilder()
+    .AddPolicy("RequirePortfolioScope", policy =>
+    {
+        policy.RequireAuthenticatedUser();
+        // Check for Portfolio.ReadWrite scope in various claim formats
+        policy.RequireAssertion(context =>
+        {
+            var user = context.User;
+            
+            // Log claims for debugging (temporary)
+            var logger = context.Resource as ILogger;
+            
+            // Check all possible scope claim formats
+            var allClaims = user.Claims.ToList();
+            
+            // Check for any claim containing Portfolio.ReadWrite
+            var hasPortfolioScope = allClaims.Any(c => 
+                c.Value.Contains("Portfolio.ReadWrite", StringComparison.OrdinalIgnoreCase));
+            
+            // Also check for the full scope URI
+            var apiClientId = Environment.GetEnvironmentVariable("AZURE_AD_CLIENT_ID") ?? builder.Configuration["AzureAd:ClientId"];
+            var hasFullScope = allClaims.Any(c => 
+                c.Value.Contains($"api://{apiClientId}/Portfolio.ReadWrite", StringComparison.OrdinalIgnoreCase));
+            
+            return hasPortfolioScope || hasFullScope;
+        });
+    });
 
 // Add CORS
 builder.Services.AddCors(options =>
@@ -187,6 +247,41 @@ builder.Services.AddSwaggerGen(c =>
         }
     });
 
+    c.AddSecurityDefinition("oauth2", new OpenApiSecurityScheme
+    {
+        Type = SecuritySchemeType.OAuth2,
+        Flows = new OpenApiOAuthFlows
+        {
+            Implicit = new OpenApiOAuthFlow
+        {
+            AuthorizationUrl = new Uri(
+                $"https://login.microsoftonline.com/{builder.Configuration["AzureAd:TenantId"]}/oauth2/v2.0/authorize"
+            ),
+            Scopes = new Dictionary<string, string>
+            {
+                {
+                    $"api://{builder.Configuration["AzureAd:ClientId"]}/Portfolio.ReadWrite",
+                    "Read and write portfolio data"
+                }
+            }
+        }
+        }
+    });
+
+    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    {
+        {
+            new OpenApiSecurityScheme
+            {
+                Reference = new OpenApiReference
+                    {
+                        Type = ReferenceType.SecurityScheme,
+                        Id = "oauth2"
+                    }
+        },
+        new[] { $"api://{builder.Configuration["AzureAd:ClientId"]}/Portfolio.ReadWrite" }
+    }
+});
     // Include XML comments for better documentation
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
@@ -203,14 +298,20 @@ var app = builder.Build();
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();
-    app.UseSwaggerUI(c =>
+app.UseSwagger();
+app.UseSwaggerUI(c =>
     {
         c.SwaggerEndpoint("/swagger/v1/swagger.json", "Portfolio Manager API v1");
-        c.RoutePrefix = string.Empty; // Serve Swagger at the root
+        c.RoutePrefix = ""; 
         c.DocumentTitle = "Portfolio Manager API";
         c.DefaultModelsExpandDepth(-1);
         c.DocExpansion(Swashbuckle.AspNetCore.SwaggerUI.DocExpansion.None);
+
+        // OAuth2 for Swagger UI (Implicit flow)
+        c.OAuthClientId(builder.Configuration["AzureAd:ClientId"]); // uses environment variable
+        c.OAuthAppName("Portfolio Manager API");
+        c.OAuthScopeSeparator(" ");
+        // IMPORTANT: do NOT call c.OAuthUsePkce() when using Implicit flow
     });
 }
 
@@ -218,6 +319,7 @@ if (app.Environment.IsDevelopment())
 app.UseCors("AllowUI");
 
 app.UseHttpsRedirection();
+app.UseAuthentication();
 app.UseAuthorization();
 
 // Map health checks endpoint
@@ -241,6 +343,41 @@ app.MapGet("/health", (ILogger<Program> logger) =>
 });
 
 app.MapHealthChecks("/health/detailed");
+
+// Add debug endpoint to check token claims (temporary - no auth required)
+app.MapGet("/debug/claims", (HttpContext context) => 
+{
+    if (context.User.Identity?.IsAuthenticated != true)
+    {
+        return Results.Ok(new { 
+            IsAuthenticated = false,
+            Message = "No authentication token present",
+            Headers = context.Request.Headers.ToDictionary(h => h.Key, h => h.Value.ToString())
+        });
+    }
+    
+    var claims = context.User.Claims.Select(c => new { 
+        Type = c.Type, 
+        Value = c.Value 
+    }).ToList();
+    
+    return Results.Ok(new { 
+        IsAuthenticated = context.User.Identity.IsAuthenticated,
+        Claims = claims
+    });
+});
+
+// Add a simple authenticated endpoint for testing
+app.MapGet("/debug/auth-test", (HttpContext context) => 
+{
+    return Results.Ok(new { 
+        Message = "You are authenticated!",
+        IsAuthenticated = context.User.Identity?.IsAuthenticated ?? false,
+        UserName = context.User.Identity?.Name ?? "Unknown",
+        ClaimsCount = context.User.Claims.Count(),
+        AllClaims = context.User.Claims.Select(c => new { c.Type, c.Value }).ToList()
+    });
+}).RequireAuthorization("RequirePortfolioScope");
 
 app.MapControllers();
 

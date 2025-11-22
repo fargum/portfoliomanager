@@ -1,5 +1,8 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
+import { AuthProvider } from '@/components/AuthProvider';
+import { AuthContextProvider } from '@/contexts/AuthContext';
+import { ClientOnly } from '@/components/ClientOnly';
 import './globals.css';
 
 const inter = Inter({ subsets: ['latin'] });
@@ -17,9 +20,15 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.className} bg-financial-gray-50 min-h-screen`}>
-        <div className="min-h-screen bg-gradient-to-br from-financial-gray-50 to-financial-gray-100">
-          {children}
-        </div>
+        <ClientOnly>
+          <AuthProvider>
+            <AuthContextProvider>
+              <div className="min-h-screen bg-gradient-to-br from-financial-gray-50 to-financial-gray-100">
+                {children}
+              </div>
+            </AuthContextProvider>
+          </AuthProvider>
+        </ClientOnly>
       </body>
     </html>
   );

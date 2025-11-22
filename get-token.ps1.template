@@ -1,0 +1,29 @@
+# Azure AD Token Testing Utility Template
+# Copy this file to get-token.ps1 and fill in your actual values
+
+# Azure AD Configuration - replace with your values
+$tenantId = "your_tenant_id_here"
+$clientId = "your_api_client_id_here" 
+$scope = "api://your_api_client_id_here/Portfolio.ReadWrite"
+
+# Rest of the script remains the same...
+Write-Host "Azure AD Token Acquisition Utility" -ForegroundColor Green
+Write-Host "===================================" -ForegroundColor Green
+Write-Host ""
+Write-Host "This script helps acquire Azure AD tokens for testing the Portfolio Manager API." -ForegroundColor Yellow
+Write-Host ""
+Write-Host "Available options:" -ForegroundColor Cyan
+Write-Host "1. Interactive login (recommended for development)" -ForegroundColor White
+Write-Host "2. Device code flow (for headless environments)" -ForegroundColor White
+Write-Host "3. Azure CLI (if you have az CLI installed and authenticated)" -ForegroundColor White
+Write-Host ""
+Write-Host "Configuration:" -ForegroundColor Cyan
+Write-Host "  Tenant ID: $tenantId" -ForegroundColor Gray
+Write-Host "  Client ID: $clientId" -ForegroundColor Gray
+Write-Host "  Scope: $scope" -ForegroundColor Gray
+Write-Host ""
+Write-Host "To use Azure CLI option, run:" -ForegroundColor Cyan
+Write-Host "  az login" -ForegroundColor Gray
+Write-Host "  az account get-access-token --resource api://your_api_client_id_here" -ForegroundColor Gray
+Write-Host ""
+Write-Host "Copy the access token and use it as Bearer token in API requests." -ForegroundColor Yellow

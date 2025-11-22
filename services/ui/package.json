@@ -10,6 +10,8 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@azure/msal-browser": "^3.26.1",
+    "@azure/msal-react": "^2.1.1",
     "ag-grid-community": "^32.2.1",
     "ag-grid-react": "^32.2.1",
     "clsx": "^2.1.1",

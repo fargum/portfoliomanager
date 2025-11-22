@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>OAuth Test - Portfolio Manager</title>
+    <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+</head>
+<body>
+    <h1>Portfolio Manager OAuth Test</h1>
+    <div id="content">
+        <script>
+            // Azure AD Configuration - replace with your values
+            const clientId = 'your_ui_client_id_here';
+            const tenantId = 'your_tenant_id_here';
+            const scope = 'api://your_api_client_id_here/Portfolio.ReadWrite';
+            
+            // Rest of the OAuth test implementation...
+            const msalConfig = {
+                auth: {
+                    clientId: clientId,
+                    authority: `https://login.microsoftonline.com/${tenantId}`,
+                    redirectUri: window.location.origin
+                }
+            };
+
+            const loginRequest = {
+                scopes: [scope]
+            };
+
+            const myMSALObj = new msal.PublicClientApplication(msalConfig);
+
+            document.write('<p>Replace the placeholder values in this file with your actual Azure AD configuration.</p>');
+            document.write('<p>Client ID: ' + clientId + '</p>');
+            document.write('<p>Tenant ID: ' + tenantId + '</p>');
+            document.write('<p>Scope: ' + scope + '</p>');
+        </script>
+    </div>
+</body>
+</html>

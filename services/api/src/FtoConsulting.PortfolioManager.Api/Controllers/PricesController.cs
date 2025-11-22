@@ -1,6 +1,7 @@
 using FtoConsulting.PortfolioManager.Api.Models.Responses;
 using FtoConsulting.PortfolioManager.Api.Services;
 using FtoConsulting.PortfolioManager.Application.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
 using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
@@ -14,6 +15,7 @@ namespace FtoConsulting.PortfolioManager.Api.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Produces("application/json")]
+[Authorize(Policy = "RequirePortfolioScope")]
 public class PricesController : ControllerBase
 {
     private static readonly ActivitySource s_activitySource = new("PortfolioManager.Prices");

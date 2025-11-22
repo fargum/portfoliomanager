@@ -43,6 +43,13 @@ services:
       - AzureFoundry__Endpoint=${AZURE_FOUNDRY_ENDPOINT}
       - AzureFoundry__ApiKey=${AZURE_FOUNDRY_API_KEY}
       
+      # Azure Active Directory Configuration
+      - AZURE_AD_INSTANCE=${AZURE_AD_INSTANCE}
+      - AZURE_AD_DOMAIN=${AZURE_AD_DOMAIN}
+      - AZURE_AD_TENANT_ID=${AZURE_AD_TENANT_ID}
+      - AZURE_AD_CLIENT_ID=${AZURE_AD_CLIENT_ID}
+      - AZURE_AD_AUDIENCE=${AZURE_AD_AUDIENCE}
+      
       # Logging Configuration
       - Logging__LogLevel__Default=Information
       - Logging__LogLevel__Microsoft.AspNetCore=Warning
@@ -70,11 +77,17 @@ services:
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_BASE_URL: http://localhost:8080
+        NEXT_PUBLIC_AZURE_CLIENT_ID: ${AZURE_AD_UI_CLIENT_ID}
+        NEXT_PUBLIC_AZURE_TENANT_ID: ${AZURE_AD_TENANT_ID}
+        NEXT_PUBLIC_AZURE_API_CLIENT_ID: ${AZURE_AD_CLIENT_ID}
     image: portfoliomanager-ui:latest
     container_name: portfoliomanager-ui
     environment:
       - API_BASE_URL=http://portfoliomanager-api:8080
       - NEXT_PUBLIC_API_BASE_URL=http://localhost:8080
+      - NEXT_PUBLIC_AZURE_CLIENT_ID=${AZURE_AD_UI_CLIENT_ID}
+      - NEXT_PUBLIC_AZURE_TENANT_ID=${AZURE_AD_TENANT_ID}
+      - NEXT_PUBLIC_AZURE_API_CLIENT_ID=${AZURE_AD_CLIENT_ID}
     ports:
       - "3000:3000"
     networks:

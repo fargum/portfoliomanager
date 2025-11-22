@@ -2,7 +2,9 @@
 
 import { HoldingsGrid } from '@/components/HoldingsGrid';
 import { AiChat } from '@/components/AiChat';
+import { AuthButton } from '@/components/AuthButton';
 import { useState, useEffect } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { apiClient } from '@/lib/api-client';
 import { Building2, AlertCircle, CheckCircle, Bot, BarChart3, MessageSquare } from 'lucide-react';
 
@@ -36,18 +38,32 @@ export default function HomePage() {
   const [apiStatus, setApiStatus] = useState<'checking' | 'online' | 'offline'>('checking');
   const [aiStatus, setAiStatus] = useState<'checking' | 'online' | 'offline'>('checking');
   const [activeTab, setActiveTab] = useState<'holdings' | 'chat'>('holdings');
+  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
-    // Check API and AI service connectivity on page load
+    // Check API and AI service connectivity on page load and when auth changes
     const checkServices = async () => {
+      console.log('Checking services, authenticated:', isAuthenticated);
       try {
         // Check main API
         const isApiOnline = await apiClient.testConnection();
         setApiStatus(isApiOnline ? 'online' : 'offline');
 
-        // Check AI chat service
-        const aiHealth = await apiClient.getChatHealthStatus();
-        setAiStatus(aiHealth.error ? 'offline' : 'online');
+        // Check AI chat service - only if authenticated
+        if (isAuthenticated) {
+          setAiStatus('checking');
+          try {
+            const aiHealth = await apiClient.getChatHealthStatus();
+            setAiStatus(aiHealth.error ? 'offline' : 'online');
+          } catch (error) {
+            console.log('AI service check failed:', error);
+            setAiStatus('offline');
+          }
+        } else {
+          // When not authenticated, AI service is unavailable
+          console.log('Not authenticated, setting AI status to offline');
+          setAiStatus('offline');
+        }
       } catch {
         setApiStatus('offline');
         setAiStatus('offline');
@@ -55,7 +71,7 @@ export default function HomePage() {
     };
 
     checkServices();
-  }, []);
+  }, [isAuthenticated]); // Re-run when authentication state changes
 
   return (
     <div className="h-screen bg-gradient-to-br from-financial-gray-50 to-financial-gray-100 flex flex-col">
@@ -92,23 +108,35 @@ export default function HomePage() {
               </div>
             </div>
             
-            {/* Right side - Service Status Indicators */}
+            {/* Right side - Service Status Indicators and Auth */}
             <div className="flex items-center space-x-4">
+              {/* Authentication */}
+              <AuthButton />
+
+              {/* Divider */}
+              <div className="h-6 w-px bg-gray-300"></div>
+
               {/* API Status */}
               <div className="flex items-center space-x-2">
-                {apiStatus === 'checking' && (
+                {!isAuthenticated && (
+                  <div className="flex items-center space-x-2 text-financial-gray-400">
+                    <Building2 className="h-4 w-4" />
+                    <span className="text-sm">API (Auth Required)</span>
+                  </div>
+                )}
+                {isAuthenticated && apiStatus === 'checking' && (
                   <div className="flex items-center space-x-2 text-financial-gray-500">
                     <div className="animate-spin h-4 w-4 border-2 border-financial-gray-300 border-t-primary-600 rounded-full"></div>
                     <span className="text-sm">Checking API...</span>
                   </div>
                 )}
-                {apiStatus === 'online' && (
+                {isAuthenticated && apiStatus === 'online' && (
                   <div className="flex items-center space-x-2 text-financial-green">
                     <CheckCircle className="h-4 w-4" />
                     <span className="text-sm font-medium">API Online</span>
                   </div>
                 )}
-                {apiStatus === 'offline' && (
+                {isAuthenticated && apiStatus === 'offline' && (
                   <div className="flex items-center space-x-2 text-financial-red">
                     <AlertCircle className="h-4 w-4" />
                     <span className="text-sm font-medium">API Offline</span>
@@ -118,19 +146,25 @@ export default function HomePage() {
 
               {/* AI Status */}
               <div className="flex items-center space-x-2">
-                {aiStatus === 'checking' && (
+                {!isAuthenticated && (
+                  <div className="flex items-center space-x-2 text-financial-gray-400">
+                    <Bot className="h-4 w-4" />
+                    <span className="text-sm">AI (Auth Required)</span>
+                  </div>
+                )}
+                {isAuthenticated && aiStatus === 'checking' && (
                   <div className="flex items-center space-x-2 text-financial-gray-500">
                     <div className="animate-spin h-4 w-4 border-2 border-financial-gray-300 border-t-blue-600 rounded-full"></div>
                     <span className="text-sm">Checking AI...</span>
                   </div>
                 )}
-                {aiStatus === 'online' && (
+                {isAuthenticated && aiStatus === 'online' && (
                   <div className="flex items-center space-x-2 text-blue-600">
                     <Bot className="h-4 w-4" />
                     <span className="text-sm font-medium">AI Online</span>
                   </div>
                 )}
-                {aiStatus === 'offline' && (
+                {isAuthenticated && aiStatus === 'offline' && (
                   <div className="flex items-center space-x-2 text-financial-red">
                     <AlertCircle className="h-4 w-4" />
                     <span className="text-sm font-medium">AI Offline</span>
@@ -143,7 +177,7 @@ export default function HomePage() {
       </header>
 
       {/* Service Status Warnings */}
-      {(apiStatus === 'offline' || aiStatus === 'offline') && (
+      {(apiStatus === 'offline' || (aiStatus === 'offline' && isAuthenticated) || (!isAuthenticated && activeTab === 'chat')) && (
         <div className="flex-shrink-0 px-4 sm:px-6 lg:px-8 pt-4">
           <div className="space-y-4">
             {apiStatus === 'offline' && (
@@ -160,7 +194,21 @@ export default function HomePage() {
               </div>
             )}
             
-            {aiStatus === 'offline' && (
+            {!isAuthenticated && activeTab === 'chat' && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                <div className="flex items-center space-x-3">
+                  <Bot className="h-5 w-5 text-blue-600" />
+                  <div>
+                    <h3 className="text-sm font-semibold text-blue-800">Authentication Required</h3>
+                    <p className="text-xs text-blue-700 mt-1">
+                      Please sign in to access the AI assistant and chat functionality.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {aiStatus === 'offline' && isAuthenticated && (
               <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
                 <div className="flex items-center space-x-3">
                   <Bot className="h-5 w-5 text-yellow-600" />

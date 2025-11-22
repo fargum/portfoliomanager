@@ -3,8 +3,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Send, Bot, User, AlertCircle, TrendingUp, TrendingDown, Activity, Clock, Lightbulb } from 'lucide-react';
+import { Send, Bot, User, AlertCircle, TrendingUp, TrendingDown, Activity, Clock, Lightbulb, LogIn } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
+import { useAuth } from '@/contexts/AuthContext';
 import { ChatMessage, ChatState, InsightDto } from '@/types/chat';
 
 interface AiChatProps {
@@ -16,6 +17,7 @@ interface AiChatProps {
 export function AiChat({ accountId, className = '', isVisible = true }: AiChatProps) {
   const [inputValue, setInputValue] = useState('');
   const [currentThreadId, setCurrentThreadId] = useState<number | undefined>(undefined);
+  const { isAuthenticated, login } = useAuth();
   const [chatState, setChatState] = useState<ChatState>({
     messages: [
       {
@@ -449,40 +451,80 @@ I can analyze your holdings, market conditions, and provide insights to help you
 
   return (
     <div className={`flex flex-col h-full bg-white ${className}`}>
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
-        {chatState.messages.map(renderMessage)}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Input */}
-      <div className="border-t border-gray-200 p-4 bg-white">
-        <form onSubmit={handleSubmit} className="flex space-x-3">
-          <input
-            ref={inputRef}
-            type="text"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Ask me about your portfolio..."
-            disabled={chatState.isLoading}
-            className="flex-1 border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed text-base"
-          />
-          <button
-            type="submit"
-            disabled={chatState.isLoading || !inputValue.trim()}
-            className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium"
-          >
-            <Send className="h-5 w-5" />
-          </button>
-        </form>
-        
-        {chatState.error && (
-          <div className="mt-3 text-sm text-red-600 flex items-center">
-            <AlertCircle className="h-4 w-4 mr-1" />
-            {chatState.error}
+      {!isAuthenticated ? (
+        // Authentication required state
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="text-center max-w-md">
+            <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Bot className="h-10 w-10 text-blue-600" />
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-3">
+              AI Assistant Ready
+            </h3>
+            <p className="text-gray-600 mb-6">
+              Sign in to access your AI portfolio assistant and get personalized insights about your investments.
+            </p>
+            <button
+              onClick={login}
+              className="inline-flex items-center space-x-2 bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 transition-colors font-medium"
+            >
+              <LogIn className="h-5 w-5" />
+              <span>Sign In to Start</span>
+            </button>
+            <p className="text-sm text-gray-500 mt-4">
+              Once authenticated, you can ask questions about your portfolio performance, holdings, and get market insights.
+            </p>
           </div>
-        )}
-      </div>
+        </div>
+      ) : (
+        // Authenticated chat interface
+        <>
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+            {chatState.messages.map(renderMessage)}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Input */}
+          <div className="border-t border-gray-200 p-4 bg-white">
+            <form onSubmit={handleSubmit} className="flex space-x-3">
+              <input
+                ref={inputRef}
+                type="text"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                placeholder="Ask me about your portfolio..."
+                disabled={chatState.isLoading}
+                className="flex-1 border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed text-base"
+              />
+              <button
+                type="submit"
+                disabled={chatState.isLoading || !inputValue.trim()}
+                className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium"
+              >
+                <Send className="h-5 w-5" />
+              </button>
+            </form>
+            
+            {chatState.error && (
+              <div className="mt-3 text-sm text-red-600 flex items-center justify-between bg-red-50 p-3 rounded-lg border border-red-200">
+                <div className="flex items-center">
+                  <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0" />
+                  <span>{chatState.error}</span>
+                </div>
+                {(chatState.error.includes('sign in') || chatState.error.includes('Authentication')) && (
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="ml-3 bg-blue-600 text-white px-3 py-1 rounded-md text-xs hover:bg-blue-700 transition-colors"
+                  >
+                    Refresh Page
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

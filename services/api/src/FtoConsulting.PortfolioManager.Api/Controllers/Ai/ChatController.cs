@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using FtoConsulting.PortfolioManager.Application.Services;
@@ -15,6 +16,7 @@ namespace FtoConsulting.PortfolioManager.Api.Controllers.Ai;
 [ApiController]
 [Route("api/ai/chat")]
 [Produces("application/json")]
+[Authorize(Policy = "RequirePortfolioScope")]
 public class ChatController : ControllerBase
 {
     private static readonly ActivitySource s_activitySource = new("PortfolioManager.AI.Controller");

@@ -3,6 +3,7 @@ import { ChatRequestDto, ChatResponseDto, AiToolDto } from '@/types/chat';
 
 export class PortfolioApiClient {
   private readonly baseUrl: string;
+  private accessToken: string | null = null;
 
   constructor(baseUrl?: string) {
     // Use Next.js public environment variable for client-side code
@@ -17,6 +18,51 @@ export class PortfolioApiClient {
   }
 
   /**
+   * Set the access token for authenticated requests
+   */
+  setAccessToken(token: string | null): void {
+    this.accessToken = token;
+  }
+
+  /**
+   * Get common headers for API requests
+   */
+  private getHeaders(): HeadersInit {
+    const headers: HeadersInit = {
+      'Accept': 'application/json',
+      'Content-Type': 'application/json',
+    };
+
+    if (this.accessToken) {
+      headers['Authorization'] = `Bearer ${this.accessToken}`;
+      console.log('API request includes auth token (length:', this.accessToken.length, ')');
+    } else {
+      console.warn('API request made WITHOUT auth token');
+    }
+
+    return headers;
+  }
+
+  /**
+   * Get common headers for streaming requests
+   */
+  private getStreamHeaders(): HeadersInit {
+    const headers: HeadersInit = {
+      'Accept': 'text/plain',
+      'Content-Type': 'application/json',
+    };
+
+    if (this.accessToken) {
+      headers['Authorization'] = `Bearer ${this.accessToken}`;
+      console.log('Streaming API request includes auth token (length:', this.accessToken.length, ')');
+    } else {
+      console.warn('Streaming API request made WITHOUT auth token');
+    }
+
+    return headers;
+  }
+
+  /**
    * Fetch holdings for a specific account and date
    */
   async getHoldings(accountId: number, valuationDate: string): Promise<ApiResponse<HoldingResponse[]>> {
@@ -24,14 +70,9 @@ export class PortfolioApiClient {
       const formattedDate = this.formatDate(valuationDate);
       const url = `${this.baseUrl}/api/holdings/account/${accountId}/date/${formattedDate}`;
       
-      console.log(`Fetching holdings from: ${url}`);
-      
       const response = await fetch(url, {
         method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
+        headers: this.getHeaders(),
       });
 
       if (!response.ok) {
@@ -96,6 +137,33 @@ export class PortfolioApiClient {
   }
 
   /**
+   * Format error messages to be user-friendly
+   */
+  private formatErrorMessage(status: number, errorText: string): string {
+    // Handle authentication/authorization errors
+    if (status === 401) {
+      return 'Please sign in to access the AI Assistant.';
+    }
+    if (status === 403) {
+      return 'You do not have permission to access this feature.';
+    }
+    if (status === 500 && errorText.includes('AuthorizationPolicy')) {
+      return 'Authentication required. Please sign in to continue.';
+    }
+    
+    // Handle other common errors
+    if (status >= 500) {
+      return 'The service is currently unavailable. Please try again later.';
+    }
+    if (status >= 400 && status < 500) {
+      return 'There was a problem with your request. Please check your input and try again.';
+    }
+    
+    // Fallback to original error for unexpected cases
+    return `HTTP ${status}: ${errorText}`;
+  }
+
+  /**
    * Test API connectivity
    */
   async testConnection(): Promise<boolean> {
@@ -127,16 +195,14 @@ export class PortfolioApiClient {
 
       const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Accept': 'text/plain',
-          'Content-Type': 'application/json',
-        },
+        headers: this.getStreamHeaders(),
         body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
+        const friendlyError = this.formatErrorMessage(response.status, errorText);
+        throw new Error(friendlyError);
       }
 
       const reader = response.body?.getReader();
@@ -184,16 +250,14 @@ export class PortfolioApiClient {
 
       const response = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
+        headers: this.getHeaders(),
         body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
+        const friendlyError = this.formatErrorMessage(response.status, errorText);
+        throw new Error(friendlyError);
       }
 
       const chatResponse: ChatResponseDto = await response.json();
@@ -221,10 +285,7 @@ export class PortfolioApiClient {
       
       const response = await fetch(url, {
         method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
+        headers: this.getHeaders(),
       });
 
       if (!response.ok) {
@@ -257,9 +318,7 @@ export class PortfolioApiClient {
       
       const response = await fetch(url, {
         method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-        },
+        headers: this.getHeaders(),
       });
 
       if (!response.ok) {

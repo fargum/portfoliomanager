@@ -1,5 +1,6 @@
 using FtoConsulting.PortfolioManager.Application.Services;
 using FtoConsulting.PortfolioManager.Application.Utilities;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 using System.Diagnostics;
@@ -12,6 +13,7 @@ namespace FtoConsulting.PortfolioManager.Api.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Produces("application/json")]
+[Authorize(Policy = "RequirePortfolioScope")]
 public class HoldingRevaluationController : ControllerBase
 {
     private static readonly ActivitySource s_activitySource = new("PortfolioManager.Revaluation");
