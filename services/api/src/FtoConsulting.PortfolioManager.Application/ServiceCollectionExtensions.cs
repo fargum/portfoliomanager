@@ -45,6 +45,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IHoldingRevaluationService, HoldingRevaluationService>();
         services.AddScoped<ICurrencyConversionService, CurrencyConversionService>();
         services.AddScoped<IPricingCalculationService, PricingCalculationService>();
+        services.AddScoped<ICurrentUserService, CurrentUserService>();
         
         // Register Azure OpenAI client and AI chat service for dependency injection
         services.AddScoped<AzureOpenAIClient>(serviceProvider =>

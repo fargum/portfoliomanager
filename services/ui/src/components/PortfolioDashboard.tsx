@@ -10,7 +10,7 @@ interface PortfolioDashboardProps {
 export function PortfolioDashboard({ accountId }: PortfolioDashboardProps) {
   return (
     <div className="w-full h-full">
-      <HoldingsGrid accountId={accountId} />
+      <HoldingsGrid />
     </div>
   );
 }

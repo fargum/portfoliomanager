@@ -242,7 +242,7 @@ export default function HomePage() {
               </div>
             </div>
             <div className="h-[calc(100%-5rem)] overflow-hidden">
-              <HoldingsGrid accountId={HARDCODED_ACCOUNT_ID} />
+              <HoldingsGrid />
             </div>
           </div>
 

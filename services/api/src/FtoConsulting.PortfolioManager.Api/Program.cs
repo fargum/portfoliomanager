@@ -115,6 +115,9 @@ builder.Services.Configure<AzureFoundryOptions>(
 // Register API services
 builder.Services.AddScoped<IPortfolioMappingService, PortfolioMappingService>();
 
+// Add IHttpContextAccessor for user context access
+builder.Services.AddHttpContextAccessor();
+
 // Register custom metrics service
 builder.Services.AddSingleton<FtoConsulting.PortfolioManager.Api.Services.MetricsService>();
 

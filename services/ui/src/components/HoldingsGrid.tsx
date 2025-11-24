@@ -12,10 +12,10 @@ import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
 
 interface HoldingsGridProps {
-  accountId: number;
+  // No props needed - account is determined from authentication
 }
 
-export const HoldingsGrid: React.FC<HoldingsGridProps> = ({ accountId }) => {
+export const HoldingsGrid: React.FC<HoldingsGridProps> = () => {
   const [holdings, setHoldings] = useState<HoldingResponse[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -33,7 +33,7 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = ({ accountId }) => {
     setError(null);
     
     try {
-      const response = await apiClient.getHoldings(accountId, valuationDate);
+      const response = await apiClient.getHoldings(valuationDate);
       
       if (response.error) {
         setError(response.error);
@@ -47,7 +47,7 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = ({ accountId }) => {
     } finally {
       setLoading(false);
     }
-  }, [accountId, valuationDate]);
+  }, [valuationDate]);
 
   // Calculate totals from filtered/displayed data
   const updateFilteredTotals = useCallback(() => {
@@ -114,7 +114,7 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = ({ accountId }) => {
             <PieChart className="h-6 w-6" />
             <div>
               <h2 className="text-lg font-bold">Portfolio Holdings</h2>
-              <p className="text-primary-100 text-sm">Account: {accountId}</p>
+              <p className="text-primary-100 text-sm">Authenticated User's Holdings</p>
             </div>
           </div>
           

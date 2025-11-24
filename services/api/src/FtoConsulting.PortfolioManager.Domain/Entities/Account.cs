@@ -4,8 +4,12 @@ namespace FtoConsulting.PortfolioManager.Domain.Entities;
 
 public class Account : BaseEntity
 {
-    public string UserName { get; private set; } = string.Empty;
-    public string Password { get; private set; } = string.Empty;
+    // Azure AD integration properties
+    public string ExternalUserId { get; private set; } = string.Empty;
+    public string Email { get; private set; } = string.Empty;
+    public string DisplayName { get; private set; } = string.Empty;
+    public bool IsActive { get; private set; } = true;
+    public DateTime? LastLoginAt { get; private set; }
 
     // Navigation properties
     public virtual ICollection<Portfolio> Portfolios { get; private set; } = [];
@@ -13,16 +17,36 @@ public class Account : BaseEntity
     // Private constructor for EF Core
     private Account() { }
 
-    public Account(string userName, string password)
+    // Azure AD external user constructor
+    public Account(string externalUserId, string email, string displayName)
     {
-        UserName = userName ?? throw new ArgumentNullException(nameof(userName));
-        Password = password ?? throw new ArgumentNullException(nameof(password));
+        ExternalUserId = externalUserId ?? throw new ArgumentNullException(nameof(externalUserId));
+        Email = email ?? throw new ArgumentNullException(nameof(email));
+        DisplayName = displayName ?? throw new ArgumentNullException(nameof(displayName));
     }
-
-    public void UpdateCredentials(string userName, string password)
+    
+    public void UpdateUserInfo(string email, string displayName)
     {
-        UserName = userName ?? throw new ArgumentNullException(nameof(userName));
-        Password = password ?? throw new ArgumentNullException(nameof(password));
+        Email = email ?? throw new ArgumentNullException(nameof(email));
+        DisplayName = displayName ?? throw new ArgumentNullException(nameof(displayName));
+        SetUpdatedAt();
+    }
+    
+    public void RecordLogin()
+    {
+        LastLoginAt = DateTime.UtcNow;
+        SetUpdatedAt();
+    }
+    
+    public void Deactivate()
+    {
+        IsActive = false;
+        SetUpdatedAt();
+    }
+    
+    public void Activate()
+    {
+        IsActive = true;
         SetUpdatedAt();
     }
 }

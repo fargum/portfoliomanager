@@ -1,1 +1,1 @@
-self.__REACT_LOADABLE_MANIFEST="{}";
+self.__REACT_LOADABLE_MANIFEST='{"..\\\\node_modules\\\\@azure\\\\msal-browser\\\\dist\\\\telemetry\\\\BrowserPerformanceClient.mjs -> ./BrowserPerformanceMeasurement.mjs":{"id":null,"files":[]}}';

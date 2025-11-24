@@ -35,27 +35,50 @@ namespace FtoConsulting.PortfolioManager.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
 
-                    b.Property<string>("Password")
+                    b.Property<string>("DisplayName")
                         .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)")
-                        .HasColumnName("password");
+                        .HasColumnName("display_name");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("email");
+
+                    b.Property<string>("ExternalUserId")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)")
+                        .HasColumnName("external_user_id");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
+                    b.Property<DateTime?>("LastLoginAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_login_at");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("updated_at");
 
-                    b.Property<string>("UserName")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasColumnName("user_name");
-
                     b.HasKey("Id");
 
-                    b.HasIndex("UserName")
+                    b.HasIndex("Email")
                         .IsUnique()
-                        .HasDatabaseName("ix_accounts_user_name");
+                        .HasDatabaseName("ix_accounts_email");
+
+                    b.HasIndex("ExternalUserId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_accounts_external_user_id");
+
+                    b.HasIndex("IsActive")
+                        .HasDatabaseName("ix_accounts_is_active");
 
                     b.ToTable("accounts", "app");
                 });

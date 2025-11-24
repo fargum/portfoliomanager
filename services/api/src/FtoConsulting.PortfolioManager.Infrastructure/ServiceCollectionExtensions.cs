@@ -2,7 +2,9 @@ using FtoConsulting.PortfolioManager.Domain.Repositories;
 using FtoConsulting.PortfolioManager.Infrastructure.Data;
 using FtoConsulting.PortfolioManager.Infrastructure.Repositories;
 using FtoConsulting.PortfolioManager.Infrastructure.Repositories.Memory;
+using FtoConsulting.PortfolioManager.Infrastructure.Services;
 using FtoConsulting.PortfolioManager.Infrastructure.Services.Memory;
+using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.AI;
 using Microsoft.Agents.AI;
@@ -28,8 +30,6 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IConversationThreadRepository, ConversationThreadRepository>();
         services.AddScoped<IChatMessageRepository, ChatMessageRepository>();
         services.AddScoped<IMemorySummaryRepository, MemorySummaryRepository>();
-        
-        // Register memory component factories
         services.AddTransient<Func<int, int?, System.Text.Json.JsonSerializerOptions?, ChatMessageStore>>(serviceProvider =>
             (accountId, threadId, jsonOptions) =>
             {

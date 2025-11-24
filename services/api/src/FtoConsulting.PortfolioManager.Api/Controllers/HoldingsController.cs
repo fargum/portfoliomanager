@@ -1,11 +1,11 @@
 using FtoConsulting.PortfolioManager.Api.Models.Responses;
 using FtoConsulting.PortfolioManager.Api.Services;
 using FtoConsulting.PortfolioManager.Application.Services;
+using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
 using System.Net;
-using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 using System.Diagnostics;
 
 namespace FtoConsulting.PortfolioManager.Api.Controllers;
@@ -23,6 +23,7 @@ public class HoldingsController : ControllerBase
     
     private readonly IHoldingsRetrieval _holdingsRetrieval;
     private readonly IPortfolioMappingService _mappingService;
+    private readonly ICurrentUserService _currentUserService;
     private readonly MetricsService _metrics;
     private readonly ILogger<HoldingsController> _logger;
 
@@ -32,24 +33,26 @@ public class HoldingsController : ControllerBase
     public HoldingsController(
         IHoldingsRetrieval holdingsRetrieval,
         IPortfolioMappingService mappingService,
+        ICurrentUserService currentUserService,
         MetricsService metrics,
         ILogger<HoldingsController> logger)
     {
         _holdingsRetrieval = holdingsRetrieval;
         _mappingService = mappingService;
+        _currentUserService = currentUserService;
         _metrics = metrics;
         _logger = logger;
     }
 
     /// <summary>
-    /// Retrieve all holdings for a specific account and valuation date
+    /// Retrieve all holdings for the current authenticated user and valuation date
     /// </summary>
-    /// <param name="accountId">The unique identifier of the account</param>
     /// <param name="valuationDate">The valuation date to retrieve holdings for (YYYY-MM-DD format)</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Collection of flattened holdings data including portfolio, instrument, and platform information</returns>
     /// <remarks>
-    /// This endpoint retrieves all holdings across all portfolios for a given account on a specific valuation date.
+    /// This endpoint retrieves all holdings across all portfolios for the authenticated user on a specific valuation date.
+    /// The account is automatically determined from the user's authentication token.
     /// 
     /// **Real-Time vs Historical Data:**
     /// - If the valuation date is today's date, holdings are returned with real-time market prices
@@ -80,8 +83,8 @@ public class HoldingsController : ControllerBase
     /// 
     /// **Example Usage:**
     /// ```
-    /// GET /api/holdings/account/12345678/date/2025-11-10  // Returns real-time data for today
-    /// GET /api/holdings/account/12345678/date/2025-09-27  // Returns historical data
+    /// GET /api/holdings/date/2025-11-10  // Returns real-time data for today
+    /// GET /api/holdings/date/2025-09-27  // Returns historical data
     /// ```
     /// 
     /// **Response Features:**
@@ -91,22 +94,24 @@ public class HoldingsController : ControllerBase
     /// - All related entity data is included to minimize additional API calls
     /// - Real-time prices are fetched live and not persisted to the database
     /// </remarks>
-    /// <response code="200">Returns the collection of holdings for the specified account and date</response>
-    /// <response code="400">Invalid account ID format or date format</response>
-    /// <response code="404">No holdings found for the specified account and date</response>
+    /// <response code="200">Returns the collection of holdings for the authenticated user and date</response>
+    /// <response code="400">Invalid date format</response>
+    /// <response code="404">No holdings found for the specified date</response>
     /// <response code="500">Internal server error occurred while retrieving holdings</response>
-    [HttpGet("account/{accountId:int}/date/{valuationDate:datetime}")]
+    [HttpGet("date/{valuationDate:datetime}")]
     [ProducesResponseType(typeof(AccountHoldingsResponse), (int)HttpStatusCode.OK)]
     [ProducesResponseType(typeof(ProblemDetails), (int)HttpStatusCode.BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), (int)HttpStatusCode.NotFound)]
     [ProducesResponseType(typeof(ProblemDetails), (int)HttpStatusCode.InternalServerError)]
-    public async Task<ActionResult<AccountHoldingsResponse>> GetHoldingsByAccountAndDate(
-        [FromRoute] int accountId,
+    public async Task<ActionResult<AccountHoldingsResponse>> GetHoldingsByDate(
         [FromRoute] DateTime valuationDate,
         CancellationToken cancellationToken = default)
     {
-        using var activity = s_activitySource.StartActivity("GetHoldingsByAccountAndDate");
+        using var activity = s_activitySource.StartActivity("GetHoldingsByDate");
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+        
+        // Get account ID from authenticated user
+        var accountId = await _currentUserService.GetCurrentUserAccountIdAsync();
         
         activity?.SetTag("account.id", accountId.ToString());
         activity?.SetTag("valuation.date", valuationDate.ToString("yyyy-MM-dd"));
@@ -123,22 +128,8 @@ public class HoldingsController : ControllerBase
                     accountId, valuationDate, valuationDate.Date == DateTime.Today);
             }
             
-            // Validate input parameters
-            if (accountId <= 0)
-            {
-                activity?.SetStatus(ActivityStatusCode.Error, "Invalid account ID");
-                activity?.SetTag("error.type", "validation");
-                activity?.SetTag("error.reason", "invalid_account_id");
-                
-                _logger.LogWarning("Invalid account ID provided: {AccountId}", accountId);
-                return BadRequest(new ProblemDetails
-                {
-                    Title = "Invalid Account ID",
-                    Detail = "Account ID must be a positive integer",
-                    Status = (int)HttpStatusCode.BadRequest
-                });
-            }
-
+            // Validate input parameters - no need to validate accountId since it's controlled by the system
+            
             // Convert DateTime to DateOnly for service call
             var dateOnly = DateOnly.FromDateTime(valuationDate);
             _logger.LogDebug("Converted valuation date to {DateOnly} for service call", dateOnly);

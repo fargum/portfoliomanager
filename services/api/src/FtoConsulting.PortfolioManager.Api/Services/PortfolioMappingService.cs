@@ -172,7 +172,7 @@ public class PortfolioMappingService : IPortfolioMappingService
             PortfolioId = holding.PortfolioId,
             PortfolioName = holding.Portfolio?.Name ?? "Unknown Portfolio",
             AccountId = holding.Portfolio?.AccountId ?? 0,
-            AccountName = holding.Portfolio?.Account?.UserName ?? "Unknown Account",
+            AccountName = holding.Portfolio?.Account?.Email ?? "Unknown Account",
 
             // Instrument Information
             InstrumentId = holding.InstrumentId,

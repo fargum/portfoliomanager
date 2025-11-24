@@ -5,6 +5,11 @@ namespace FtoConsulting.PortfolioManager.Domain.Repositories;
 
 public interface IAccountRepository : IRepository<Account>
 {
-    Task<Account?> GetByUserNameAsync(string userName);
-    Task<bool> UserNameExistsAsync(string userName);
+    // External user management methods
+    Task<Account?> GetByExternalUserIdAsync(string externalUserId);
+    Task<Account?> GetByEmailAsync(string email);
+    Task<bool> ExternalUserIdExistsAsync(string externalUserId);
+    Task<bool> EmailExistsAsync(string email);
+    Task<Account> CreateOrUpdateExternalUserAsync(string externalUserId, string email, string displayName);
+    Task<IEnumerable<Account>> GetActiveAccountsAsync();
 }
