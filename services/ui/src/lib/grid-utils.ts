@@ -187,6 +187,21 @@ export const calculateTotalValue = (holdings: HoldingResponse[]): number => {
   return holdings.reduce((sum, holding) => sum + holding.currentValue, 0);
 };
 
+export const calculateTotalBoughtValue = (holdings: HoldingResponse[]): number => {
+  return holdings.reduce((sum, holding) => sum + holding.boughtValue, 0);
+};
+
+export const calculateTotalGainLoss = (holdings: HoldingResponse[]): number => {
+  return holdings.reduce((sum, holding) => sum + holding.gainLoss, 0);
+};
+
+export const calculateTotalGainLossPercentage = (holdings: HoldingResponse[]): number => {
+  if (holdings.length === 0) return 0;
+  const totalBoughtValue = calculateTotalBoughtValue(holdings);
+  const totalGainLoss = calculateTotalGainLoss(holdings);
+  return totalBoughtValue !== 0 ? (totalGainLoss / totalBoughtValue) * 100 : 0;
+};
+
 export const calculateTotalDailyPnL = (holdings: HoldingResponse[]): number => {
   return holdings.reduce((sum, holding) => sum + holding.dailyProfitLoss, 0);
 };

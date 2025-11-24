@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { HoldingResponse } from '@/types/api';
 import { apiClient } from '@/lib/api-client';
-import { getHoldingsColumnDefs, getGridOptions, calculateTotalValue, calculateTotalDailyPnL, calculateAverageDailyPnLPercentage, formatCurrency } from '@/lib/grid-utils';
+import { getHoldingsColumnDefs, getGridOptions, calculateTotalValue, calculateTotalBoughtValue, calculateTotalGainLoss, calculateTotalGainLossPercentage, calculateTotalDailyPnL, calculateAverageDailyPnLPercentage, formatCurrency } from '@/lib/grid-utils';
 import { Calendar, Search, TrendingUp, PoundSterling, PieChart, RefreshCw } from 'lucide-react';
 
 // AG Grid CSS imports (we'll handle these in the layout)
@@ -101,6 +101,9 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = () => {
   }, [fetchHoldings]);
 
   const totalValue = calculateTotalValue(holdings);
+  const totalBoughtValue = calculateTotalBoughtValue(holdings);
+  const totalGainLoss = calculateTotalGainLoss(holdings);
+  const totalGainLossPercentage = calculateTotalGainLossPercentage(holdings);
   const totalDailyPnL = calculateTotalDailyPnL(holdings);
   const avgDailyPnLPercentage = calculateAverageDailyPnLPercentage(holdings);
   const holdingsCount = holdings.length;
@@ -130,26 +133,40 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = () => {
               />
             </div>
             
-            {/* Stats */}
-            <div className="text-right space-y-1">
-              <div>
-                <p className="text-xs text-primary-100">
-                  {filteredCount !== holdings.length ? 'Filtered' : 'Total'} Value
-                </p>
-                <p className="text-lg font-bold">
-                  {formatCurrency(filteredTotalValue > 0 ? filteredTotalValue : totalValue)}
-                </p>
-                {filteredCount !== holdings.length && (
-                  <p className="text-xs text-primary-200">
-                    Total: {formatCurrency(totalValue)}
+            {/* Compact Stats */}
+            <div className="text-right">
+              <div className="flex items-baseline space-x-6">
+                <div>
+                  <p className="text-xs text-primary-100">
+                    {filteredCount !== holdings.length ? 'Filtered' : 'Total'} Value
                   </p>
-                )}
-              </div>
-              <div>
-                <p className="text-xs text-primary-100">Daily P&L</p>
-                <p className={`text-sm font-bold ${totalDailyPnL >= 0 ? 'text-green-200' : 'text-red-200'}`}>
-                  {formatCurrency(totalDailyPnL)} ({avgDailyPnLPercentage >= 0 ? '+' : ''}{avgDailyPnLPercentage.toFixed(2)}%)
-                </p>
+                  <p className="text-xl font-bold">
+                    {formatCurrency(filteredTotalValue > 0 ? filteredTotalValue : totalValue)}
+                  </p>
+                  {filteredCount !== holdings.length && (
+                    <p className="text-xs text-primary-200">
+                      Total: {formatCurrency(totalValue)}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs text-primary-100">Total P&L</p>
+                  <p className={`text-sm font-bold ${totalGainLoss >= 0 ? 'text-green-200' : 'text-red-200'}`}>
+                    {formatCurrency(totalGainLoss)}
+                  </p>
+                  <p className={`text-xs ${totalGainLossPercentage >= 0 ? 'text-green-200' : 'text-red-200'}`}>
+                    ({totalGainLossPercentage >= 0 ? '+' : ''}{totalGainLossPercentage.toFixed(2)}%)
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-primary-100">Daily P&L</p>
+                  <p className={`text-sm font-bold ${totalDailyPnL >= 0 ? 'text-green-200' : 'text-red-200'}`}>
+                    {formatCurrency(totalDailyPnL)}
+                  </p>
+                  <p className={`text-xs ${avgDailyPnLPercentage >= 0 ? 'text-green-200' : 'text-red-200'}`}>
+                    ({avgDailyPnLPercentage >= 0 ? '+' : ''}{avgDailyPnLPercentage.toFixed(2)}%)
+                  </p>
+                </div>
               </div>
             </div>
             
@@ -244,6 +261,18 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = () => {
                     {filteredCount !== holdings.length ? 'Filtered' : 'Total'} Value: 
                     <span className="text-green-600 text-base ml-1">
                       {formatCurrency(filteredTotalValue > 0 ? filteredTotalValue : totalValue)}
+                    </span>
+                  </span>
+                  <span className="font-semibold">
+                    Total P&L: 
+                    <span className={`text-base ml-1 ${totalGainLoss >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {formatCurrency(totalGainLoss)} ({totalGainLossPercentage >= 0 ? '+' : ''}{totalGainLossPercentage.toFixed(2)}%)
+                    </span>
+                  </span>
+                  <span className="font-semibold">
+                    Daily P&L: 
+                    <span className={`text-base ml-1 ${totalDailyPnL >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {formatCurrency(totalDailyPnL)} ({avgDailyPnLPercentage >= 0 ? '+' : ''}{avgDailyPnLPercentage.toFixed(2)}%)
                     </span>
                   </span>
                 </div>

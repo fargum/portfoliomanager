@@ -80,6 +80,16 @@ public class PortfolioManagerDbContext : DbContext
                     updatedAtProperty.CurrentValue = DateTime.SpecifyKind(updatedAt, DateTimeKind.Utc);
                 }
             }
+            
+            // Special handling for Holding entities to ensure ValuationDate is UTC
+            if (entry.Entity is Holding && (entry.State == EntityState.Added || entry.State == EntityState.Modified))
+            {
+                var valuationDateProperty = entry.Property("ValuationDate");
+                if (valuationDateProperty.CurrentValue is DateTime valuationDate && valuationDate.Kind != DateTimeKind.Utc)
+                {
+                    valuationDateProperty.CurrentValue = DateTime.SpecifyKind(valuationDate, DateTimeKind.Utc);
+                }
+            }
         }
 
         return await base.SaveChangesAsync(cancellationToken);

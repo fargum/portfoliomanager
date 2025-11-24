@@ -1,0 +1,414 @@
+{
+  "portfolioName": "Demo Portfolio - Diversified Holdings",
+  "accountId": 2,
+  "holdings": [
+    {
+      "valuationDate": "2024-11-24T00:00:00Z",
+      "platformId": 2,
+      "unitAmount": 1500.00,
+      "boughtValue": 1066.20,
+      "currentValue": 1066.20,
+      "dailyProfitLoss": 0.00,
+      "dailyProfitLossPercentage": 0.00,
+      "instrument": {
+        "name": "Vodafone Group PLC",
+        "description": "British multinational telecommunications company",
+        "ticker": "VOD.LSE",
+        "currencyCode": "GBP",
+        "quoteUnit": "GBX",
+        "instrumentTypeId": 1
+      }
+    },
+    {
+      "valuationDate": "2024-11-24T00:00:00Z",
+      "platformId": 2,
+      "unitAmount": 200.00,
+      "boughtValue": 775.70,
+      "currentValue": 775.70,
+      "dailyProfitLoss": 0.00,
+      "dailyProfitLossPercentage": 0.00,
+      "instrument": {
+        "name": "BP PLC",
+        "description": "British multinational oil and gas company",
+        "ticker": "BP.LSE",
+        "currencyCode": "GBP",
+        "quoteUnit": "GBX",
+        "instrumentTypeId": 1
+      }
+    },
+    {
+      "valuationDate": "2024-11-24T00:00:00Z",
+      "platformId": 2,
+      "unitAmount": 15.00,
+      "boughtValue": 542.10,
+      "currentValue": 542.10,
+      "dailyProfitLoss": 0.00,
+      "dailyProfitLossPercentage": 0.00,
+      "instrument": {
+        "name": "FTSE 100 UCITS ETF",
+        "description": "Exchange-traded fund tracking the FTSE 100 Index",
+        "ticker": "VUKE.LSE",
+        "currencyCode": "GBP",
+        "quoteUnit": "GBP",
+        "instrumentTypeId": 1
+      }
+    },
+    {
+      "valuationDate": "2024-11-24T00:00:00Z",
+      "platformId": 2,
+      "unitAmount": 25.00,
+      "boughtValue": 2792.25,
+      "currentValue": 2792.25,
+      "dailyProfitLoss": 0.00,
+      "dailyProfitLossPercentage": 0.00,
+      "instrument": {
+        "name": "Vanguard All-World UCITS ETF",
+        "description": "Global equity index fund tracking developed and emerging markets",
+        "ticker": "VWRL.LSE",
+        "currencyCode": "GBP",
+        "quoteUnit": "GBP",
+        "instrumentTypeId": 1
+      }
+    },
+    {
+      "valuationDate": "2024-11-24T00:00:00Z",
+      "platformId": 2,
+      "unitAmount": 300.00,
+      "boughtValue": 1627.80,
+      "currentValue": 1627.80,
+      "dailyProfitLoss": 0.00,
+      "dailyProfitLossPercentage": 0.00,
+      "instrument": {
+        "name": "Rolls-Royce Holdings PLC",
+        "description": "British aerospace and defence company",
+        "ticker": "RR.LSE",
+        "currencyCode": "GBP",
+        "quoteUnit": "GBX",
+        "instrumentTypeId": 1
+      }
+    },
+    {
+      "valuationDate": "2024-11-24T00:00:00Z",
+      "platformId": 2,
+      "unitAmount": 100.00,
+      "boughtValue": 1004.25,
+      "currentValue": 1004.25,
+      "dailyProfitLoss": 0.00,
+      "dailyProfitLossPercentage": 0.00,
+      "instrument": {
+        "name": "iShares UK Gilts UCITS ETF",
+        "description": "UK government bond ETF",
+        "ticker": "IGLT.LSE",
+        "currencyCode": "GBP",
+        "quoteUnit": "GBP",
+        "instrumentTypeId": 1
+      }
+    },
+    {
+      "valuationDate": "2024-11-24T00:00:00Z",
+      "platformId": 2,
+      "unitAmount": 10.00,
+      "boughtValue": 2328.70,
+      "currentValue": 2328.70,
+      "dailyProfitLoss": 0.00,
+      "dailyProfitLossPercentage": 0.00,
+      "instrument": {
+        "name": "Apple Inc",
+        "description": "American technology company",
+        "ticker": "AAPL.US",
+        "currencyCode": "USD",
+        "quoteUnit": "USD",
+        "instrumentTypeId": 1
+      }
+    },
+    {
+      "valuationDate": "2024-11-24T00:00:00Z",
+      "platformId": 2,
+      "unitAmount": 6.00,
+      "boughtValue": 2512.74,
+      "currentValue": 2512.74,
+      "dailyProfitLoss": 0.00,
+      "dailyProfitLossPercentage": 0.00,
+      "instrument": {
+        "name": "Microsoft Corporation",
+        "description": "American technology company",
+        "ticker": "MSFT.US",
+        "currencyCode": "USD",
+        "quoteUnit": "USD",
+        "instrumentTypeId": 1
+      }
+    },
+    {
+      "valuationDate": "2024-11-24T00:00:00Z",
+      "platformId": 2,
+      "unitAmount": 40.00,
+      "boughtValue": 3625.60,
+      "currentValue": 3625.60,
+      "dailyProfitLoss": 0.00,
+      "dailyProfitLossPercentage": 0.00,
+      "instrument": {
+        "name": "Vanguard S&P 500 UCITS ETF",
+        "description": "US large-cap equity index fund",
+        "ticker": "VUAG.LSE",
+        "currencyCode": "USD",
+        "quoteUnit": "GBP",
+        "instrumentTypeId": 1
+      }
+    },
+    {
+      "valuationDate": "2024-11-24T00:00:00Z",
+      "platformId": 2,
+      "unitAmount": 80.00,
+      "boughtValue": 276.12,
+      "currentValue": 276.12,
+      "dailyProfitLoss": 0.00,
+      "dailyProfitLossPercentage": 0.00,
+      "instrument": {
+        "name": "iShares $ Treasury Bond 20+yr UCITS ETF",
+        "description": "Long-term US Treasury bond ETF",
+        "ticker": "IDTL.LSE",
+        "currencyCode": "GBP",
+        "quoteUnit": "GBP",
+        "instrumentTypeId": 1
+      }
+    },
+    {
+      "valuationDate": "2024-11-24T00:00:00Z",
+      "platformId": 2,
+      "unitAmount": 2000.00,
+      "boughtValue": 1093.20,
+      "currentValue": 1093.20,
+      "dailyProfitLoss": 0.00,
+      "dailyProfitLossPercentage": 0.00,
+      "instrument": {
+        "name": "Lloyds Banking Group PLC",
+        "description": "British retail and commercial bank",
+        "ticker": "LLOY.LSE",
+        "currencyCode": "GBP",
+        "quoteUnit": "GBX",
+        "instrumentTypeId": 1
+      }
+    },
+    {
+      "valuationDate": "2024-11-24T00:00:00Z",
+      "platformId": 2,
+      "unitAmount": 400.00,
+      "boughtValue": 892.40,
+      "currentValue": 892.40,
+      "dailyProfitLoss": 0.00,
+      "dailyProfitLossPercentage": 0.00,
+      "instrument": {
+        "name": "Legal and General PLC",
+        "description": "British financial services company",
+        "ticker": "LGEN.LSE",
+        "currencyCode": "GBP",
+        "quoteUnit": "GBX",
+        "instrumentTypeId": 1
+      }
+    },
+    {
+      "valuationDate": "2024-11-24T00:00:00Z",
+      "platformId": 5,
+      "unitAmount": 800.00,
+      "boughtValue": 2400.00,
+      "currentValue": 2400.00,
+      "dailyProfitLoss": 0.00,
+      "dailyProfitLossPercentage": 0.00,
+      "instrument": {
+        "name": "Legal & General UK 100 Index Trust",
+        "description": "UK equity index fund tracking FTSE 100",
+        "ticker": "GB00BG0QP518.EUFUND",
+        "currencyCode": "GBP",
+        "quoteUnit": "GBP",
+        "instrumentTypeId": 1
+      }
+    },
+    {
+      "valuationDate": "2024-11-24T00:00:00Z",
+      "platformId": 5,
+      "unitAmount": 600.00,
+      "boughtValue": 1749.00,
+      "currentValue": 1749.00,
+      "dailyProfitLoss": 0.00,
+      "dailyProfitLossPercentage": 0.00,
+      "instrument": {
+        "name": "Legal & General International Index Trust",
+        "description": "International developed markets equity index fund",
+        "ticker": "GB00BG0QP604.EUFUND",
+        "currencyCode": "GBP",
+        "quoteUnit": "GBP",
+        "instrumentTypeId": 1
+      }
+    },
+    {
+      "valuationDate": "2024-11-24T00:00:00Z",
+      "platformId": 5,
+      "unitAmount": 500.00,
+      "boughtValue": 1850.00,
+      "currentValue": 1850.00,
+      "dailyProfitLoss": 0.00,
+      "dailyProfitLossPercentage": 0.00,
+      "instrument": {
+        "name": "Legal & General US Index Trust",
+        "description": "US equity index fund",
+        "ticker": "GB00BG0QP725.EUFUND",
+        "currencyCode": "USD",
+        "quoteUnit": "GBP",
+        "instrumentTypeId": 1
+      }
+    },
+    {
+      "valuationDate": "2024-11-24T00:00:00Z",
+      "platformId": 5,
+      "unitAmount": 300.00,
+      "boughtValue": 564.90,
+      "currentValue": 564.90,
+      "dailyProfitLoss": 0.00,
+      "dailyProfitLossPercentage": 0.00,
+      "instrument": {
+        "name": "Legal & General All Stocks Gilt Index Trust",
+        "description": "UK government bond index fund",
+        "ticker": "GB00B8344798.EUFUND",
+        "currencyCode": "GBP",
+        "quoteUnit": "GBP",
+        "instrumentTypeId": 1
+      }
+    },
+    {
+      "valuationDate": "2024-11-24T00:00:00Z",
+      "platformId": 5,
+      "unitAmount": 350.00,
+      "boughtValue": 1750.00,
+      "currentValue": 1750.00,
+      "dailyProfitLoss": 0.00,
+      "dailyProfitLossPercentage": 0.00,
+      "instrument": {
+        "name": "Legal & General European Index Trust",
+        "description": "European equity index fund",
+        "ticker": "GB00BG0QP642.EUFUND",
+        "currencyCode": "EUR",
+        "quoteUnit": "GBP",
+        "instrumentTypeId": 1
+      }
+    },
+    {
+      "valuationDate": "2024-11-24T00:00:00Z",
+      "platformId": 5,
+      "unitAmount": 400.00,
+      "boughtValue": 3225.80,
+      "currentValue": 3225.80,
+      "dailyProfitLoss": 0.00,
+      "dailyProfitLossPercentage": 0.00,
+      "instrument": {
+        "name": "Legal & General Corporate Bond Index Trust",
+        "description": "Investment grade corporate bond fund",
+        "ticker": "GBPC.LSE",
+        "currencyCode": "GBP",
+        "quoteUnit": "GBX",
+        "instrumentTypeId": 1
+      }
+    },
+    {
+      "valuationDate": "2024-11-24T00:00:00Z",
+      "platformId": 1,
+      "unitAmount": 15.00,
+      "boughtValue": 2040.30,
+      "currentValue": 2040.30,
+      "dailyProfitLoss": 0.00,
+      "dailyProfitLossPercentage": 0.00,
+      "instrument": {
+        "name": "NVIDIA Corporation",
+        "description": "American technology company specializing in graphics and AI",
+        "ticker": "NVDA.US",
+        "currencyCode": "USD",
+        "quoteUnit": "USD",
+        "instrumentTypeId": 1
+      }
+    },
+    {
+      "valuationDate": "2024-11-24T00:00:00Z",
+      "platformId": 1,
+      "unitAmount": 12.00,
+      "boughtValue": 2417.40,
+      "currentValue": 2417.40,
+      "dailyProfitLoss": 0.00,
+      "dailyProfitLossPercentage": 0.00,
+      "instrument": {
+        "name": "Amazon.com Inc",
+        "description": "American e-commerce and cloud computing company",
+        "ticker": "AMZN.US",
+        "currencyCode": "USD",
+        "quoteUnit": "USD",
+        "instrumentTypeId": 1
+      }
+    },
+    {
+      "valuationDate": "2024-11-24T00:00:00Z",
+      "platformId": 1,
+      "unitAmount": 8.00,
+      "boughtValue": 1341.20,
+      "currentValue": 1341.20,
+      "dailyProfitLoss": 0.00,
+      "dailyProfitLossPercentage": 0.00,
+      "instrument": {
+        "name": "Alphabet Inc Class A",
+        "description": "American technology holding company",
+        "ticker": "GOOGL.US",
+        "currencyCode": "USD",
+        "quoteUnit": "USD",
+        "instrumentTypeId": 1
+      }
+    },
+    {
+      "valuationDate": "2024-11-24T00:00:00Z",
+      "platformId": 1,
+      "unitAmount": 6.00,
+      "boughtValue": 2031.54,
+      "currentValue": 2031.54,
+      "dailyProfitLoss": 0.00,
+      "dailyProfitLossPercentage": 0.00,
+      "instrument": {
+        "name": "Tesla Inc",
+        "description": "American electric vehicle and energy company",
+        "ticker": "TSLA.US",
+        "currencyCode": "USD",
+        "quoteUnit": "USD",
+        "instrumentTypeId": 1
+      }
+    },
+    {
+      "valuationDate": "2024-11-24T00:00:00Z",
+      "platformId": 1,
+      "unitAmount": 8.00,
+      "boughtValue": 4801.76,
+      "currentValue": 4801.76,
+      "dailyProfitLoss": 0.00,
+      "dailyProfitLossPercentage": 0.00,
+      "instrument": {
+        "name": "iShares Core S&P 500 ETF",
+        "description": "US large-cap equity ETF",
+        "ticker": "IVV.US",
+        "currencyCode": "USD",
+        "quoteUnit": "USD",
+        "instrumentTypeId": 1
+      }
+    },
+    {
+      "valuationDate": "2024-11-24T00:00:00Z",
+      "platformId": 1,
+      "unitAmount": 25.00,
+      "boughtValue": 2300.00,
+      "currentValue": 2300.00,
+      "dailyProfitLoss": 0.00,
+      "dailyProfitLossPercentage": 0.00,
+      "instrument": {
+        "name": "iShares 20+ Year Treasury Bond ETF",
+        "description": "Long-term US Treasury bond ETF",
+        "ticker": "TLT.US",
+        "currencyCode": "USD",
+        "quoteUnit": "USD",
+        "instrumentTypeId": 1
+      }
+    }
+  ]
+}

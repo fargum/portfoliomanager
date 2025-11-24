@@ -83,7 +83,7 @@ public class PortfolioIngestService : IPortfolioIngest
                 _logger.LogInformation("Using existing portfolio {PortfolioName} with ID {PortfolioId}", resultPortfolio.Name, resultPortfolio.Id);
                 
                 
-// Process holdings with the existing portfolio ID
+                // Process holdings with the existing portfolio ID
                 if (portfolio.Holdings?.Any() == true)
                 {
                     await ProcessHoldingsAsync(portfolio.Holdings, resultPortfolio.Id, cancellationToken);
