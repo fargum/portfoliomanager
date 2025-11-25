@@ -21,12 +21,17 @@ public static class ServiceCollectionExtensions
     {
         // Register core application services
         services.AddScoped<IPortfolioIngest, PortfolioIngestService>();
-        services.AddScoped<IHoldingsRetrieval>(serviceProvider =>
+        services.AddScoped<IHoldingService>(serviceProvider =>
         {
             var holdingRepository = serviceProvider.GetRequiredService<IHoldingRepository>();
-            var logger = serviceProvider.GetRequiredService<ILogger<HoldingsRetrievalService>>();
-            var currencyConversionService = serviceProvider.GetRequiredService<ICurrencyConversionService>();
+            var portfolioRepository = serviceProvider.GetRequiredService<IPortfolioRepository>();
+            var instrumentRepository = serviceProvider.GetRequiredService<IInstrumentRepository>();
+            var instrumentManagementService = serviceProvider.GetRequiredService<IInstrumentManagementService>();
+            var pricingCalculationHelper = serviceProvider.GetRequiredService<IPricingCalculationHelper>();
             var pricingCalculationService = serviceProvider.GetRequiredService<IPricingCalculationService>();
+            var currencyConversionService = serviceProvider.GetRequiredService<ICurrencyConversionService>();
+            var unitOfWork = serviceProvider.GetRequiredService<IUnitOfWork>();
+            var logger = serviceProvider.GetRequiredService<ILogger<HoldingService>>();
             
             // Create factory for EodMarketDataTool for real-time pricing
             Func<EodMarketDataTool>? eodMarketDataToolFactory = null;
@@ -39,13 +44,27 @@ public static class ServiceCollectionExtensions
                 // If EodMarketDataTool can't be resolved, leave factory as null - service will work without real-time pricing
             }
             
-            return new HoldingsRetrievalService(holdingRepository, logger, currencyConversionService, pricingCalculationService, eodMarketDataToolFactory);
+            return new HoldingService(
+                holdingRepository,
+                portfolioRepository,
+                instrumentRepository,
+                instrumentManagementService,
+                pricingCalculationHelper,
+                pricingCalculationService,
+                currencyConversionService,
+                unitOfWork,
+                logger,
+                eodMarketDataToolFactory);
         });
         services.AddScoped<IPriceFetching, PriceFetchingService>();
         services.AddScoped<IHoldingRevaluationService, HoldingRevaluationService>();
         services.AddScoped<ICurrencyConversionService, CurrencyConversionService>();
         services.AddScoped<IPricingCalculationService, PricingCalculationService>();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
+        
+        // Register new holding management services
+        services.AddScoped<IInstrumentManagementService, InstrumentManagementService>();
+        services.AddScoped<IPricingCalculationHelper, PricingCalculationHelper>();
         
         // Register Azure OpenAI client and AI chat service for dependency injection
         services.AddScoped<AzureOpenAIClient>(serviceProvider =>

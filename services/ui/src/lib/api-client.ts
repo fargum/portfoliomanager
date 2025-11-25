@@ -1,4 +1,4 @@
-import { HoldingResponse, ApiResponse, HoldingsListResponse } from '@/types/api';
+import { HoldingResponse, ApiResponse, HoldingsListResponse, AddHoldingRequest } from '@/types/api';
 import { ChatRequestDto, ChatResponseDto, AiToolDto } from '@/types/chat';
 
 export class PortfolioApiClient {
@@ -37,7 +37,7 @@ export class PortfolioApiClient {
       headers['Authorization'] = `Bearer ${this.accessToken}`;
       console.log('API request includes auth token (length:', this.accessToken.length, ')');
     } else {
-      console.warn('API request made WITHOUT auth token');
+      console.warn('API request made WITHOUT auth token - user may need to sign in');
     }
 
     return headers;
@@ -56,7 +56,7 @@ export class PortfolioApiClient {
       headers['Authorization'] = `Bearer ${this.accessToken}`;
       console.log('Streaming API request includes auth token (length:', this.accessToken.length, ')');
     } else {
-      console.warn('Streaming API request made WITHOUT auth token');
+      console.warn('Streaming API request made WITHOUT auth token - user may need to sign in');
     }
 
     return headers;
@@ -270,6 +270,139 @@ export class PortfolioApiClient {
       console.error('Error sending chat query:', error);
       return {
         error: error instanceof Error ? error.message : 'Unknown error occurred',
+      };
+    }
+  }
+
+  /**
+   * Update holding units
+   */
+  async updateHoldingUnits(holdingId: number, units: number): Promise<ApiResponse<any>> {
+    try {
+      const url = `${this.baseUrl}/api/holdings/${holdingId}/units`;
+      
+      console.log(`Updating holding units: ${url}`, { holdingId, units });
+      
+      const requestBody = { units };
+
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: this.getHeaders(),
+        body: JSON.stringify(requestBody),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        const friendlyError = this.formatErrorMessage(response.status, errorText);
+        throw new Error(friendlyError);
+      }
+
+      const updateResponse = await response.json();
+      
+      return {
+        data: updateResponse,
+        message: 'Holding units updated successfully',
+      };
+    } catch (error) {
+      console.error('Error updating holding units:', error);
+      return {
+        error: error instanceof Error ? error.message : 'Failed to update holding units',
+      };
+    }
+  }
+
+  /**
+   * Delete a holding
+   */
+  async deleteHolding(holdingId: number): Promise<ApiResponse<any>> {
+    try {
+      const url = `${this.baseUrl}/api/holdings/${holdingId}`;
+      
+      console.log(`Deleting holding: ${url}`, { holdingId });
+
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: this.getHeaders(),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        const friendlyError = this.formatErrorMessage(response.status, errorText);
+        throw new Error(friendlyError);
+      }
+
+      const deleteResponse = await response.json();
+      
+      return {
+        data: deleteResponse,
+        message: 'Holding deleted successfully',
+      };
+    } catch (error) {
+      console.error('Error deleting holding:', error);
+      return {
+        error: error instanceof Error ? error.message : 'Failed to delete holding',
+      };
+    }
+  }
+
+  /**
+   * Check if an instrument exists
+   */
+  async checkInstrument(ticker: string): Promise<ApiResponse<{ exists: boolean; instrument?: any }>> {
+    try {
+      const url = `${this.baseUrl}/api/instruments/check/${encodeURIComponent(ticker.trim().toUpperCase())}`;
+      
+      console.log(`Checking instrument: ${url}`, { ticker });
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: this.getHeaders(),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        return { data, error: undefined };
+      } else {
+        const errorData = await response.json().catch(() => ({ detail: 'Unknown error' }));
+        return { data: undefined, error: errorData.detail || `Failed to check instrument: ${response.status}` };
+      }
+    } catch (error) {
+      console.error('Error checking instrument:', error);
+      return { data: undefined, error: error instanceof Error ? error.message : 'Unknown error occurred' };
+    }
+  }
+
+  /**
+   * Add a new holding to a portfolio
+   */
+  async addHolding(portfolioId: number, request: AddHoldingRequest): Promise<ApiResponse<any>> {
+    try {
+      const url = `${this.baseUrl}/api/holdings/portfolio/${portfolioId}`;
+      
+      console.log(`Adding new holding: ${url}`, { portfolioId, request });
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: this.getHeaders(),
+        body: JSON.stringify(request),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        const friendlyError = this.formatErrorMessage(response.status, errorText);
+        throw new Error(friendlyError);
+      }
+
+      const addResponse = await response.json();
+      
+      return {
+        data: addResponse,
+        message: 'Holding added successfully',
+      };
+    } catch (error) {
+      console.error('Error adding holding:', error);
+      return {
+        error: error instanceof Error ? error.message : 'Failed to add holding',
       };
     }
   }

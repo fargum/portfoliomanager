@@ -11,14 +11,14 @@ namespace FtoConsulting.PortfolioManager.Application.Services.Ai;
 /// </summary>
 public class PortfolioAnalysisService : IPortfolioAnalysisService
 {
-    private readonly IHoldingsRetrieval _holdingsRetrieval;
+    private readonly IHoldingService _holdingService;
     private readonly ILogger<PortfolioAnalysisService> _logger;
 
     public PortfolioAnalysisService(
-        IHoldingsRetrieval holdingsRetrieval,
+        IHoldingService holdingService,
         ILogger<PortfolioAnalysisService> logger)
     {
-        _holdingsRetrieval = holdingsRetrieval;
+        _holdingService = holdingService;
         _logger = logger;
     }
 
@@ -29,7 +29,7 @@ public class PortfolioAnalysisService : IPortfolioAnalysisService
             _logger.LogInformation("Analyzing portfolio performance for account {AccountId} on {Date}", accountId, analysisDate);
 
             // Get current holdings
-            var holdings = await _holdingsRetrieval.GetHoldingsByAccountAndDateAsync(
+            var holdings = await _holdingService.GetHoldingsByAccountAndDateAsync(
                 accountId, DateOnly.FromDateTime(analysisDate), cancellationToken);
 
             if (!holdings.Any())
@@ -84,9 +84,9 @@ public class PortfolioAnalysisService : IPortfolioAnalysisService
                 accountId, startDate, endDate);
 
             // Get holdings for both dates
-            var startHoldings = await _holdingsRetrieval.GetHoldingsByAccountAndDateAsync(
+            var startHoldings = await _holdingService.GetHoldingsByAccountAndDateAsync(
                 accountId, DateOnly.FromDateTime(startDate), cancellationToken);
-            var endHoldings = await _holdingsRetrieval.GetHoldingsByAccountAndDateAsync(
+            var endHoldings = await _holdingService.GetHoldingsByAccountAndDateAsync(
                 accountId, DateOnly.FromDateTime(endDate), cancellationToken);
 
             var startValue = startHoldings.Sum(h => h.CurrentValue);

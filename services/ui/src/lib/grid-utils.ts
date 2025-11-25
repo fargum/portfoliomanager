@@ -27,7 +27,20 @@ export const formatDate = (dateString: string): string => {
 };
 
 // AG Grid column definitions
-export const getHoldingsColumnDefs = (): ColDef<HoldingResponse>[] => [
+export const getHoldingsColumnDefs = (onCellValueChanged?: (params: any) => void): ColDef<HoldingResponse>[] => [
+  // Checkbox column for row selection
+  {
+    headerName: '',
+    checkboxSelection: true,
+    headerCheckboxSelection: true,
+    width: 50,
+    minWidth: 50,
+    maxWidth: 50,
+    resizable: false,
+    sortable: false,
+    filter: false,
+    pinned: 'left',
+  },
   {
     field: 'platformName',
     headerName: 'Platform',
@@ -67,8 +80,24 @@ export const getHoldingsColumnDefs = (): ColDef<HoldingResponse>[] => [
     sortable: true,
     filter: 'agNumberColumnFilter',
     type: 'numericColumn',
+    editable: true,
+    cellEditor: 'agNumberCellEditor',
+    cellEditorParams: {
+      min: 0.0001,
+      max: 999999999,
+      precision: 4,
+      step: 0.0001,
+    },
     valueFormatter: (params: any) => formatNumber(params.value),
-    cellStyle: { textAlign: 'right', fontFamily: 'monospace' },
+    cellStyle: (params: any) => ({
+      textAlign: 'right',
+      fontFamily: 'monospace',
+      backgroundColor: params.node?.isRowPinned() ? 'transparent' : '#f8fafc',
+      border: '1px solid #e2e8f0',
+      cursor: 'pointer'
+    }),
+    onCellValueChanged: onCellValueChanged,
+    cellClass: 'editable-cell',
   },
   {
     field: 'boughtValue',

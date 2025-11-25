@@ -21,7 +21,26 @@ public class UnitOfWork : IUnitOfWork
 
     public async Task BeginTransactionAsync()
     {
-        _transaction = await _context.Database.BeginTransactionAsync();
+        try
+        {
+            // Check if there's already an active transaction
+            if (_transaction != null)
+            {
+                throw new InvalidOperationException("A transaction is already active. Call CommitTransactionAsync or RollbackTransactionAsync first.");
+            }
+
+            // Check if the database context already has a transaction
+            if (_context.Database.CurrentTransaction != null)
+            {
+                throw new InvalidOperationException("The database context already has an active transaction.");
+            }
+
+            _transaction = await _context.Database.BeginTransactionAsync();
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to begin database transaction: {ex.Message}", ex);
+        }
     }
 
     public async Task CommitTransactionAsync()

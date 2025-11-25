@@ -12,11 +12,11 @@ namespace FtoConsulting.PortfolioManager.Application.Services.Ai.Tools;
 /// </summary>
 public class PortfolioHoldingsTool
 {
-    private readonly IHoldingsRetrieval _holdingsRetrieval;
+    private readonly IHoldingService _holdingService;
 
-    public PortfolioHoldingsTool(IHoldingsRetrieval holdingsRetrieval)
+    public PortfolioHoldingsTool(IHoldingService holdingService)
     {
-        _holdingsRetrieval = holdingsRetrieval;
+        _holdingService = holdingService;
     }
 
     [Description("Retrieve portfolio holdings for a specific account and date. For current/today performance, use today's date to get real-time data. For historical analysis, specify the desired date.")]
@@ -36,7 +36,7 @@ public class PortfolioHoldingsTool
         }
         
         var parsedDate = DateUtilities.ParseDate(effectiveDate);
-        var holdings = await _holdingsRetrieval.GetHoldingsByAccountAndDateAsync(accountId, parsedDate, cancellationToken);
+        var holdings = await _holdingService.GetHoldingsByAccountAndDateAsync(accountId, parsedDate, cancellationToken);
         
         return new
         {

@@ -135,9 +135,6 @@ builder.Services.AddAuthorizationBuilder()
         {
             var user = context.User;
             
-            // Log claims for debugging (temporary)
-            var logger = context.Resource as ILogger;
-            
             // Check all possible scope claim formats
             var allClaims = user.Claims.ToList();
             
@@ -150,7 +147,16 @@ builder.Services.AddAuthorizationBuilder()
             var hasFullScope = allClaims.Any(c => 
                 c.Value.Contains($"api://{apiClientId}/Portfolio.ReadWrite", StringComparison.OrdinalIgnoreCase));
             
-            return hasPortfolioScope || hasFullScope;
+            var result = hasPortfolioScope || hasFullScope;
+            
+            if (!result)
+            {
+                var logger = context.Resource as ILogger;
+                logger?.LogWarning("Authorization failed: User {User} does not have Portfolio.ReadWrite scope. Claims: {Claims}",
+                    user.Identity?.Name ?? "Unknown", string.Join(", ", allClaims.Select(c => $"{c.Type}:{c.Value}")));
+            }
+            
+            return result;
         });
     });
 

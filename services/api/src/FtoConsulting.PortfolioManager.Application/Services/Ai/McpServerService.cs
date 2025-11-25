@@ -1,5 +1,4 @@
 using FtoConsulting.PortfolioManager.Application.Services;
-using FtoConsulting.PortfolioManager.Application.Services;
 using FtoConsulting.PortfolioManager.Application.Configuration;
 using FtoConsulting.PortfolioManager.Application.Services.Ai.Tools;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,7 +24,7 @@ namespace FtoConsulting.PortfolioManager.Application.Services.Ai;
 /// </summary>
 public class McpServerService : IMcpServerService
 {
-    private readonly IHoldingsRetrieval _holdingsRetrieval;
+    private readonly IHoldingService _holdingService;
     private readonly IPortfolioAnalysisService _portfolioAnalysisService;
     private readonly ILogger<McpServerService> _logger;
     private readonly AzureFoundryOptions _azureFoundryOptions;
@@ -52,7 +51,7 @@ public class McpServerService : IMcpServerService
     private void SetEodSessionId(string sessionId) => _eodSessionCache[_eodApiOptions.McpServerUrl] = sessionId;
 
     public McpServerService(
-        IHoldingsRetrieval holdingsRetrieval,
+        IHoldingService holdingService,
         IPortfolioAnalysisService portfolioAnalysisService,
         ILogger<McpServerService> logger,
         IOptions<AzureFoundryOptions> azureFoundryOptions,
@@ -62,7 +61,7 @@ public class McpServerService : IMcpServerService
         PortfolioComparisonTool portfolioComparisonTool,
         MarketIntelligenceTool marketIntelligenceTool)
     {
-        _holdingsRetrieval = holdingsRetrieval;
+        _holdingService = holdingService;
         _portfolioAnalysisService = portfolioAnalysisService;
         _logger = logger;
         _azureFoundryOptions = azureFoundryOptions.Value;
@@ -131,7 +130,7 @@ public class McpServerService : IMcpServerService
         {
             // Check if core services are available
             var testDate = DateOnly.FromDateTime(DateTime.UtcNow);
-            await _holdingsRetrieval.GetHoldingsByAccountAndDateAsync(1, testDate, CancellationToken.None);
+            await _holdingService.GetHoldingsByAccountAndDateAsync(1, testDate, CancellationToken.None);
             return true;
         }
         catch

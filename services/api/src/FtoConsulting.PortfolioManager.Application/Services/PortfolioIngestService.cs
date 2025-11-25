@@ -15,6 +15,7 @@ public class PortfolioIngestService : IPortfolioIngest
     private readonly IPortfolioRepository _portfolioRepository;
     private readonly IInstrumentRepository _instrumentRepository;
     private readonly IHoldingRepository _holdingRepository;
+    private readonly IInstrumentManagementService _instrumentManagementService;
     private readonly IUnitOfWork _unitOfWork;
     private readonly ILogger<PortfolioIngestService> _logger;
 
@@ -22,12 +23,14 @@ public class PortfolioIngestService : IPortfolioIngest
         IPortfolioRepository portfolioRepository,
         IInstrumentRepository instrumentRepository,
         IHoldingRepository holdingRepository,
+        IInstrumentManagementService instrumentManagementService,
         IUnitOfWork unitOfWork,
         ILogger<PortfolioIngestService> logger)
     {
         _portfolioRepository = portfolioRepository;
         _instrumentRepository = instrumentRepository;
         _holdingRepository = holdingRepository;
+        _instrumentManagementService = instrumentManagementService ?? throw new ArgumentNullException(nameof(instrumentManagementService));
         _unitOfWork = unitOfWork;
         _logger = logger;
     }
@@ -163,30 +166,8 @@ public class PortfolioIngestService : IPortfolioIngest
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            // Check if instrument already exists by ticker
-            var existingInstrument = await _instrumentRepository.GetByTickerAsync(instrument.Ticker);
-            
-            if (existingInstrument == null)
-            {
-                // Create new instrument
-                await _instrumentRepository.AddAsync(instrument);
-                _logger.LogDebug("Created new instrument {Ticker} - {Name}", instrument.Ticker, instrument.Name);
-            }
-            else
-            {
-                // Update existing instrument if needed
-                if (ShouldUpdateInstrument(existingInstrument, instrument))
-                {
-                    existingInstrument.UpdateDetails(instrument.Name, instrument.Ticker, instrument.Description, instrument.CurrencyCode, instrument.QuoteUnit);
-                    if (existingInstrument.InstrumentTypeId != instrument.InstrumentTypeId)
-                    {
-                        existingInstrument.UpdateInstrumentType(instrument.InstrumentTypeId);
-                    }
-                    
-                    await _instrumentRepository.UpdateAsync(existingInstrument);
-                    _logger.LogDebug("Updated existing instrument {Ticker}", instrument.Ticker);
-                }
-            }
+            // Use the centralized instrument management service
+            await _instrumentManagementService.EnsureInstrumentExistsAsync(instrument, cancellationToken);
         }
 
         // Save all instrument changes before processing holdings
@@ -266,13 +247,4 @@ public class PortfolioIngestService : IPortfolioIngest
         return resultPortfolio;
     }
 
-    private static bool ShouldUpdateInstrument(Instrument existing, Instrument incoming)
-    {
-        return existing.Name != incoming.Name ||
-               existing.Description != incoming.Description ||
-               existing.Ticker != incoming.Ticker ||
-               existing.CurrencyCode != incoming.CurrencyCode ||
-               existing.QuoteUnit != incoming.QuoteUnit ||
-               existing.InstrumentTypeId != incoming.InstrumentTypeId;
-    }
 }
