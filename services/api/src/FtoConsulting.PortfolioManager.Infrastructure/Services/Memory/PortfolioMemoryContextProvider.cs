@@ -66,13 +66,28 @@ public class PortfolioMemoryContextProvider : AIContextProvider
             var instructions = new StringBuilder();
             
             // Load recent conversation summaries for context
+            var beforeSummaries = instructions.Length;
             await LoadRecentSummariesAsync(instructions, cancellationToken);
+            var summariesSize = instructions.Length - beforeSummaries;
             
             // Add user preferences if available
+            var beforePreferences = instructions.Length;
             AddUserPreferences(instructions);
+            var preferencesSize = instructions.Length - beforePreferences;
             
             // Add portfolio-specific context
+            var beforePortfolio = instructions.Length;
             AddPortfolioContext(instructions);
+            var portfolioSize = instructions.Length - beforePortfolio;
+
+            // CONTEXT SIZE ANALYSIS: Log memory context breakdown
+            var totalTokens = instructions.Length / 4; // Rough token estimation
+            var summaryTokens = summariesSize / 4;
+            var preferenceTokens = preferencesSize / 4;
+            var portfolioTokens = portfolioSize / 4;
+            
+            _logger.LogInformation("Memory Context Analysis for account {AccountId}: Total={TotalTokens} tokens (Summaries={SummaryTokens}, Preferences={PreferenceTokens}, Portfolio={PortfolioTokens})", 
+                _accountId, totalTokens, summaryTokens, preferenceTokens, portfolioTokens);
 
             _logger.LogDebug("Generated memory context for account {AccountId}: {Instructions}", 
                 _accountId, instructions.ToString());
@@ -98,13 +113,28 @@ public class PortfolioMemoryContextProvider : AIContextProvider
     {
         try
         {
-            // Extract insights from the conversation
-            await ExtractConversationInsightsAsync(context, cancellationToken);
-            
-            // Update user preferences if patterns are detected
-            await UpdateUserPreferencesAsync(context, cancellationToken);
+            // Start background memory processing without blocking the response
+            // Use Task.Run to execute on thread pool to avoid blocking the HTTP response
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    // Extract insights from the conversation
+                    await ExtractConversationInsightsAsync(context, CancellationToken.None);
+                    
+                    // Update user preferences if patterns are detected
+                    await UpdateUserPreferencesAsync(context, CancellationToken.None);
 
-            _logger.LogDebug("Updated memory state after invocation for account {AccountId}", _accountId);
+                    _logger.LogDebug("Completed background memory processing for account {AccountId}", _accountId);
+                }
+                catch (Exception backgroundEx)
+                {
+                    _logger.LogWarning(backgroundEx, "Background memory processing failed for account {AccountId}", _accountId);
+                    // Don't throw - background failure shouldn't impact user experience
+                }
+            });
+
+            _logger.LogDebug("Started background memory processing for account {AccountId}", _accountId);
         }
         catch (Exception ex)
         {
@@ -121,67 +151,51 @@ public class PortfolioMemoryContextProvider : AIContextProvider
     }
 
     /// <summary>
-    /// Load recent conversation summaries to provide context
+    /// Load recent conversation summaries using tiered memory approach with token budgeting
     /// </summary>
     private async Task LoadRecentSummariesAsync(StringBuilder instructions, CancellationToken cancellationToken)
     {
-        // Load consolidated long-term memories first
-        await LoadConsolidatedMemoriesAsync(instructions, cancellationToken);
+        const int maxMemoryTokens = 2000; // Token budget for memory context
+        var currentTokens = 0;
         
-        // Then load recent summaries for immediate context
-        var recentSummaries = await _dbContext.MemorySummaries
+        // TIER 1: Essential persistent facts (cold memory) - always include, minimal tokens
+        await LoadEssentialFactsAsync(instructions, cancellationToken);
+        currentTokens += (instructions.Length / 4); // Rough token estimate
+        
+        // TIER 2: Recent summaries (hot memory) - last 7 days, full detail
+        var hotMemoryCutoff = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-7));
+        var hotSummaries = await _dbContext.MemorySummaries
             .Include(ms => ms.ConversationThread)
-            .Where(ms => ms.ConversationThread.AccountId == _accountId)
+            .Where(ms => ms.ConversationThread.AccountId == _accountId && ms.SummaryDate >= hotMemoryCutoff)
             .OrderByDescending(ms => ms.SummaryDate)
-            .Take(5) // Recent context only
+            .Take(3) // Limit recent summaries
             .ToListAsync(cancellationToken);
 
-        if (recentSummaries.Any())
+        if (hotSummaries.Any() && currentTokens < maxMemoryTokens)
         {
-            instructions.AppendLine("## Recent Conversation Context:");
+            instructions.AppendLine("## Recent Conversations:");
             
-            foreach (var summary in recentSummaries.OrderBy(s => s.SummaryDate))
+            foreach (var summary in hotSummaries.OrderBy(s => s.SummaryDate))
             {
-                instructions.AppendLine($"**{summary.SummaryDate:MMM dd}:** {summary.Summary}");
+                var summaryText = $"**{summary.SummaryDate:MMM dd}:** {summary.Summary}";
+                var summaryTokens = summaryText.Length / 4;
                 
-                // Add key topics if available
-                if (!string.IsNullOrEmpty(summary.KeyTopics))
+                if (currentTokens + summaryTokens > maxMemoryTokens)
+                    break; // Stop if we hit token budget
+                    
+                instructions.AppendLine(summaryText);
+                currentTokens += summaryTokens;
+                
+                // Add condensed key topics only
+                if (!string.IsNullOrEmpty(summary.KeyTopics) && currentTokens < maxMemoryTokens - 100)
                 {
                     try
                     {
-                        // Try parsing as new format first (object with keyTopics property)
-                        string[]? topics = null;
-                        string[]? importantFacts = null;
-                        
-                        if (summary.KeyTopics.TrimStart().StartsWith('{'))
+                        var topicsText = ExtractCondensedTopics(summary.KeyTopics);
+                        if (!string.IsNullOrEmpty(topicsText))
                         {
-                            // New format: {"keyTopics": ["topic1", "topic2"], "importantFacts": [...], "confidenceScore": 0.85}
-                            var keyTopicsObject = JsonSerializer.Deserialize<JsonElement>(summary.KeyTopics);
-                            
-                            if (keyTopicsObject.TryGetProperty("keyTopics", out var keyTopicsArray))
-                            {
-                                topics = JsonSerializer.Deserialize<string[]>(keyTopicsArray.GetRawText());
-                            }
-                            
-                            if (keyTopicsObject.TryGetProperty("importantFacts", out var importantFactsArray))
-                            {
-                                importantFacts = JsonSerializer.Deserialize<string[]>(importantFactsArray.GetRawText());
-                            }
-                        }
-                        else
-                        {
-                            // Legacy format: ["topic1", "topic2"]
-                            topics = JsonSerializer.Deserialize<string[]>(summary.KeyTopics);
-                        }
-                        
-                        if (topics?.Length > 0)
-                        {
-                            instructions.AppendLine($"Key topics: {string.Join(", ", topics)}");
-                        }
-                        
-                        if (importantFacts?.Length > 0)
-                        {
-                            instructions.AppendLine($"Important facts: {string.Join("; ", importantFacts)}");
+                            instructions.AppendLine(topicsText);
+                            currentTokens += topicsText.Length / 4;
                         }
                     }
                     catch (JsonException ex)
@@ -193,31 +207,33 @@ public class PortfolioMemoryContextProvider : AIContextProvider
             
             instructions.AppendLine();
         }
+        
+        // TIER 3: Warm memory (7-30 days) - compressed if budget allows
+        if (currentTokens < maxMemoryTokens - 200)
+        {
+            await LoadWarmMemoryAsync(instructions, maxMemoryTokens - currentTokens, cancellationToken);
+        }
     }
 
     /// <summary>
-    /// Load and consolidate long-term memories that should persist across all conversations
+    /// Load only essential persistent facts (cold memory) with strict token limits
     /// </summary>
-    private async Task LoadConsolidatedMemoriesAsync(StringBuilder instructions, CancellationToken cancellationToken)
+    private async Task LoadEssentialFactsAsync(StringBuilder instructions, CancellationToken cancellationToken)
     {
-        // Get ALL summaries for this account to extract persistent information
-        var allSummaries = await _dbContext.MemorySummaries
+        // Only load the most recent persistent preferences from memory state and recent summaries
+        var recentSummariesForFacts = await _dbContext.MemorySummaries
             .Include(ms => ms.ConversationThread)
             .Where(ms => ms.ConversationThread.AccountId == _accountId)
-            .OrderBy(ms => ms.SummaryDate) // Chronological order for proper precedence
+            .OrderByDescending(ms => ms.SummaryDate)
+            .Take(3) // Only look at last 3 summaries for essential facts
             .ToListAsync(cancellationToken);
 
-        if (!allSummaries.Any())
-            return;
+        var essentialFacts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var corePreferences = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
-        // Consolidate core facts and preferences from all summaries
-        var consolidatedFacts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var consolidatedPreferences = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        var persistentTopics = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        foreach (var summary in allSummaries)
+        foreach (var summary in recentSummariesForFacts)
         {
-            // Extract important facts
+            // Extract only critical persistent facts (name, goals, etc.)
             if (!string.IsNullOrEmpty(summary.KeyTopics))
             {
                 try
@@ -226,31 +242,17 @@ public class PortfolioMemoryContextProvider : AIContextProvider
                     {
                         var summaryData = JsonSerializer.Deserialize<JsonElement>(summary.KeyTopics);
                         
-                        // Extract important facts
                         if (summaryData.TryGetProperty("importantFacts", out var factsArray))
                         {
                             var facts = JsonSerializer.Deserialize<string[]>(factsArray.GetRawText());
                             if (facts != null)
                             {
-                                foreach (var fact in facts)
+                                foreach (var fact in facts.Take(2)) // Max 2 facts per summary
                                 {
-                                    if (IsPersistentFact(fact))
+                                    if (IsCriticalPersistentFact(fact))
                                     {
-                                        consolidatedFacts.Add(fact);
+                                        essentialFacts.Add(fact);
                                     }
-                                }
-                            }
-                        }
-                        
-                        // Extract persistent topics
-                        if (summaryData.TryGetProperty("keyTopics", out var topicsArray))
-                        {
-                            var topics = JsonSerializer.Deserialize<string[]>(topicsArray.GetRawText());
-                            if (topics != null)
-                            {
-                                foreach (var topic in topics)
-                                {
-                                    persistentTopics.Add(topic);
                                 }
                             }
                         }
@@ -258,11 +260,11 @@ public class PortfolioMemoryContextProvider : AIContextProvider
                 }
                 catch (JsonException ex)
                 {
-                    _logger.LogWarning(ex, "Failed to parse summary data for consolidation from summary {SummaryId}", summary.Id);
+                    _logger.LogWarning(ex, "Failed to parse essential facts from summary {SummaryId}", summary.Id);
                 }
             }
 
-            // Extract user preferences
+            // Extract core user preferences
             if (!string.IsNullOrEmpty(summary.UserPreferences))
             {
                 try
@@ -270,76 +272,180 @@ public class PortfolioMemoryContextProvider : AIContextProvider
                     var preferences = JsonSerializer.Deserialize<Dictionary<string, string>>(summary.UserPreferences);
                     if (preferences != null)
                     {
-                        foreach (var pref in preferences)
+                        foreach (var pref in preferences.Where(p => IsCorePreference(p.Key)))
                         {
-                            // Later preferences override earlier ones
-                            consolidatedPreferences[pref.Key] = pref.Value;
+                            corePreferences[pref.Key] = pref.Value;
                         }
                     }
                 }
                 catch (JsonException ex)
                 {
-                    _logger.LogWarning(ex, "Failed to parse user preferences from summary {SummaryId}", summary.Id);
+                    _logger.LogWarning(ex, "Failed to parse core preferences from summary {SummaryId}", summary.Id);
                 }
             }
         }
 
-        // Add consolidated information to instructions
-        if (consolidatedFacts.Any() || consolidatedPreferences.Any())
+        // Add essential information with strict limits
+        if (essentialFacts.Any() || corePreferences.Any())
         {
-            instructions.AppendLine("## Long-term User Profile:");
+            instructions.AppendLine("## Essential User Context:");
             
-            if (consolidatedFacts.Any())
+            if (essentialFacts.Any())
             {
-                instructions.AppendLine("**Core Facts About This User:**");
-                foreach (var fact in consolidatedFacts.OrderBy(f => f))
+                // Limit to top 3 essential facts
+                foreach (var fact in essentialFacts.OrderBy(f => f).Take(3))
                 {
                     instructions.AppendLine($"- {fact}");
                 }
-                instructions.AppendLine();
             }
 
-            if (consolidatedPreferences.Any())
+            if (corePreferences.Any())
             {
-                instructions.AppendLine("**User Preferences:**");
-                foreach (var pref in consolidatedPreferences.OrderBy(p => p.Key))
+                // Only show critical preferences
+                foreach (var pref in corePreferences.OrderBy(p => p.Key))
                 {
                     instructions.AppendLine($"- {pref.Key}: {pref.Value}");
                 }
-                instructions.AppendLine();
             }
-
-            if (persistentTopics.Any())
-            {
-                instructions.AppendLine($"**Recurring Topics:** {string.Join(", ", persistentTopics.OrderBy(t => t))}");
-                instructions.AppendLine();
-            }
+            
+            instructions.AppendLine();
         }
     }
 
     /// <summary>
-    /// Determine if a fact should be considered persistent (long-term memory)
+    /// Load compressed warm memory (7-30 days old) with remaining token budget
     /// </summary>
-    private static bool IsPersistentFact(string fact)
+    private async Task LoadWarmMemoryAsync(StringBuilder instructions, int remainingTokens, CancellationToken cancellationToken)
+    {
+        if (remainingTokens < 100) return; // Not enough budget
+        
+        var warmMemoryStart = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-30));
+        var warmMemoryEnd = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-7));
+        
+        var warmSummaries = await _dbContext.MemorySummaries
+            .Include(ms => ms.ConversationThread)
+            .Where(ms => ms.ConversationThread.AccountId == _accountId && 
+                        ms.SummaryDate >= warmMemoryStart && 
+                        ms.SummaryDate < warmMemoryEnd)
+            .OrderByDescending(ms => ms.SummaryDate)
+            .Take(3) // Limit warm memory entries
+            .ToListAsync(cancellationToken);
+
+        if (warmSummaries.Any())
+        {
+            instructions.AppendLine("## Previous Context:");
+            
+            var usedTokens = 0;
+            foreach (var summary in warmSummaries.OrderBy(s => s.SummaryDate))
+            {
+                // Compress to just key points
+                var compressedSummary = CompressSummary(summary.Summary);
+                var tokenEstimate = compressedSummary.Length / 4;
+                
+                if (usedTokens + tokenEstimate > remainingTokens - 50)
+                    break;
+                    
+                instructions.AppendLine($"**{summary.SummaryDate:MMM dd}:** {compressedSummary}");
+                usedTokens += tokenEstimate;
+            }
+            
+            instructions.AppendLine();
+        }
+    }
+
+    /// <summary>
+    /// Determine if a fact is critical for persistent memory (only the most important)
+    /// </summary>
+    private static bool IsCriticalPersistentFact(string fact)
     {
         if (string.IsNullOrWhiteSpace(fact))
             return false;
             
         var lowerFact = fact.ToLowerInvariant();
         
-        // Personal identity information
-        var persistentIndicators = new[]
+        // Only critical identity and goal information
+        var criticalIndicators = new[]
         {
-            "name", "called", "i'm", "i am", "my wife", "my husband", "my partner",
-            "my children", "my kids", "my daughter", "my son", "my family",
-            "work in", "work for", "job", "career", "profession", "retired",
-            "age", "years old", "born in", "live in", "from", "originally",
-            "investment goal", "financial goal", "saving for", "planning for",
-            "risk tolerance", "conservative", "aggressive", "moderate risk",
-            "time horizon", "retirement", "university", "college", "education"
+            "name", "called", "i'm", "i am",
+            "investment goal", "financial goal", "saving for", "retirement",
+            "risk tolerance", "conservative investor", "aggressive investor"
         };
 
-        return persistentIndicators.Any(indicator => lowerFact.Contains(indicator));
+        return criticalIndicators.Any(indicator => lowerFact.Contains(indicator));
+    }
+
+    /// <summary>
+    /// Determine if a preference is core/critical
+    /// </summary>
+    private static bool IsCorePreference(string preferenceKey)
+    {
+        var corePreferences = new[] { "RiskTolerance", "CommunicationStyle", "InvestmentGoal" };
+        return corePreferences.Contains(preferenceKey, StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Extract only essential topics from key topics JSON (condensed version)
+    /// </summary>
+    private static string ExtractCondensedTopics(string keyTopicsJson)
+    {
+        try
+        {
+            if (keyTopicsJson.TrimStart().StartsWith('{'))
+            {
+                var topicsData = JsonSerializer.Deserialize<JsonElement>(keyTopicsJson);
+                
+                if (topicsData.TryGetProperty("keyTopics", out var topicsArray))
+                {
+                    var topics = JsonSerializer.Deserialize<string[]>(topicsArray.GetRawText());
+                    if (topics != null && topics.Length > 0)
+                    {
+                        // Only show top 3 topics
+                        return $"Topics: {string.Join(", ", topics.Take(3))}";
+                    }
+                }
+            }
+            else
+            {
+                // Legacy format
+                var topics = JsonSerializer.Deserialize<string[]>(keyTopicsJson);
+                if (topics != null && topics.Length > 0)
+                {
+                    return $"Topics: {string.Join(", ", topics.Take(3))}";
+                }
+            }
+        }
+        catch
+        {
+            // Silently fail for condensed version
+        }
+        
+        return string.Empty;
+    }
+
+    /// <summary>
+    /// Compress a summary to key points only
+    /// </summary>
+    private static string CompressSummary(string summary)
+    {
+        if (string.IsNullOrEmpty(summary) || summary.Length <= 100)
+            return summary;
+            
+        // Simple compression: take first sentence and any sentences with key financial terms
+        var sentences = summary.Split('.', StringSplitOptions.RemoveEmptyEntries);
+        var keyTerms = new[] { "portfolio", "investment", "stock", "fund", "risk", "return", "performance" };
+        
+        var compressedSentences = new List<string> { sentences[0] }; // Always include first sentence
+        
+        foreach (var sentence in sentences.Skip(1))
+        {
+            if (keyTerms.Any(term => sentence.ToLowerInvariant().Contains(term)))
+            {
+                compressedSentences.Add(sentence);
+                if (compressedSentences.Count >= 2) break; // Limit to 2 additional sentences
+            }
+        }
+        
+        return string.Join(". ", compressedSentences) + ".";
     }
 
     /// <summary>

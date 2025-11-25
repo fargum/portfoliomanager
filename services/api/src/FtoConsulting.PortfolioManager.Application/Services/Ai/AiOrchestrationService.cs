@@ -26,11 +26,13 @@ public class AiOrchestrationService(
     IAgentPromptService agentPromptService,
     AgentFrameworkGuardrails guardrails,
     Func<int, int?, System.Text.Json.JsonSerializerOptions?, ChatMessageStore> chatMessageStoreFactory,
-    Func<int, IChatClient, AIContextProvider> memoryContextProviderFactory) : IAiOrchestrationService
+    Func<int, IChatClient, AIContextProvider> memoryContextProviderFactory,
+    ILoggerFactory loggerFactory) : IAiOrchestrationService
 {
     private static readonly ActivitySource s_activitySource = new("PortfolioManager.AI");
     
     private readonly ILogger<AiOrchestrationService> _logger = logger;
+    private readonly ILoggerFactory _loggerFactory = loggerFactory;
     private readonly AzureFoundryOptions _azureFoundryOptions = azureFoundryOptions.Value;
     private readonly IMcpServerService _mcpServerService = mcpServerService;
     private readonly IConversationThreadService _conversationThreadService = conversationThreadService;
@@ -224,6 +226,24 @@ For casual conversation, respond naturally without using tools.";
 
 
     /// <summary>
+    /// Measure the estimated token count for context analysis
+    /// </summary>
+    private int MeasureContextSize(object content)
+    {
+        if (content == null) return 0;
+        
+        string text = content switch
+        {
+            string str => str,
+            IEnumerable<ChatMessage> messages => string.Join(" ", messages.Select(m => m.Text ?? "")),
+            _ => content.ToString() ?? ""
+        };
+        
+        // Rough estimation: ~4 characters per token
+        return Math.Max(1, text.Length / 4);
+    }
+
+    /// <summary>
     /// Clean up markdown formatting issues in AI responses
     /// </summary>
     private string CleanupMarkdownFormatting(string response)
@@ -280,12 +300,16 @@ For casual conversation, respond naturally without using tools.";
         var azureOpenAIClient = _azureOpenAIClient.Value;
 
         // Get a chat client for the specific model and enable OpenTelemetry
-        var chatClient = azureOpenAIClient.GetChatClient(_azureFoundryOptions.ModelName)
+        var baseChatClient = azureOpenAIClient.GetChatClient(_azureFoundryOptions.ModelName)
             .AsIChatClient()
             .AsBuilder()
             .UseOpenTelemetry(sourceName: "PortfolioManager.AI", 
                              configure: cfg => cfg.EnableSensitiveData = true) // Enable sensitive data for token metrics
             .Build();
+        
+        // Wrap with token tracking for detailed usage monitoring
+        var tokenTrackingLogger = _loggerFactory.CreateLogger<TokenTrackingChatClient>();
+        var chatClient = new TokenTrackingChatClient(baseChatClient, tokenTrackingLogger, accountId, "portfolio-agent");
         
         // Create memory-aware AI agent with ChatClientAgentOptions and enhanced security
         var portfolioTools = CreatePortfolioMcpFunctions();
@@ -302,17 +326,45 @@ For casual conversation, respond naturally without using tools.";
 
         _logger.LogInformation("Memory store and context provider configured for agent on thread {ThreadId}", threadId);
 
-        // Load existing conversation history from the chat message store
+        // Load existing conversation history from the chat message store with token budgeting
         var messageStore = _chatMessageStoreFactory(accountId, threadId, null);
-        var allStoredMessages = await messageStore.GetMessagesAsync(cancellationToken);
         
-        // OPTIMIZATION: Only use recent messages for immediate context
-        // Let the PortfolioMemoryContextProvider handle long-term knowledge via summaries
-        var recentMessages = allStoredMessages
-            .OrderByDescending(m => m.CreatedAt)
-            .Take(6) // Last 6 messages (3 exchanges) for immediate context
-            .OrderBy(m => m.CreatedAt)
-            .ToList();
+        // OPTIMIZATION: Use token-aware message selection instead of fixed count
+        // This provides better context utilization while respecting token limits
+        List<ChatMessage> recentMessages;
+        
+        if (messageStore is ITokenAwareChatMessageStore tokenAwareStore)
+        {
+            // Use token-budgeted message selection (2000 tokens = ~8000 characters)
+            var tokenBudgetedMessages = await tokenAwareStore.GetMessagesWithinTokenBudgetAsync(
+                tokenBudget: 2000, 
+                cancellationToken);
+            recentMessages = tokenBudgetedMessages.ToList();
+        }
+        else
+        {
+            // Fallback to previous behavior for other store types
+            var allStoredMessages = await messageStore.GetMessagesAsync(cancellationToken);
+            recentMessages = allStoredMessages
+                .OrderByDescending(m => m.CreatedAt)
+                .Take(6) // Last 6 messages (3 exchanges) for immediate context
+                .OrderBy(m => m.CreatedAt)
+                .ToList();
+        }
+
+        // CONTEXT SIZE ANALYSIS: Measure each component for visibility
+        var contextAnalysis = new
+        {
+            ConversationHistory = MeasureContextSize(recentMessages),
+            AgentInstructions = MeasureContextSize(secureInstructions),
+            ToolDescriptions = MeasureContextSize(secureChatOptions?.Tools?.Count.ToString() ?? "0 tools")
+        };
+
+        _logger.LogInformation("Context Window Analysis for thread {ThreadId}: Conversation={ConversationTokens} tokens, Instructions={InstructionTokens} tokens, Tools={ToolTokens} tokens",
+            threadId, 
+            contextAnalysis.ConversationHistory, 
+            contextAnalysis.AgentInstructions,
+            contextAnalysis.ToolDescriptions);
 
         // Combine recent messages with new message using secure preparation
         var messagesToSend = await _guardrails.PrepareSecureMessagesAsync(recentMessages, query, accountId, threadId);

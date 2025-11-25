@@ -1,6 +1,7 @@
 using System.Text.Json;
 using FtoConsulting.PortfolioManager.Infrastructure.Data;
 using FtoConsulting.PortfolioManager.Domain.Entities;
+using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
@@ -14,7 +15,7 @@ namespace FtoConsulting.PortfolioManager.Infrastructure.Services.Memory;
 /// PostgreSQL-based implementation of ChatMessageStore for the Microsoft Agent Framework
 /// Provides persistent storage for conversation messages scoped to accounts
 /// </summary>
-public class PostgreSqlChatMessageStore : ChatMessageStore
+public class PostgreSqlChatMessageStore : ChatMessageStore, ITokenAwareChatMessageStore
 {
     private readonly PortfolioManagerDbContext _dbContext;
     private readonly ILogger<PostgreSqlChatMessageStore> _logger;
@@ -239,6 +240,94 @@ public class PostgreSqlChatMessageStore : ChatMessageStore
     }
 
     /// <summary>
+    /// Get messages within a specified token budget, prioritizing recent messages
+    /// </summary>
+    public async Task<IEnumerable<AIChatMessage>> GetMessagesWithinTokenBudgetAsync(
+        int tokenBudget = 2000,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            if (_conversationThreadId == null)
+            {
+                _logger.LogDebug("No conversation thread ID set for account {AccountId}, returning empty messages", _accountId);
+                return [];
+            }
+
+            // Get recent messages ordered by timestamp (most recent first)
+            var dbMessages = await _dbContext.ChatMessages
+                .Where(cm => cm.ConversationThreadId == _conversationThreadId.Value)
+                .OrderByDescending(cm => cm.MessageTimestamp)
+                .Take(100) // Get more messages than we need to work with
+                .ToListAsync(cancellationToken);
+
+            var selectedMessages = new List<AIChatMessage>();
+            var currentTokenCount = 0;
+
+            // Work backwards from most recent, adding messages until we hit budget
+            foreach (var dbMessage in dbMessages)
+            {
+                var estimatedTokens = dbMessage.TokenCount > 0 ? dbMessage.TokenCount : EstimateTokenCount(dbMessage.Content);
+                
+                // Check if adding this message would exceed budget
+                if (currentTokenCount + estimatedTokens > tokenBudget && selectedMessages.Any())
+                {
+                    break;
+                }
+
+                try
+                {
+                    var role = new ChatRole(dbMessage.Role);
+                    var content = new TextContent(dbMessage.Content);
+                    var chatMessage = new AIChatMessage(role, [content]);
+                    
+                    // Restore message ID from metadata if available
+                    if (!string.IsNullOrEmpty(dbMessage.Metadata))
+                    {
+                        try
+                        {
+                            var metadata = JsonSerializer.Deserialize<JsonElement>(dbMessage.Metadata);
+                            if (metadata.TryGetProperty("MessageId", out var messageIdElement))
+                            {
+                                var messageId = messageIdElement.GetString();
+                                if (!string.IsNullOrEmpty(messageId))
+                                {
+                                    chatMessage.MessageId = messageId;
+                                }
+                            }
+                        }
+                        catch (JsonException ex)
+                        {
+                            _logger.LogWarning(ex, "Failed to parse metadata for message {MessageId}", dbMessage.Id);
+                        }
+                    }
+
+                    selectedMessages.Add(chatMessage);
+                    currentTokenCount += estimatedTokens;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to deserialize message {MessageId}, skipping", dbMessage.Id);
+                }
+            }
+
+            // Reverse to get chronological order (oldest first)
+            selectedMessages.Reverse();
+
+            _logger.LogDebug("Selected {MessageCount} messages ({TokenCount} tokens) from conversation thread {ThreadId} for account {AccountId}",
+                selectedMessages.Count, currentTokenCount, _conversationThreadId, _accountId);
+
+            return selectedMessages;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error retrieving token-budgeted messages from conversation thread {ThreadId} for account {AccountId}",
+                _conversationThreadId, _accountId);
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Extract text content from a chat message
     /// </summary>
     private static string GetMessageText(AIChatMessage message)
@@ -249,6 +338,15 @@ public class PostgreSqlChatMessageStore : ChatMessageStore
         }
 
         return message.Text ?? string.Empty;
+    }
+
+    /// <summary>
+    /// Estimate token count for text content
+    /// </summary>
+    private static int EstimateTokenCount(string text)
+    {
+        // Rough estimation: ~4 characters per token
+        return Math.Max(1, text.Length / 4);
     }
 
     /// <summary>
