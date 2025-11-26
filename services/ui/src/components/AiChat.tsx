@@ -102,7 +102,7 @@ I can analyze your holdings, market conditions, and provide insights to help you
             ...prev,
             messages: prev.messages.map(msg => 
               msg.id === aiMessageId 
-                ? { ...msg, content: streamingContent, isLoading: false }
+                ? { ...msg, content: streamingContent, isLoading: false, statusMessage: undefined }
                 : msg
             ),
           }));
@@ -170,6 +170,17 @@ I can analyze your holdings, market conditions, and provide insights to help you
               error: fallbackError instanceof Error ? fallbackError.message : 'Unknown error',
             }));
           }
+        },
+        // On status update
+        (status) => {
+          setChatState(prev => ({
+            ...prev,
+            messages: prev.messages.map(msg => 
+              msg.id === aiMessageId 
+                ? { ...msg, statusMessage: status.Message, isLoading: true }
+                : msg
+            ),
+          }));
         },
         currentThreadId
       );
@@ -302,7 +313,7 @@ I can analyze your holdings, market conditions, and provide insights to help you
             {message.isLoading ? (
               <div className="flex items-center space-x-2">
                 <div className="animate-spin h-4 w-4 border-2 border-gray-300 border-t-blue-600 rounded-full"></div>
-                <span className="text-sm">Thinking...</span>
+                <span className="text-sm">{message.statusMessage || 'Thinking...'}</span>
               </div>
             ) : (
               <>

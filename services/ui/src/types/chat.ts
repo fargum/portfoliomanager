@@ -51,6 +51,7 @@ export interface ChatMessage {
   portfolioSummary?: PortfolioSummaryDto;
   insights?: InsightDto[];
   isLoading?: boolean;
+  statusMessage?: string;
   error?: string;
 }
 
@@ -58,4 +59,18 @@ export interface ChatState {
   messages: ChatMessage[];
   isLoading: boolean;
   error?: string;
+}
+
+// Streaming message types (matching backend DTOs)
+export interface StatusUpdateDto {
+  Type: string;
+  Message: string;
+  Progress?: number;
+  Details?: string;
+}
+
+export interface StreamingMessage {
+  MessageType: string;
+  Status?: StatusUpdateDto;
+  Content?: string;
 }

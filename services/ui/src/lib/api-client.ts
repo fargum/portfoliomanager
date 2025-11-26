@@ -172,7 +172,7 @@ export class PortfolioApiClient {
   }
 
   /**
-   * Send a chat query to the AI assistant with streaming response
+   * Send a chat query to the AI assistant with streaming response and status updates
    */
   async sendChatQueryStream(
     query: string, 
@@ -180,6 +180,7 @@ export class PortfolioApiClient {
     onChunk: (chunk: string) => void,
     onComplete: () => void,
     onError: (error: string) => void,
+    onStatusUpdate?: (status: import('@/types/chat').StatusUpdateDto) => void,
     threadId?: number
   ): Promise<void> {
     try {
@@ -213,6 +214,8 @@ export class PortfolioApiClient {
       const decoder = new TextDecoder();
       
       try {
+        let buffer = '';
+        
         while (true) {
           const { done, value } = await reader.read();
           
@@ -222,7 +225,31 @@ export class PortfolioApiClient {
           }
           
           const chunk = decoder.decode(value, { stream: true });
-          onChunk(chunk);
+          buffer += chunk;
+          
+          // Process complete lines (JSON messages are line-delimited)
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || ''; // Keep incomplete line in buffer
+          
+          for (const line of lines) {
+            if (line.trim()) {
+              try {
+                const message = JSON.parse(line) as import('@/types/chat').StreamingMessage;
+                
+                if (message.MessageType === 'status' && message.Status && onStatusUpdate) {
+                  onStatusUpdate(message.Status);
+                } else if (message.MessageType === 'content' && message.Content) {
+                  onChunk(message.Content);
+                } else if (message.MessageType === 'completion') {
+                  onComplete();
+                  return;
+                }
+              } catch (jsonError) {
+                // If JSON parsing fails, treat as legacy plain text content
+                onChunk(line);
+              }
+            }
+          }
         }
       } finally {
         reader.releaseLock();

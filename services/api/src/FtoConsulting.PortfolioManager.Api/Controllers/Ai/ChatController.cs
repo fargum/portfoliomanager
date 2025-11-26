@@ -6,6 +6,7 @@ using FtoConsulting.PortfolioManager.Application.DTOs.Ai;
 using FtoConsulting.PortfolioManager.Application.Configuration;
 using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 using System.Diagnostics;
+using System.Text;
 
 
 namespace FtoConsulting.PortfolioManager.Api.Controllers.Ai;
@@ -85,20 +86,41 @@ public class ChatController : ControllerBase
             Response.Headers["Cache-Control"] = "no-cache";
             Response.Headers["Connection"] = "keep-alive";
 
-            // Use memory-aware streaming from the AI service
-            await _aiOrchestrationService.ProcessPortfolioQueryStreamWithMemoryAsync(
+            // Use unified memory-aware streaming with status updates from the AI service
+            await _aiOrchestrationService.ProcessPortfolioQueryAsync(
                 request.Query, 
                 request.AccountId,
-                async (token) =>
+                onStatusUpdate: async (status) =>
                 {
                     if (!cancellationToken.IsCancellationRequested)
                     {
-                        await Response.WriteAsync(token, cancellationToken);
+                        var statusMessage = new StatusStreamingMessageDto(status);
+                        var jsonMessage = System.Text.Json.JsonSerializer.Serialize(statusMessage);
+                        await Response.WriteAsync($"{jsonMessage}\n", cancellationToken);
+                        await Response.Body.FlushAsync(cancellationToken);
+                    }
+                },
+                onTokenReceived: async (token) =>
+                {
+                    if (!cancellationToken.IsCancellationRequested)
+                    {
+                        var contentMessage = new ContentStreamingMessageDto(token);
+                        var jsonMessage = System.Text.Json.JsonSerializer.Serialize(contentMessage);
+                        await Response.WriteAsync($"{jsonMessage}\n", cancellationToken);
                         await Response.Body.FlushAsync(cancellationToken);
                     }
                 },
                 request.ThreadId,
                 cancellationToken);
+
+            // Send completion message
+            if (!cancellationToken.IsCancellationRequested)
+            {
+                var completionMessage = new CompletionStreamingMessageDto();
+                var jsonMessage = System.Text.Json.JsonSerializer.Serialize(completionMessage);
+                await Response.WriteAsync($"{jsonMessage}\n", cancellationToken);
+                await Response.Body.FlushAsync(cancellationToken);
+            }
 
             _logger.LogInformation("Successfully completed streaming AI chat query with memory for account {AccountId}", 
                 request.AccountId);
@@ -169,11 +191,21 @@ public class ChatController : ControllerBase
             _logger.LogInformation("Processing AI chat query with memory for account {AccountId}, thread {ThreadId}: {Query}", 
                 request.AccountId, request.ThreadId, request.Query);
 
-            var response = await _aiOrchestrationService.ProcessPortfolioQueryWithMemoryAsync(
+            // For non-streaming endpoint, accumulate response via streaming internally
+            var responseBuilder = new StringBuilder();
+            
+            await _aiOrchestrationService.ProcessPortfolioQueryAsync(
                 request.Query, 
                 request.AccountId,
-                request.ThreadId,
-                cancellationToken);
+                onStatusUpdate: null, // No status updates for non-streaming endpoint
+                onTokenReceived: token => {
+                    responseBuilder.Append(token);
+                    return Task.CompletedTask;
+                },
+                threadId: request.ThreadId,
+                cancellationToken: cancellationToken);
+
+            var finalResponse = responseBuilder.ToString();
 
             _logger.LogInformation("Successfully processed AI chat query with memory for account {AccountId}", 
                 request.AccountId);
@@ -181,7 +213,10 @@ public class ChatController : ControllerBase
             activity?.SetStatus(ActivityStatusCode.Ok);
             activity?.SetTag("response.completed", "true");
 
-            return Ok(response);
+            return Ok(new ChatResponseDto(
+                Response: finalResponse,
+                QueryType: "General"
+            ));
         }
         catch (Exception ex)
         {
