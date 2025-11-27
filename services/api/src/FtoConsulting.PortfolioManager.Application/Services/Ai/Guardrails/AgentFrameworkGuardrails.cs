@@ -79,7 +79,7 @@ Always maintain a professional, helpful tone while staying within these safety b
     /// <summary>
     /// Validate input before processing with the agent
     /// </summary>
-    public async Task<GuardrailValidationResult> ValidateInputAsync(string userInput, int accountId)
+    public Task<GuardrailValidationResult> ValidateInputAsync(string userInput, int accountId)
     {
         try
         {
@@ -99,25 +99,25 @@ Always maintain a professional, helpful tone while staying within these safety b
                 }
             }
 
-            return result;
+            return Task.FromResult(result);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during input validation for account {AccountId}", accountId);
             
-            return new GuardrailValidationResult 
+            return Task.FromResult(new GuardrailValidationResult 
             { 
                 IsValid = false, 
                 Reason = "Unable to process your request at this time. Please try again.",
                 Severity = GuardrailSeverity.Medium 
-            };
+            });
         }
     }
 
     /// <summary>
     /// Validate agent output before returning to user
     /// </summary>
-    public async Task<GuardrailValidationResult> ValidateOutputAsync(string agentOutput, string originalQuery, int accountId)
+    public Task<GuardrailValidationResult> ValidateOutputAsync(string agentOutput, string originalQuery, int accountId)
     {
         try
         {
@@ -136,18 +136,18 @@ Always maintain a professional, helpful tone while staying within these safety b
                 }
             }
 
-            return result;
+            return Task.FromResult(result);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during output validation for account {AccountId}", accountId);
             
-            return new GuardrailValidationResult 
+            return Task.FromResult(new GuardrailValidationResult 
             { 
                 IsValid = false, 
                 Reason = "I encountered an issue processing the response. Please try your question again.",
                 Severity = GuardrailSeverity.Medium 
-            };
+            });
         }
     }
 

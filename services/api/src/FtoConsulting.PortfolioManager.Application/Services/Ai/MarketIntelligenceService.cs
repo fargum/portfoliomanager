@@ -131,7 +131,7 @@ public class MarketIntelligenceService : IMarketIntelligenceService
             _logger.LogInformation("Generating AI market summary for tickers: {Tickers}", string.Join(", ", tickers));
 
             
-// Check if AI chat service is available
+            // Check if AI chat service is available
             if (_aiChatService == null)
             {
                 _logger.LogError("AI chat service not configured");

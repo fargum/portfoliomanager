@@ -135,6 +135,9 @@ public class PortfolioMemoryContextProvider : AIContextProvider
             });
 
             _logger.LogDebug("Started background memory processing for account {AccountId}", _accountId);
+            
+            // Satisfy async requirement since this is an override method
+            await Task.CompletedTask;
         }
         catch (Exception ex)
         {

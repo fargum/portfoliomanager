@@ -51,7 +51,6 @@ public static class ServiceCollectionExtensions
                 instrumentManagementService,
                 pricingCalculationHelper,
                 pricingCalculationService,
-                currencyConversionService,
                 unitOfWork,
                 logger,
                 eodMarketDataToolFactory);
@@ -165,6 +164,7 @@ public static class ServiceCollectionExtensions
         
         // Register automated background services
         services.AddHostedService<AutomatedRevaluationBackgroundService>();
+        services.AddHostedService<McpServerInitializationService>();
         
         return services;
     }

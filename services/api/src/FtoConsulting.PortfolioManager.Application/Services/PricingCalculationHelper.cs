@@ -9,21 +9,11 @@ namespace FtoConsulting.PortfolioManager.Application.Services;
 /// <summary>
 /// Service for calculating holding values using current market prices
 /// </summary>
-public class PricingCalculationHelper : IPricingCalculationHelper
+public class PricingCalculationHelper(
+    IInstrumentPriceRepository instrumentPriceRepository,
+    IPricingCalculationService pricingCalculationService,
+    ILogger<PricingCalculationHelper> logger) : IPricingCalculationHelper
 {
-    private readonly IInstrumentPriceRepository _instrumentPriceRepository;
-    private readonly IPricingCalculationService _pricingCalculationService;
-    private readonly ILogger<PricingCalculationHelper> _logger;
-
-    public PricingCalculationHelper(
-        IInstrumentPriceRepository instrumentPriceRepository,
-        IPricingCalculationService pricingCalculationService,
-        ILogger<PricingCalculationHelper> logger)
-    {
-        _instrumentPriceRepository = instrumentPriceRepository ?? throw new ArgumentNullException(nameof(instrumentPriceRepository));
-        _pricingCalculationService = pricingCalculationService ?? throw new ArgumentNullException(nameof(pricingCalculationService));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
 
     public async Task<HoldingPriceResult> FetchAndCalculateHoldingValueAsync(
         int instrumentId,
@@ -40,13 +30,13 @@ public class PricingCalculationHelper : IPricingCalculationHelper
         if (units < 0)
             throw new ArgumentException("Units cannot be negative", nameof(units));
 
-        _logger.LogDebug("Calculating holding value for {Ticker} with {Units} units on {ValuationDate}", 
+        logger.LogDebug("Calculating holding value for {Ticker} with {Units} units on {ValuationDate}", 
             ticker, units, valuationDate);
 
         // Check if this is a CASH instrument - no pricing needed
         if (ticker.Equals(ExchangeConstants.CASH_TICKER, StringComparison.OrdinalIgnoreCase))
         {
-            _logger.LogDebug("CASH instrument detected, using units as current value");
+            logger.LogDebug("CASH instrument detected, using units as current value");
             return new HoldingPriceResult
             {
                 CurrentPrice = 1.0m,
@@ -59,17 +49,17 @@ public class PricingCalculationHelper : IPricingCalculationHelper
         try
         {
             // Try to get price for the specific date first
-            var instrumentPrice = await _instrumentPriceRepository.GetByInstrumentAndDateAsync(instrumentId, valuationDate, cancellationToken);
+            var instrumentPrice = await instrumentPriceRepository.GetByInstrumentAndDateAsync(instrumentId, valuationDate, cancellationToken);
             
             if (instrumentPrice == null)
             {
                 // Try to get the latest available price before or on the valuation date
-                instrumentPrice = await _instrumentPriceRepository.GetLatestPriceAsync(instrumentId, valuationDate, cancellationToken);
+                instrumentPrice = await instrumentPriceRepository.GetLatestPriceAsync(instrumentId, valuationDate, cancellationToken);
             }
 
             if (instrumentPrice == null)
             {
-                _logger.LogWarning("No price data available for instrument {Ticker} (ID: {InstrumentId}) on or before {ValuationDate}",
+                logger.LogWarning("No price data available for instrument {Ticker} (ID: {InstrumentId}) on or before {ValuationDate}",
                     ticker, instrumentId, valuationDate);
                 
                 return new HoldingPriceResult
@@ -81,7 +71,7 @@ public class PricingCalculationHelper : IPricingCalculationHelper
 
             // Use the existing IPricingCalculationService for all pricing calculations
             // This handles scaling factors, currency conversion, and unit conversion
-            var currentValue = await _pricingCalculationService.CalculateCurrentValueAsync(
+            var currentValue = await pricingCalculationService.CalculateCurrentValueAsync(
                 units,
                 instrumentPrice.Price,
                 quoteUnit,
@@ -89,9 +79,9 @@ public class PricingCalculationHelper : IPricingCalculationHelper
                 valuationDate);
 
             // Get the scaled price for display purposes
-            var scaledPrice = _pricingCalculationService.ApplyScalingFactor(instrumentPrice.Price, ticker);
+            var scaledPrice = pricingCalculationService.ApplyScalingFactor(instrumentPrice.Price, ticker);
 
-            _logger.LogDebug("Price calculation successful for {Ticker}: OriginalPrice={OriginalPrice}, ScaledPrice={ScaledPrice}, Units={Units}, Value={Value}",
+            logger.LogDebug("Price calculation successful for {Ticker}: OriginalPrice={OriginalPrice}, ScaledPrice={ScaledPrice}, Units={Units}, Value={Value}",
                 ticker, instrumentPrice.Price, scaledPrice, units, currentValue);
 
             return new HoldingPriceResult
@@ -104,7 +94,7 @@ public class PricingCalculationHelper : IPricingCalculationHelper
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error calculating holding value for {Ticker} (ID: {InstrumentId})", ticker, instrumentId);
+            logger.LogError(ex, "Error calculating holding value for {Ticker} (ID: {InstrumentId})", ticker, instrumentId);
             
             return new HoldingPriceResult
             {

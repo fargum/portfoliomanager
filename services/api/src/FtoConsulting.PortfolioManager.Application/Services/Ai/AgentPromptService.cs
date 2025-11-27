@@ -10,22 +10,17 @@ namespace FtoConsulting.PortfolioManager.Application.Services.Ai;
 /// <summary>
 /// Implementation of agent prompt service that loads prompts from JSON configuration
 /// </summary>
-public class AgentPromptService : IAgentPromptService
+public class AgentPromptService(ILogger<AgentPromptService> logger) : IAgentPromptService
 {
-    private readonly ILogger<AgentPromptService> _logger;
-    private readonly AgentPromptConfiguration _promptConfig;
-
-    public AgentPromptService(ILogger<AgentPromptService> logger)
-    {
-        _logger = logger;
-        _promptConfig = LoadPromptConfiguration();
-    }
+    private AgentPromptConfiguration? _promptConfig;
+    
+    private AgentPromptConfiguration PromptConfig => _promptConfig ??= LoadPromptConfiguration();
 
     public string GetPortfolioAdvisorPrompt(int accountId)
     {
         try
         {
-            var config = _promptConfig.PortfolioAdvisor;
+            var config = PromptConfig.PortfolioAdvisor;
             var promptBuilder = new StringBuilder();
 
             // Base instructions with account ID
@@ -119,7 +114,7 @@ public class AgentPromptService : IAgentPromptService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error building portfolio advisor prompt for account {AccountId}", accountId);
+            logger.LogError(ex, "Error building portfolio advisor prompt for account {AccountId}", accountId);
             
             // Fallback to a basic prompt if configuration fails
             return $"You are a helpful financial advisor for Account ID {accountId}. Provide clear, friendly assistance with portfolio questions.";
@@ -141,7 +136,7 @@ public class AgentPromptService : IAgentPromptService
             return GetMemoryExtractionPrompt(parameters);
         }
 
-        _logger.LogWarning("Unknown prompt name: {PromptName}", promptName);
+        logger.LogWarning("Unknown prompt name: {PromptName}", promptName);
         return "You are a helpful AI assistant.";
     }
 
@@ -157,7 +152,7 @@ public class AgentPromptService : IAgentPromptService
         // Get the memory extraction config
         if (!config.AdditionalAgents.ContainsKey("MemoryExtractionAgent"))
         {
-            _logger.LogError("MemoryExtractionAgent configuration not found in AgentPrompts.json");
+            logger.LogError("MemoryExtractionAgent configuration not found in AgentPrompts.json");
             return "You are a helpful assistant that extracts information from conversations.";
         }
 
@@ -215,20 +210,19 @@ public class AgentPromptService : IAgentPromptService
             
             using var stream = assembly.GetManifestResourceStream(resourceName);
             
-if (stream == null)
+            if (stream == null)
             {
-                _logger.LogWarning("Could not find embedded prompt configuration resource: {ResourceName}", resourceName);
+                logger.LogWarning("Could not find embedded prompt configuration resource: {ResourceName}", resourceName);
                 return CreateFallbackConfiguration();
             }
             
-            using var reader = new StreamReader(stream);
-            
-var jsonContent = reader.ReadToEnd();
+            using var reader = new StreamReader(stream);           
+            var jsonContent = reader.ReadToEnd();
             
             // Parse as JsonDocument first to handle dynamic structure
             using var document = JsonDocument.Parse(jsonContent);
             
-var config = new AgentPromptConfiguration();
+            var config = new AgentPromptConfiguration();
             
             foreach (var property in document.RootElement.EnumerateObject())
             {
@@ -246,15 +240,14 @@ var config = new AgentPromptConfiguration();
                 }
             }
             
-            _logger.LogInformation("Successfully loaded agent prompt configuration with {AgentCount} agents", 
+            logger.LogInformation("Successfully loaded agent prompt configuration with {AgentCount} agents", 
                 config.AdditionalAgents.Count + 1);
             return config;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error loading prompt configuration, using fallback");
-            
-return CreateFallbackConfiguration();
+            logger.LogError(ex, "Error loading prompt configuration, using fallback");          
+             return CreateFallbackConfiguration();
         }
     }
 

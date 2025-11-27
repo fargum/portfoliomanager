@@ -30,16 +30,6 @@ public class AiOrchestrationService(
     ILoggerFactory loggerFactory) : IAiOrchestrationService
 {
     private static readonly ActivitySource s_activitySource = new("PortfolioManager.AI");
-    
-    private readonly ILogger<AiOrchestrationService> _logger = logger;
-    private readonly ILoggerFactory _loggerFactory = loggerFactory;
-    private readonly AzureFoundryOptions _azureFoundryOptions = azureFoundryOptions.Value;
-    private readonly IMcpServerService _mcpServerService = mcpServerService;
-    private readonly IConversationThreadService _conversationThreadService = conversationThreadService;
-    private readonly IAgentPromptService _agentPromptService = agentPromptService;
-    private readonly AgentFrameworkGuardrails _guardrails = guardrails;
-    private readonly Func<int, int?, System.Text.Json.JsonSerializerOptions?, ChatMessageStore> _chatMessageStoreFactory = chatMessageStoreFactory;
-    private readonly Func<int, IChatClient, AIContextProvider> _memoryContextProviderFactory = memoryContextProviderFactory;
 
     // Lazy-loaded Azure OpenAI client to avoid creating it on every request
     private readonly Lazy<AzureOpenAIClient> _azureOpenAIClient = new Lazy<AzureOpenAIClient>(() =>
@@ -56,19 +46,17 @@ public class AiOrchestrationService(
         CancellationToken cancellationToken = default)
     {
         // Get or create conversation thread
-        var thread = threadId.HasValue 
-            ? await _conversationThreadService.GetThreadByIdAsync(threadId.Value, accountId, cancellationToken)
-                ?? await _conversationThreadService.GetOrCreateActiveThreadAsync(accountId, cancellationToken)
-            : await _conversationThreadService.GetOrCreateActiveThreadAsync(accountId, cancellationToken);
-        
-        // GUARDRAILS: Validate input
-        var inputValidation = await _guardrails.ValidateInputAsync(query, accountId);
+        var thread = threadId.HasValue
+            ? await conversationThreadService.GetThreadByIdAsync(threadId.Value, accountId, cancellationToken)
+                ?? await conversationThreadService.GetOrCreateActiveThreadAsync(accountId, cancellationToken)
+            : await conversationThreadService.GetOrCreateActiveThreadAsync(accountId, cancellationToken);        // GUARDRAILS: Validate input
+        var inputValidation = await guardrails.ValidateInputAsync(query, accountId);
         
         if (!inputValidation.IsValid)
         {
-            await _guardrails.LogSecurityIncident(inputValidation, accountId, "ProcessPortfolioQueryAsync");
+            await guardrails.LogSecurityIncident(inputValidation, accountId, "ProcessPortfolioQueryAsync");
             
-            var fallbackResponse = _guardrails.CreateFallbackResponse(inputValidation, accountId);
+            var fallbackResponse = guardrails.CreateFallbackResponse(inputValidation, accountId);
             await onTokenReceived(fallbackResponse);
             return;
         }
@@ -86,7 +74,7 @@ public class AiOrchestrationService(
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing portfolio query for account {AccountId}, thread {ThreadId}", accountId, thread.Id);
+            logger.LogError(ex, "Error processing portfolio query for account {AccountId}, thread {ThreadId}", accountId, thread.Id);
             
             var errorResponse = "I apologize, but I encountered an error while processing your request. Please try again.";
             await onTokenReceived(errorResponse);
@@ -116,11 +104,11 @@ public class AiOrchestrationService(
     {
         try
         {
-            return _agentPromptService.GetPortfolioAdvisorPrompt(accountId);
+            return agentPromptService.GetPortfolioAdvisorPrompt(accountId);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error loading agent instructions for account {AccountId}, using fallback", accountId);
+            logger.LogError(ex, "Error loading agent instructions for account {AccountId}, using fallback", accountId);
             
             // Fallback prompt in case the service fails
             return $@"You are a friendly financial advisor helping the owner of Account ID {accountId}. 
@@ -140,17 +128,17 @@ For casual conversation, respond naturally without using tools.";
     {
         try
         {
-            _logger.LogInformation("Calling MCP tool: {ToolName} with parameters: {@Parameters}", toolName, parameters);
+            logger.LogInformation("Calling MCP tool: {ToolName} with parameters: {@Parameters}", toolName, parameters);
             
             // Call our MCP server service directly (more efficient than HTTP calls)
-            var result = await _mcpServerService.ExecuteToolAsync(toolName, parameters);
+            var result = await mcpServerService.ExecuteToolAsync(toolName, parameters);
             
-            _logger.LogInformation("Successfully executed MCP tool: {ToolName}", toolName);
+            logger.LogInformation("Successfully executed MCP tool: {ToolName}", toolName);
             return result;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error calling MCP tool: {ToolName}", toolName);
+            logger.LogError(ex, "Error calling MCP tool: {ToolName}", toolName);
             throw;
         }
     }
@@ -224,7 +212,7 @@ For casual conversation, respond naturally without using tools.";
     private async Task<(AIAgent agent, List<ChatMessage> messagesToSend)> SetupMemoryAwareAgent(string query, int accountId, int threadId, CancellationToken cancellationToken)
     {
         // Validate Azure Foundry configuration
-        if (string.IsNullOrEmpty(_azureFoundryOptions.Endpoint) || string.IsNullOrEmpty(_azureFoundryOptions.ApiKey))
+        if (string.IsNullOrEmpty(azureFoundryOptions.Value.Endpoint) || string.IsNullOrEmpty(azureFoundryOptions.Value.ApiKey))
         {
             throw new InvalidOperationException("Azure Foundry configuration is not valid for memory processing.");
         }
@@ -233,7 +221,7 @@ For casual conversation, respond naturally without using tools.";
         var azureOpenAIClient = _azureOpenAIClient.Value;
 
         // Get a chat client for the specific model and enable OpenTelemetry
-        var baseChatClient = azureOpenAIClient.GetChatClient(_azureFoundryOptions.ModelName)
+        var baseChatClient = azureOpenAIClient.GetChatClient(azureFoundryOptions.Value.ModelName)
             .AsIChatClient()
             .AsBuilder()
             .UseOpenTelemetry(sourceName: "PortfolioManager.AI", 
@@ -241,27 +229,27 @@ For casual conversation, respond naturally without using tools.";
             .Build();
         
         // Wrap with token tracking for detailed usage monitoring
-        var tokenTrackingLogger = _loggerFactory.CreateLogger<TokenTrackingChatClient>();
+        var tokenTrackingLogger = loggerFactory.CreateLogger<TokenTrackingChatClient>();
         var chatClient = new TokenTrackingChatClient(baseChatClient, tokenTrackingLogger, accountId, "portfolio-agent");
         
         // Create memory-aware AI agent with ChatClientAgentOptions and enhanced security
         var portfolioTools = CreatePortfolioMcpFunctions();
-        var secureInstructions = _guardrails.CreateSecureAgentInstructions(CreateAgentInstructions(accountId), accountId);
-        var secureChatOptions = _guardrails.CreateSecureChatOptions(portfolioTools, accountId);
+        var secureInstructions = guardrails.CreateSecureAgentInstructions(CreateAgentInstructions(accountId), accountId);
+        var secureChatOptions = guardrails.CreateSecureChatOptions(portfolioTools, accountId);
         
         var agent = chatClient.CreateAIAgent(new ChatClientAgentOptions
         {
             Instructions = secureInstructions,
             ChatOptions = secureChatOptions,
-            ChatMessageStoreFactory = ctx => _chatMessageStoreFactory(accountId, threadId, ctx.JsonSerializerOptions),
+            ChatMessageStoreFactory = ctx => chatMessageStoreFactory(accountId, threadId, ctx.JsonSerializerOptions),
             // Use existing context provider - optimization is in message loading instead
-            AIContextProviderFactory = ctx => _memoryContextProviderFactory(accountId, chatClient)
+            AIContextProviderFactory = ctx => memoryContextProviderFactory(accountId, chatClient)
         });
 
-        _logger.LogInformation("Memory store and context provider configured for agent on thread {ThreadId}", threadId);
+        logger.LogInformation("Memory store and context provider configured for agent on thread {ThreadId}", threadId);
 
         // OPTIMIZATION: Load existing conversation history with reduced token budget for faster processing
-        var messageStore = _chatMessageStoreFactory(accountId, threadId, null);
+        var messageStore = chatMessageStoreFactory(accountId, threadId, null);
         
         // Use a smaller token budget for faster initial loading - prioritize recent context
         List<ChatMessage> recentMessages;
@@ -293,14 +281,14 @@ For casual conversation, respond naturally without using tools.";
             ToolDescriptions = MeasureContextSize(secureChatOptions?.Tools?.Count.ToString() ?? "0 tools")
         };
 
-        _logger.LogInformation("Context Window Analysis for thread {ThreadId}: Conversation={ConversationTokens} tokens, Instructions={InstructionTokens} tokens, Tools={ToolTokens} tokens",
+        logger.LogInformation("Context Window Analysis for thread {ThreadId}: Conversation={ConversationTokens} tokens, Instructions={InstructionTokens} tokens, Tools={ToolTokens} tokens",
             threadId, 
             contextAnalysis.ConversationHistory, 
             contextAnalysis.AgentInstructions,
             contextAnalysis.ToolDescriptions);
 
         // Combine recent messages with new message using secure preparation
-        var messagesToSend = await _guardrails.PrepareSecureMessagesAsync(recentMessages, query, accountId, threadId);
+        var messagesToSend = await guardrails.PrepareSecureMessagesAsync(recentMessages, query, accountId, threadId);
         
         return (agent, messagesToSend);
     }
@@ -319,7 +307,7 @@ For casual conversation, respond naturally without using tools.";
             
             var (agent, messagesToSend) = await SetupMemoryAwareAgent(query, accountId, threadId, cancellationToken);
             
-            _logger.LogInformation("Processing with streaming agent for thread {ThreadId}", threadId);
+            logger.LogInformation("Processing with streaming agent for thread {ThreadId}", threadId);
             
             // Send initial thinking status
             if (onStatusUpdate != null)
@@ -436,7 +424,7 @@ For casual conversation, respond naturally without using tools.";
                 await onStatusUpdate(new StatusUpdateDto(StatusUpdateType.Completed, "Analysis complete!"));
             }
             
-            _logger.LogInformation("Successfully completed streaming for thread {ThreadId}", threadId);
+            logger.LogInformation("Successfully completed streaming for thread {ThreadId}", threadId);
         }
         catch (Exception ex)
         {
@@ -444,7 +432,7 @@ For casual conversation, respond naturally without using tools.";
             {
                 await onStatusUpdate(new StatusUpdateDto(StatusUpdateType.Error, "An error occurred during processing"));
             }
-            _logger.LogError(ex, "Error in streaming processing for thread {ThreadId}", threadId);
+            logger.LogError(ex, "Error in streaming processing for thread {ThreadId}", threadId);
             throw;
         }
     }

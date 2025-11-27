@@ -3,7 +3,7 @@ namespace FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 /// <summary>
 /// Service interface for MCP (Model Context Protocol) server functionality
 /// </summary>
-public interface IMcpServerService
+public interface IMcpServerService : IAsyncDisposable
 {
     /// <summary>
     /// Initialize the MCP server with available tools

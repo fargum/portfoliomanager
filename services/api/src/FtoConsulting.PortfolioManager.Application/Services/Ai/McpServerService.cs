@@ -1,16 +1,7 @@
 using FtoConsulting.PortfolioManager.Application.Services;
 using FtoConsulting.PortfolioManager.Application.Configuration;
 using FtoConsulting.PortfolioManager.Application.Services.Ai.Tools;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
-using Microsoft.Extensions.AI;
-using Microsoft.Agents.AI;
-using ModelContextProtocol;
-using ModelContextProtocol.Server;
-using Azure.AI.OpenAI;
-using Azure;
-using System.ComponentModel;
 using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
@@ -19,27 +10,30 @@ using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 namespace FtoConsulting.PortfolioManager.Application.Services.Ai;
 
 /// <summary>
-/// Implementation of MCP (Model Context Protocol) server service using Microsoft Agent Framework
-/// This service bridges between our custom MCP controller and the Microsoft Agent Framework MCP server
+/// Implementation of custom MCP-style server service for portfolio tools
+/// This service provides tool execution and external MCP server integration (EOD)
 /// </summary>
-public class McpServerService : IMcpServerService
+public class McpServerService(
+    IHoldingService holdingService,
+    ILogger<McpServerService> logger,
+    IOptions<AzureFoundryOptions> azureFoundryOptions,
+    IOptions<EodApiOptions> eodApiOptions,
+    PortfolioHoldingsTool portfolioHoldingsTool,
+    PortfolioAnalysisTool portfolioAnalysisTool,
+    PortfolioComparisonTool portfolioComparisonTool,
+    MarketIntelligenceTool marketIntelligenceTool) : IMcpServerService
 {
-    private readonly IHoldingService _holdingService;
-    private readonly IPortfolioAnalysisService _portfolioAnalysisService;
-    private readonly ILogger<McpServerService> _logger;
-    private readonly AzureFoundryOptions _azureFoundryOptions;
-    private readonly EodApiOptions _eodApiOptions;
-    
-    // Direct tool references for execution
-    private readonly PortfolioHoldingsTool _portfolioHoldingsTool;
-    private readonly PortfolioAnalysisTool _portfolioAnalysisTool;
-    private readonly PortfolioComparisonTool _portfolioComparisonTool;
-    private readonly MarketIntelligenceTool _marketIntelligenceTool;
+
+    private readonly AzureFoundryOptions _azureFoundryOptions = azureFoundryOptions.Value;
+    private readonly EodApiOptions _eodApiOptions = eodApiOptions.Value;
     
     // Static session storage to persist across service instances (EOD requires session persistence)
     private static readonly ConcurrentDictionary<string, string> _eodSessionCache = new();
     private static readonly SemaphoreSlim _sessionSemaphore = new(1, 1);
     
+    // Service initialization components
+    private readonly SemaphoreSlim _initializationSemaphore = new(1, 1);
+    private bool _isInitialized = false;
     /// <summary>
     /// Get the session ID for the EOD MCP server
     /// </summary>
@@ -50,51 +44,160 @@ public class McpServerService : IMcpServerService
     /// </summary>
     private void SetEodSessionId(string sessionId) => _eodSessionCache[_eodApiOptions.McpServerUrl] = sessionId;
 
-    public McpServerService(
-        IHoldingService holdingService,
-        IPortfolioAnalysisService portfolioAnalysisService,
-        ILogger<McpServerService> logger,
-        IOptions<AzureFoundryOptions> azureFoundryOptions,
-        IOptions<EodApiOptions> eodApiOptions,
-        PortfolioHoldingsTool portfolioHoldingsTool,
-        PortfolioAnalysisTool portfolioAnalysisTool,
-        PortfolioComparisonTool portfolioComparisonTool,
-        MarketIntelligenceTool marketIntelligenceTool)
-    {
-        _holdingService = holdingService;
-        _portfolioAnalysisService = portfolioAnalysisService;
-        _logger = logger;
-        _azureFoundryOptions = azureFoundryOptions.Value;
-        _eodApiOptions = eodApiOptions.Value;
-        _portfolioHoldingsTool = portfolioHoldingsTool;
-        _portfolioAnalysisTool = portfolioAnalysisTool;
-        _portfolioComparisonTool = portfolioComparisonTool;
-        _marketIntelligenceTool = marketIntelligenceTool;
-    }
-
     public async Task InitializeAsync(CancellationToken cancellationToken = default)
     {
+        if (_isInitialized)
+            return;
+
+        await _initializationSemaphore.WaitAsync(cancellationToken);
         try
         {
-            _logger.LogInformation("Initializing MCP server with portfolio tools using Microsoft Agent Framework");
+            if (_isInitialized)
+                return;
 
+            logger.LogInformation("Initializing custom MCP server service with portfolio tools");
+
+            // Step 1: Validate configuration
+            await ValidateConfigurationAsync();
             
-// For now, create a simpler implementation that works with the current packages
-            // TODO: Enhance with proper Agent Framework integration when APIs are stable
+            // Step 2: Validate tool registry is populated
+            await ValidateToolRegistryAsync(cancellationToken);
+            
+            // Step 3: Pre-initialize EOD session if configured
+            await PreInitializeExternalIntegrationsAsync(cancellationToken);
+            
+            // Step 4: Validate core service connectivity
+            await ValidateServiceConnectivityAsync();
 
-            _logger.LogInformation("MCP server initialized successfully");
-            await Task.CompletedTask;
+            _isInitialized = true;
+            logger.LogInformation("Custom MCP server service initialization completed successfully. Available tools: {ToolCount}", 
+                PortfolioToolRegistry.Tools.Length);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error initializing MCP server");
+            logger.LogError(ex, "Error initializing custom MCP server service");
             throw;
+        }
+        finally
+        {
+            _initializationSemaphore.Release();
         }
     }
 
+    #region Initialization Helper Methods
+
+    /// <summary>
+    /// Validate all configuration options are properly set
+    /// </summary>
+    private Task ValidateConfigurationAsync()
+    {
+        logger.LogDebug("Validating MCP server configuration");
+
+        // Validate Azure Foundry configuration
+        if (_azureFoundryOptions == null)
+        {
+            throw new InvalidOperationException("Azure Foundry options not configured");
+        }
+
+        // Validate EOD configuration if token is provided (it's optional but if provided should be valid)
+        if (!string.IsNullOrEmpty(_eodApiOptions?.Token))
+        {
+            if (string.IsNullOrEmpty(_eodApiOptions.McpServerUrl))
+            {
+                throw new InvalidOperationException("EOD MCP server URL not configured but token provided");
+            }
+
+            if (_eodApiOptions.TimeoutSeconds <= 0)
+            {
+                logger.LogWarning("EOD timeout seconds not properly configured, using default");
+            }
+        }
+
+        logger.LogDebug("MCP server configuration validation completed");
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Validate that portfolio tools are properly registered
+    /// </summary>
+    private async Task ValidateToolRegistryAsync(CancellationToken cancellationToken)
+    {
+        logger.LogDebug("Validating portfolio tool registry");
+
+        var portfolioTools = PortfolioToolRegistry.GetMcpToolDefinitions();
+        
+        if (!portfolioTools.Any())
+        {
+            throw new InvalidOperationException("No portfolio tools found in registry");
+        }
+        
+        logger.LogDebug("Portfolio tool registry validated. Available tools: {ToolNames}", 
+            string.Join(", ", portfolioTools.Select(t => t.Name)));
+        
+        await Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Pre-initialize external integrations like EOD session
+    /// </summary>
+    private async Task PreInitializeExternalIntegrationsAsync(CancellationToken cancellationToken)
+    {
+        logger.LogDebug("Pre-initializing external integrations");
+
+        // Only initialize EOD if token is configured
+        if (!string.IsNullOrEmpty(_eodApiOptions?.Token))
+        {
+            try
+            {
+                logger.LogDebug("Pre-initializing EOD MCP session");
+                await EnsureEodSessionAsync(cancellationToken);
+                logger.LogDebug("EOD MCP session pre-initialized successfully");
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to pre-initialize EOD session during startup. Will retry on first use");
+                // Don't fail initialization if EOD is unavailable - it's an external dependency
+            }
+        }
+        else
+        {
+            logger.LogDebug("EOD API token not configured - skipping EOD session initialization");
+        }
+
+        logger.LogDebug("External integrations initialization completed");
+    }
+
+    /// <summary>
+    /// Validate connectivity to core services
+    /// </summary>
+    private async Task ValidateServiceConnectivityAsync()
+    {
+        logger.LogDebug("Validating core service connectivity");
+
+        try
+        {
+            // Test basic service connectivity by checking if we can access holding service
+            var testDate = DateOnly.FromDateTime(DateTime.UtcNow);
+            
+            // This will test database connectivity and core service availability
+            // Using a likely non-existent account ID to avoid returning large datasets
+            await holdingService.GetHoldingsByAccountAndDateAsync(int.MaxValue, testDate, CancellationToken.None);
+            
+            logger.LogDebug("Core service connectivity validation completed");
+        }
+        catch (Exception ex)
+        {
+            // Log the validation attempt but don't fail initialization
+            // Services might be temporarily unavailable during startup
+            logger.LogWarning(ex, "Core service connectivity validation failed - services may be starting up");
+        }
+    }
+
+    #endregion
+
     public async Task<object> ExecuteToolAsync(string toolName, Dictionary<string, object> parameters, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Executing MCP tool: {ToolName} with parameters: {@Parameters}", toolName, parameters);
+        logger.LogInformation("Executing MCP tool: {ToolName} with parameters: {@Parameters}", toolName, parameters);
         
         try
         {
@@ -111,14 +214,14 @@ public class McpServerService : IMcpServerService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error executing tool {ToolName}", toolName);
+            logger.LogError(ex, "Error executing tool {ToolName}", toolName);
             throw;
         }
     }
 
     public Task<IEnumerable<McpToolDefinition>> GetAvailableToolsAsync()
     {
-        _logger.LogInformation("Returning available MCP tools from centralized tool registry");
+        logger.LogInformation("Returning available MCP tools from centralized tool registry");
         
         var tools = PortfolioToolRegistry.GetMcpToolDefinitions();
         return Task.FromResult(tools);
@@ -130,7 +233,7 @@ public class McpServerService : IMcpServerService
         {
             // Check if core services are available
             var testDate = DateOnly.FromDateTime(DateTime.UtcNow);
-            await _holdingService.GetHoldingsByAccountAndDateAsync(1, testDate, CancellationToken.None);
+            await holdingService.GetHoldingsByAccountAndDateAsync(1, testDate, CancellationToken.None);
             return true;
         }
         catch
@@ -146,7 +249,7 @@ public class McpServerService : IMcpServerService
         var accountId = Convert.ToInt32(parameters["accountId"]);
         var date = parameters["date"].ToString()!;
         
-        return await _portfolioHoldingsTool.GetPortfolioHoldings(accountId, date, cancellationToken);
+        return await portfolioHoldingsTool.GetPortfolioHoldings(accountId, date, cancellationToken);
     }
 
     private async Task<object> ExecuteAnalyzePortfolioPerformance(Dictionary<string, object> parameters, CancellationToken cancellationToken)
@@ -154,7 +257,7 @@ public class McpServerService : IMcpServerService
         var accountId = Convert.ToInt32(parameters["accountId"]);
         var analysisDate = parameters["analysisDate"].ToString()!;
         
-        return await _portfolioAnalysisTool.AnalyzePortfolioPerformance(accountId, analysisDate, cancellationToken);
+        return await portfolioAnalysisTool.AnalyzePortfolioPerformance(accountId, analysisDate, cancellationToken);
     }
 
     private async Task<object> ExecuteComparePortfolioPerformance(Dictionary<string, object> parameters, CancellationToken cancellationToken)
@@ -163,7 +266,7 @@ public class McpServerService : IMcpServerService
         var startDate = parameters["startDate"].ToString()!;
         var endDate = parameters["endDate"].ToString()!;
         
-        return await _portfolioComparisonTool.ComparePortfolioPerformance(accountId, startDate, endDate, cancellationToken);
+        return await portfolioComparisonTool.ComparePortfolioPerformance(accountId, startDate, endDate, cancellationToken);
     }
 
     private async Task<object> ExecuteGetMarketContext(Dictionary<string, object> parameters, CancellationToken cancellationToken)
@@ -171,7 +274,7 @@ public class McpServerService : IMcpServerService
         var tickers = ExtractStringArrayFromJsonParameter(parameters["tickers"]);
         var date = parameters["date"].ToString()!;
         
-        return await _marketIntelligenceTool.GetMarketContext(tickers, date, cancellationToken);
+        return await marketIntelligenceTool.GetMarketContext(tickers, date, cancellationToken);
     }
 
     private async Task<object> ExecuteSearchFinancialNews(Dictionary<string, object> parameters, CancellationToken cancellationToken)
@@ -180,14 +283,14 @@ public class McpServerService : IMcpServerService
         var fromDate = parameters["fromDate"].ToString()!;
         var toDate = parameters["toDate"].ToString()!;
         
-        return await _marketIntelligenceTool.SearchFinancialNews(tickers, fromDate, toDate, cancellationToken);
+        return await marketIntelligenceTool.SearchFinancialNews(tickers, fromDate, toDate, cancellationToken);
     }
 
     private async Task<object> ExecuteGetMarketSentiment(Dictionary<string, object> parameters, CancellationToken cancellationToken)
     {
         var date = parameters["date"].ToString()!;
         
-        return await _marketIntelligenceTool.GetMarketSentiment(date, cancellationToken);
+        return await marketIntelligenceTool.GetMarketSentiment(date, cancellationToken);
     }
 
     /// <summary>
@@ -202,7 +305,7 @@ public class McpServerService : IMcpServerService
     {
         try
         {
-            _logger.LogInformation("Calling external MCP tool {ToolName} on server {ServerId}", toolName, serverId);
+            logger.LogInformation("Calling external MCP tool {ToolName} on server {ServerId}", toolName, serverId);
 
             // Handle EOD Historical Data MCP server calls
             if (serverId == _eodApiOptions.McpServerUrl)
@@ -214,7 +317,7 @@ public class McpServerService : IMcpServerService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error calling external MCP tool {ToolName} on server {ServerId}", toolName, serverId);
+            logger.LogError(ex, "Error calling external MCP tool {ToolName} on server {ServerId}", toolName, serverId);
             throw;
         }
     }
@@ -227,7 +330,7 @@ public class McpServerService : IMcpServerService
         // Validate EOD API token is configured
         if (string.IsNullOrEmpty(_eodApiOptions.Token))
         {
-            _logger.LogError("EOD API token not configured - cannot call MCP server");
+            logger.LogError("EOD API token not configured - cannot call MCP server");
             throw new InvalidOperationException("Cannot call EOD MCP server: API token not configured");
         }
 
@@ -236,9 +339,8 @@ public class McpServerService : IMcpServerService
 
         try
         {
-            using var httpClient = new HttpClient();
-            
-httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
+            using var httpClient = new HttpClient();           
+            httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
             
             // Build the EOD MCP server URL with API key parameter
             var eodServerUrl = $"{_eodApiOptions.McpServerUrl}?apikey={_eodApiOptions.Token}";
@@ -251,11 +353,11 @@ httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
             if (!string.IsNullOrEmpty(sessionId))
             {
                 httpClient.DefaultRequestHeaders.Add("Mcp-Session-Id", sessionId);
-                _logger.LogInformation("Added EOD session ID header: {SessionId}", sessionId);
+                logger.LogInformation("Added EOD session ID header: {SessionId}", sessionId);
             }
             else
             {
-                _logger.LogWarning("No session ID available for EOD MCP request");
+                logger.LogWarning("No session ID available for EOD MCP request");
             }
 
             // Prepare MCP request payload in proper JSON-RPC 2.0 format
@@ -274,7 +376,7 @@ httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
             var jsonContent = System.Text.Json.JsonSerializer.Serialize(mcpRequest);
             var httpContent = new StringContent(jsonContent, System.Text.Encoding.UTF8, "application/json");
 
-            _logger.LogInformation("Calling EOD MCP server: {Url} with tool {ToolName}", 
+            logger.LogInformation("Calling EOD MCP server: {Url} with tool {ToolName}", 
                 eodServerUrl, toolName);
 
             var response = await httpClient.PostAsync(eodServerUrl, httpContent, cancellationToken);
@@ -282,18 +384,18 @@ httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
             if (!response.IsSuccessStatusCode)
             {
                 var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
-                _logger.LogError("EOD MCP server returned {StatusCode} for tool {ToolName}: {Error}", 
+                logger.LogError("EOD MCP server returned {StatusCode} for tool {ToolName}: {Error}", 
                     response.StatusCode, toolName, errorContent);
                 throw new InvalidOperationException($"EOD MCP server call failed with status {response.StatusCode}: {errorContent}");
             }
 
             var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
-            _logger.LogInformation("EOD MCP server response for tool {ToolName}: {Response}", toolName, responseContent);
+            logger.LogInformation("EOD MCP server response for tool {ToolName}: {Response}", toolName, responseContent);
 
             // Validate response content before parsing
             if (string.IsNullOrWhiteSpace(responseContent))
             {
-                _logger.LogError("EOD MCP server returned empty response for tool {ToolName}", toolName);
+                logger.LogError("EOD MCP server returned empty response for tool {ToolName}", toolName);
                 throw new InvalidOperationException($"EOD MCP server returned empty response for tool '{toolName}'");
             }
 
@@ -301,7 +403,7 @@ httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
             if (responseContent.StartsWith("Error:") || responseContent.StartsWith("ERROR:") ||
                 responseContent.StartsWith("<!DOCTYPE") || responseContent.StartsWith("<html"))
             {
-                _logger.LogError("EOD MCP server returned error response for tool {ToolName}: {Error}", toolName, responseContent);
+                logger.LogError("EOD MCP server returned error response for tool {ToolName}: {Error}", toolName, responseContent);
                 throw new InvalidOperationException($"EOD MCP server returned error for tool '{toolName}': {responseContent}");
             }
 
@@ -322,21 +424,21 @@ httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
                         if (string.IsNullOrWhiteSpace(jsonData) || !IsValidJsonStart(jsonData))
                         {
                             var analysis = string.IsNullOrWhiteSpace(jsonData) ? "JSON data is null or empty" : AnalyzeInvalidContent(jsonData);
-                            _logger.LogError("Invalid JSON data in SSE response for tool {ToolName}. Analysis: {Analysis}", toolName, analysis);
+                            logger.LogError("Invalid JSON data in SSE response for tool {ToolName}. Analysis: {Analysis}", toolName, analysis);
                             throw new InvalidOperationException($"Invalid JSON in SSE response for tool '{toolName}': {analysis}");
                         }
                         
                         var mcpResponse = System.Text.Json.JsonSerializer.Deserialize<object>(jsonData);
                         if (mcpResponse == null)
                         {
-                            _logger.LogError("Failed to deserialize SSE JSON data for tool {ToolName}", toolName);
+                            logger.LogError("Failed to deserialize SSE JSON data for tool {ToolName}", toolName);
                             throw new InvalidOperationException($"Invalid JSON in SSE response for tool '{toolName}'");
                         }
                         return mcpResponse;
                     }
                     else
                     {
-                        _logger.LogError("No data line found in SSE response for tool {ToolName}", toolName);
+                        logger.LogError("No data line found in SSE response for tool {ToolName}", toolName);
                         throw new InvalidOperationException($"Invalid SSE response format for tool '{toolName}'");
                     }
                 }
@@ -346,7 +448,7 @@ httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
                     if (!IsValidJsonStart(responseContent))
                     {
                         var analysis = AnalyzeInvalidContent(responseContent);
-                        _logger.LogError("Response is not valid JSON for tool {ToolName}. Analysis: {Analysis}", toolName, analysis);
+                        logger.LogError("Response is not valid JSON for tool {ToolName}. Analysis: {Analysis}", toolName, analysis);
                         throw new InvalidOperationException($"EOD MCP server returned non-JSON response for tool '{toolName}': {analysis}");
                     }
 
@@ -355,7 +457,7 @@ httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
                     
                     if (mcpResponse == null)
                     {
-                        _logger.LogError("EOD MCP server returned null response for tool {ToolName}", toolName);
+                        logger.LogError("EOD MCP server returned null response for tool {ToolName}", toolName);
                         throw new InvalidOperationException($"EOD MCP server returned invalid response for tool '{toolName}'");
                     }
                     
@@ -364,23 +466,23 @@ httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
             }
             catch (System.Text.Json.JsonException ex)
             {
-                _logger.LogError(ex, "Failed to parse EOD MCP response as JSON for tool {ToolName}. Response content: {Response}", toolName, responseContent);
+                logger.LogError(ex, "Failed to parse EOD MCP response as JSON for tool {ToolName}. Response content: {Response}", toolName, responseContent);
                 throw new InvalidOperationException($"EOD MCP server returned invalid JSON response for tool '{toolName}': {ex.Message}. Response was: {responseContent}", ex);
             }
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogError(ex, "HTTP error calling EOD MCP server for tool {ToolName}", toolName);
+            logger.LogError(ex, "HTTP error calling EOD MCP server for tool {ToolName}", toolName);
             throw new InvalidOperationException($"Failed to call EOD MCP server for tool '{toolName}': {ex.Message}", ex);
         }
         catch (TaskCanceledException ex)
         {
-            _logger.LogError(ex, "Timeout calling EOD MCP server for tool {ToolName}", toolName);
+            logger.LogError(ex, "Timeout calling EOD MCP server for tool {ToolName}", toolName);
             throw new InvalidOperationException($"Timeout calling EOD MCP server for tool '{toolName}': {ex.Message}", ex);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error calling EOD MCP server for tool {ToolName}", toolName);
+            logger.LogError(ex, "Error calling EOD MCP server for tool {ToolName}", toolName);
             throw new InvalidOperationException($"Failed to call EOD MCP server for tool '{toolName}': {ex.Message}", ex);
         }
     }
@@ -404,22 +506,20 @@ httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
                 return;
             }
 
-            _logger.LogInformation("Initializing EOD MCP session with InitializeRequest");
+            logger.LogInformation("Initializing EOD MCP session with InitializeRequest");
 
             // Validate EOD API token is configured
             if (string.IsNullOrEmpty(_eodApiOptions.Token))
             {
-                _logger.LogError("EOD API token not configured - cannot initialize session");
+                logger.LogError("EOD API token not configured - cannot initialize session");
                 throw new InvalidOperationException("Cannot initialize EOD MCP session: API token not configured");
             }
 
-            using var httpClient = new HttpClient();
-            
-httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
+            using var httpClient = new HttpClient();           
+            httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
             
             // Build the EOD MCP server URL with API key parameter
-            var eodServerUrl = $"{_eodApiOptions.McpServerUrl}?apikey={_eodApiOptions.Token}";
-            
+            var eodServerUrl = $"{_eodApiOptions.McpServerUrl}?apikey={_eodApiOptions.Token}";        
             httpClient.DefaultRequestHeaders.Add("Accept", "application/json, text/event-stream");
 
             // Send InitializeRequest as per EOD support instructions
@@ -446,14 +546,14 @@ httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
             var jsonContent = System.Text.Json.JsonSerializer.Serialize(initRequest);
             var httpContent = new StringContent(jsonContent, System.Text.Encoding.UTF8, "application/json");
 
-            _logger.LogInformation("Sending InitializeRequest to EOD MCP server");
+            logger.LogInformation("Sending InitializeRequest to EOD MCP server");
 
             var response = await httpClient.PostAsync(eodServerUrl, httpContent, cancellationToken);
             
             if (!response.IsSuccessStatusCode)
             {
                 var errorContent = await response.Content.ReadAsStringAsync(cancellationToken);
-                _logger.LogError("Failed to initialize EOD MCP session: {StatusCode} - {Error}", 
+                logger.LogError("Failed to initialize EOD MCP session: {StatusCode} - {Error}", 
                     response.StatusCode, errorContent);
                 throw new InvalidOperationException($"Failed to initialize EOD MCP session: {response.StatusCode} - {errorContent}");
             }
@@ -469,18 +569,18 @@ httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
             if (!string.IsNullOrEmpty(sessionId))
             {
                 SetEodSessionId(sessionId);
-                _logger.LogInformation("Successfully initialized EOD MCP session with ID: {SessionId}", sessionId);
+                logger.LogInformation("Successfully initialized EOD MCP session with ID: {SessionId}", sessionId);
                 return;
             }
 
             // If no session ID in header, log error
             var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
-            _logger.LogError("EOD MCP server did not return Mcp-Session-Id header. Response: {Response}", responseContent);
+            logger.LogError("EOD MCP server did not return Mcp-Session-Id header. Response: {Response}", responseContent);
             throw new InvalidOperationException("EOD MCP server did not return required Mcp-Session-Id header in InitializeRequest response");
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to initialize EOD MCP session");
+            logger.LogError(ex, "Failed to initialize EOD MCP session");
             throw new InvalidOperationException($"Failed to initialize EOD MCP session: {ex.Message}", ex);
         }
         finally
@@ -573,6 +673,26 @@ httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
         }
 
         return Array.Empty<string>();
+    }
+
+    /// <summary>
+    /// Dispose of the MCP server resources properly
+    /// </summary>
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            logger.LogInformation("Cleaning up custom MCP server service");
+            _isInitialized = false;
+            logger.LogInformation("Custom MCP server service cleaned up successfully");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error cleaning up custom MCP server service");
+        }
+
+        _initializationSemaphore.Dispose();
+        await Task.CompletedTask;
     }
 
     #endregion

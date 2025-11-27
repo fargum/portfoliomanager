@@ -13,13 +13,8 @@ public class CurrencyConversionService(
     IExchangeRateRepository exchangeRateRepository,
     ILogger<CurrencyConversionService> logger) : ICurrencyConversionService
 {
-    private readonly IExchangeRateRepository _exchangeRateRepository = exchangeRateRepository ?? throw new ArgumentNullException(nameof(exchangeRateRepository));
-    private readonly ILogger<CurrencyConversionService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-
     // Supported currency pairs for conversion
     private static readonly string[] SupportedCurrencies = { CurrencyConstants.GBP, CurrencyConstants.USD, CurrencyConstants.EUR, CurrencyConstants.GBX };
-    private const string BaseCurrency = CurrencyConstants.DEFAULT_BASE_CURRENCY; // Portfolio base currency
-
     public async Task<(decimal convertedAmount, decimal exchangeRate, string rateSource)> ConvertCurrencyAsync(
         decimal amount, 
         string fromCurrency, 
@@ -48,30 +43,27 @@ public class CurrencyConversionService(
         }
 
         // Get exchange rate from database
-        var exchangeRate = await _exchangeRateRepository.GetLatestRateAsync(fromCurrency, toCurrency, valuationDate, cancellationToken);
+        var exchangeRate = await exchangeRateRepository.GetLatestRateAsync(fromCurrency, toCurrency, valuationDate, cancellationToken);
         
         if (exchangeRate != null)
         {
             var convertedAmount = amount * exchangeRate.Rate;
-            _logger.LogDebug("Converted {Amount} {FromCurrency} to {ConvertedAmount} {ToCurrency} using rate {Rate} from {Source}", 
+            logger.LogDebug("Converted {Amount} {FromCurrency} to {ConvertedAmount} {ToCurrency} using rate {Rate} from {Source}", 
                 amount, fromCurrency, convertedAmount, toCurrency, exchangeRate.Rate, exchangeRate.Source);
-            
-            
-return (convertedAmount, exchangeRate.Rate, exchangeRate.Source);
+                     
+            return (convertedAmount, exchangeRate.Rate, exchangeRate.Source);
         }
 
         // Try inverse rate (e.g., if we need USD/GBP but only have GBP/USD)
-        var inverseRate = await _exchangeRateRepository.GetLatestRateAsync(toCurrency, fromCurrency, valuationDate, cancellationToken);
+        var inverseRate = await exchangeRateRepository.GetLatestRateAsync(toCurrency, fromCurrency, valuationDate, cancellationToken);
         
         if (inverseRate != null && inverseRate.Rate != 0)
         {
             var rate = 1m / inverseRate.Rate;
             var convertedAmount = amount * rate;
-            _logger.LogDebug("Converted {Amount} {FromCurrency} to {ConvertedAmount} {ToCurrency} using inverse rate {Rate} from {Source}", 
-                amount, fromCurrency, convertedAmount, toCurrency, rate, inverseRate.Source);
-            
-            
-return (convertedAmount, rate, $"INVERSE_{inverseRate.Source}");
+            logger.LogDebug("Converted {Amount} {FromCurrency} to {ConvertedAmount} {ToCurrency} using inverse rate {Rate} from {Source}", 
+                amount, fromCurrency, convertedAmount, toCurrency, rate, inverseRate.Source);                  
+            return (convertedAmount, rate, $"INVERSE_{inverseRate.Source}");
         }
 
         // No exchange rate available

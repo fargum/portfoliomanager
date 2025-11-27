@@ -8,18 +8,10 @@ namespace FtoConsulting.PortfolioManager.Application.Services;
 /// <summary>
 /// Service implementation for calculating pricing with proper currency conversion and unit handling
 /// </summary>
-public class PricingCalculationService : IPricingCalculationService
+public class PricingCalculationService(
+    ICurrencyConversionService currencyConversionService,
+    ILogger<PricingCalculationService> logger) : IPricingCalculationService
 {
-    private readonly ICurrencyConversionService _currencyConversionService;
-    private readonly ILogger<PricingCalculationService> _logger;
-
-    public PricingCalculationService(
-        ICurrencyConversionService currencyConversionService,
-        ILogger<PricingCalculationService> logger)
-    {
-        _currencyConversionService = currencyConversionService ?? throw new ArgumentNullException(nameof(currencyConversionService));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
 
     /// <summary>
     /// Calculate current value considering quote unit conversion and currency conversion to GBP
@@ -65,7 +57,7 @@ public class PricingCalculationService : IPricingCalculationService
         {
             try
             {
-                var conversionResult = await _currencyConversionService.ConvertCurrencyAsync(
+                var conversionResult = await currencyConversionService.ConvertCurrencyAsync(
                     grossValue, 
                     actualCurrency, 
                     CurrencyConstants.GBP, 
@@ -75,7 +67,7 @@ public class PricingCalculationService : IPricingCalculationService
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Failed to convert {GrossValue} {Currency} to GBP for {ValuationDate}, using unconverted value", 
+                logger.LogWarning(ex, "Failed to convert {GrossValue} {Currency} to GBP for {ValuationDate}, using unconverted value", 
                     grossValue, actualCurrency, valuationDate);
                 
                 
@@ -112,7 +104,7 @@ public class PricingCalculationService : IPricingCalculationService
         if (ticker.Equals(ExchangeConstants.ISF_TICKER, StringComparison.OrdinalIgnoreCase))
         {
             var scaledPrice = price * ExchangeConstants.ISF_SCALING_FACTOR;
-            _logger.LogInformation("Applied scaling factor {ScalingFactor} to {Ticker}: Original price={OriginalPrice}, Scaled price={ScaledPrice}", 
+            logger.LogInformation("Applied scaling factor {ScalingFactor} to {Ticker}: Original price={OriginalPrice}, Scaled price={ScaledPrice}", 
                 ExchangeConstants.ISF_SCALING_FACTOR, ticker, price, scaledPrice);
             return scaledPrice;
         }

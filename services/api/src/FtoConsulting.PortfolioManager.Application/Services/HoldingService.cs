@@ -12,44 +12,17 @@ namespace FtoConsulting.PortfolioManager.Application.Services;
 /// Comprehensive service for all holding operations (CRUD and retrieval)
 /// Combines both holding management and retrieval functionality
 /// </summary>
-public class HoldingService : IHoldingService
+public class HoldingService(
+    IHoldingRepository holdingRepository,
+    IPortfolioRepository portfolioRepository,
+    IInstrumentRepository instrumentRepository,
+    IInstrumentManagementService instrumentManagementService,
+    IPricingCalculationHelper pricingCalculationHelper,
+    IPricingCalculationService pricingCalculationService,
+    IUnitOfWork unitOfWork,
+    ILogger<HoldingService> logger,
+    Func<EodMarketDataTool>? eodMarketDataToolFactory = null) : IHoldingService
 {
-    private readonly IHoldingRepository _holdingRepository;
-    private readonly IPortfolioRepository _portfolioRepository;
-    private readonly IInstrumentRepository _instrumentRepository;
-    private readonly IInstrumentManagementService _instrumentManagementService;
-    private readonly IPricingCalculationHelper _pricingCalculationHelper;
-    private readonly IPricingCalculationService _pricingCalculationService;
-    private readonly ICurrencyConversionService _currencyConversionService;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly ILogger<HoldingService> _logger;
-    private readonly Func<EodMarketDataTool>? _eodMarketDataToolFactory;
-
-    public HoldingService(
-        IHoldingRepository holdingRepository,
-        IPortfolioRepository portfolioRepository,
-        IInstrumentRepository instrumentRepository,
-        IInstrumentManagementService instrumentManagementService,
-        IPricingCalculationHelper pricingCalculationHelper,
-        IPricingCalculationService pricingCalculationService,
-        ICurrencyConversionService currencyConversionService,
-        IUnitOfWork unitOfWork,
-        ILogger<HoldingService> logger,
-        Func<EodMarketDataTool>? eodMarketDataToolFactory = null)
-    {
-        _holdingRepository = holdingRepository ?? throw new ArgumentNullException(nameof(holdingRepository));
-        _portfolioRepository = portfolioRepository ?? throw new ArgumentNullException(nameof(portfolioRepository));
-        _instrumentRepository = instrumentRepository ?? throw new ArgumentNullException(nameof(instrumentRepository));
-        _instrumentManagementService = instrumentManagementService ?? throw new ArgumentNullException(nameof(instrumentManagementService));
-        _pricingCalculationHelper = pricingCalculationHelper ?? throw new ArgumentNullException(nameof(pricingCalculationHelper));
-        _pricingCalculationService = pricingCalculationService ?? throw new ArgumentNullException(nameof(pricingCalculationService));
-        _currencyConversionService = currencyConversionService ?? throw new ArgumentNullException(nameof(currencyConversionService));
-        _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _eodMarketDataToolFactory = eodMarketDataToolFactory;
-    }
-
-    // Read Operations (from HoldingsRetrievalService)
 
     /// <summary>
     /// Retrieves all holdings for a given account on a specific date
@@ -57,7 +30,7 @@ public class HoldingService : IHoldingService
     /// </summary>
     public async Task<IEnumerable<Holding>> GetHoldingsByAccountAndDateAsync(int accountId, DateOnly valuationDate, CancellationToken cancellationToken = default)
     {
-        _logger.LogInformation("Retrieving holdings for account {AccountId} on date {ValuationDate}", accountId, valuationDate);
+        logger.LogInformation("Retrieving holdings for account {AccountId} on date {ValuationDate}", accountId, valuationDate);
 
         try
         {
@@ -68,8 +41,8 @@ public class HoldingService : IHoldingService
             if (valuationDate < today)
             {
                 // Historical data - get holdings for the specific date
-                holdings = await _holdingRepository.GetHoldingsByAccountAndDateAsync(accountId, dateTime, cancellationToken);
-                _logger.LogInformation("Retrieved {Count} historical holdings for account {AccountId} on date {ValuationDate}", 
+                holdings = await holdingRepository.GetHoldingsByAccountAndDateAsync(accountId, dateTime, cancellationToken);
+                logger.LogInformation("Retrieved {Count} historical holdings for account {AccountId} on date {ValuationDate}", 
                     holdings.Count(), accountId, valuationDate);
                 return holdings;
             }
@@ -77,42 +50,42 @@ public class HoldingService : IHoldingService
             if (valuationDate > today)
             {
                 // Future date - not supported, return empty
-                _logger.LogWarning("Future date {ValuationDate} requested, returning empty holdings", valuationDate);
+                logger.LogWarning("Future date {ValuationDate} requested, returning empty holdings", valuationDate);
                 holdings = Enumerable.Empty<Holding>();
                 return holdings;
             }
 
-            holdings = await _holdingRepository.GetHoldingsByAccountAndDateAsync(accountId, dateTime, cancellationToken);
+            holdings = await holdingRepository.GetHoldingsByAccountAndDateAsync(accountId, dateTime, cancellationToken);
             if (holdings.Any())
             {
-                _logger.LogInformation("Retrieved {Count} holdings for account {AccountId} on today's date {ValuationDate}", 
+                logger.LogInformation("Retrieved {Count} holdings for account {AccountId} on today's date {ValuationDate}", 
                     holdings.Count(), accountId, valuationDate);
                 return holdings;
             }
 
             // Real-time data - get the most recent holdings and apply real-time pricing
-            var latestDate = await _holdingRepository.GetLatestValuationDateAsync(cancellationToken);
+            var latestDate = await holdingRepository.GetLatestValuationDateAsync(cancellationToken);
             if (latestDate.HasValue)
             {
                 // Get ALL holdings from the latest date, then filter by account (using no-tracking for real-time pricing)
-                var allLatestHoldings = await _holdingRepository.GetHoldingsByValuationDateWithInstrumentsNoTrackingAsync(latestDate.Value, cancellationToken);
+                var allLatestHoldings = await holdingRepository.GetHoldingsByValuationDateWithInstrumentsNoTrackingAsync(latestDate.Value, cancellationToken);
                 holdings = allLatestHoldings.Where(h => h.Portfolio.AccountId == accountId).ToList();
-                _logger.LogInformation("Retrieved {Count} latest holdings for account {AccountId} from date {LatestDate} for real-time pricing (no tracking to prevent persistence)", 
+                logger.LogInformation("Retrieved {Count} latest holdings for account {AccountId} from date {LatestDate} for real-time pricing (no tracking to prevent persistence)", 
                     holdings.Count(), accountId, latestDate.Value);
 
-                if (_eodMarketDataToolFactory != null)
+                if (eodMarketDataToolFactory != null)
                 {
-                    _logger.LogInformation("Applying real-time pricing for today's date: {Date}", valuationDate);
+                    logger.LogInformation("Applying real-time pricing for today's date: {Date}", valuationDate);
                     holdings = await ApplyRealTimePricing(holdings.ToList(), valuationDate, cancellationToken);
                 }
                 else
                 {
-                    _logger.LogWarning("EOD market data tool not available for real-time pricing, returning latest holdings with historical prices");
+                    logger.LogWarning("EOD market data tool not available for real-time pricing, returning latest holdings with historical prices");
                 }
             }
             else
             {
-                _logger.LogWarning("No historical holdings found for account {AccountId}, returning empty holdings", accountId);
+                logger.LogWarning("No historical holdings found for account {AccountId}, returning empty holdings", accountId);
                 holdings = Enumerable.Empty<Holding>();
             }
                       
@@ -120,12 +93,10 @@ public class HoldingService : IHoldingService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving holdings for account {AccountId} on date {ValuationDate}", accountId, valuationDate);
+            logger.LogError(ex, "Error retrieving holdings for account {AccountId} on date {ValuationDate}", accountId, valuationDate);
             throw;
         }
     }
-
-    // Create Operations (from HoldingManagementService)
 
     /// <summary>
     /// Adds a new holding to a portfolio for the latest valuation date
@@ -140,183 +111,48 @@ public class HoldingService : IHoldingService
 
         try
         {
-            _logger.LogInformation("Adding new holding {Ticker} to portfolio {PortfolioId} for account {AccountId}",
+            logger.LogInformation("Adding new holding {Ticker} to portfolio {PortfolioId} for account {AccountId}",
                 request.Ticker, portfolioId, accountId);
 
-            // Validate input
-            var validationErrors = ValidateAddHoldingRequest(request);
-            if (validationErrors.Any())
-            {
-                result.Errors.AddRange(validationErrors);
-                result.Message = "Validation failed";
+            // Validate and setup prerequisites
+            if (!await ValidateAndSetupAddHoldingAsync(result, request, portfolioId, accountId, cancellationToken))
                 return result;
-            }
 
-            // Get latest valuation date
-            var latestValuationDate = await _holdingRepository.GetLatestValuationDateAsync(cancellationToken);
-            if (latestValuationDate == null)
-            {
-                result.Errors.Add("No holdings found in the system");
-                result.Message = "Cannot add holdings - no valuation data available";
-                return result;
-            }
+            // Get latest valuation date (validated in previous step)
+            var latestValuationDate = await holdingRepository.GetLatestValuationDateAsync(cancellationToken);
 
-            // Verify portfolio ownership
-            var portfolio = await _portfolioRepository.GetByIdAsync(portfolioId);
-            if (portfolio == null || portfolio.AccountId != accountId)
-            {
-                _logger.LogWarning("Portfolio access denied: PortfolioId={PortfolioId}, AccountId={AccountId}, Portfolio={Portfolio}", 
-                    portfolioId, accountId, portfolio);
-                result.Errors.Add("Portfolio not found or does not belong to your account");
-                result.Message = "Portfolio not accessible";
-                return result;
-            }
-
-            _logger.LogInformation("Portfolio verification successful: PortfolioId={PortfolioId}, PortfolioName={PortfolioName}, OwnerAccountId={OwnerAccountId}", 
-                portfolio.Id, portfolio.Name, portfolio.AccountId);
-
-            // Debug dependency injection
-            _logger.LogInformation("Checking dependency injection - UnitOfWork: {UnitOfWorkType}, HoldingRepository: {HoldingRepositoryType}, PortfolioRepository: {PortfolioRepositoryType}", 
-                _unitOfWork?.GetType().Name ?? "NULL",
-                _holdingRepository?.GetType().Name ?? "NULL", 
-                _portfolioRepository?.GetType().Name ?? "NULL");
-
-            if (_unitOfWork == null)
-            {
-                _logger.LogError("UnitOfWork is null - dependency injection failure");
-                result.Errors.Add("Internal service configuration error - UnitOfWork not available");
-                result.Message = "Service configuration error";
-                return result;
-            }
-
-            // Begin transaction
-            _logger.LogInformation("Beginning database transaction for holding creation");
-            try
-            {
-                await _unitOfWork.BeginTransactionAsync();
-                _logger.LogInformation("Database transaction started successfully");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to begin database transaction: {ErrorMessage}", ex.Message);
-                result.Errors.Add($"Database transaction error: {ex.Message}");
-                result.Message = "Failed to begin database transaction";
-                return result;
-            }
-
-            // Ensure instrument exists
-            _logger.LogInformation("Starting instrument processing for ticker: {Ticker}", request.Ticker);
-            var instrument = await EnsureInstrumentExistsAsync(request, cancellationToken);
+            // Process instrument and check for duplicates
+            var instrument = await ProcessInstrumentForAddAsync(result, request, portfolioId, latestValuationDate!.Value, cancellationToken);
             if (instrument == null)
-            {
-                result.Errors.Add("Failed to create or retrieve instrument");
-                result.Message = "Instrument processing failed";
                 return result;
-            }
 
-            result.Instrument = instrument;
-            result.InstrumentCreated = await WasInstrumentJustCreated(request.Ticker, cancellationToken);
-
-            _logger.LogInformation("Instrument processed: {InstrumentId}, Created: {InstrumentCreated}", 
-                instrument.Id, result.InstrumentCreated);
-
-            // Check for duplicate holding
-            _logger.LogInformation("Checking for duplicate holding: Portfolio={PortfolioId}, Instrument={InstrumentId}, Date={ValuationDate}", 
-                portfolioId, instrument.Id, latestValuationDate.Value);
-            
-            var existingHolding = await GetExistingHoldingAsync(portfolioId, instrument.Id, latestValuationDate.Value, cancellationToken);
-            if (existingHolding != null)
-            {
-                _logger.LogWarning("Duplicate holding found: {ExistingHoldingId}", existingHolding.Id);
-                result.Errors.Add($"A holding for {request.Ticker} already exists in this portfolio for the current valuation date");
-                result.Message = "Duplicate holding detected";
+            // Calculate pricing and create holding
+            var holding = await CreateAndSaveHoldingAsync(result, request, portfolioId, instrument, latestValuationDate.Value, cancellationToken);
+            if (holding == null)
                 return result;
-            }
 
-            _logger.LogInformation("No duplicate holding found, proceeding with pricing calculation");
-
-            // Calculate current value
-            _logger.LogInformation("Starting pricing calculation for {Ticker}, Units={Units}, QuoteUnit={QuoteUnit}, Currency={Currency}", 
-                instrument.Ticker, request.Units, instrument.QuoteUnit, instrument.CurrencyCode);
-                
-            var pricingResult = await _pricingCalculationHelper.FetchAndCalculateHoldingValueAsync(
-                instrument.Id, instrument.Ticker, request.Units, 
-                instrument.QuoteUnit, instrument.CurrencyCode, 
-                latestValuationDate.Value, cancellationToken);
-
-            if (!pricingResult.Success)
-            {
-                _logger.LogError("Pricing calculation failed: {ErrorMessage}", pricingResult.ErrorMessage);
-                result.Errors.Add(pricingResult.ErrorMessage ?? "Failed to calculate current value");
-                result.Message = "Pricing calculation failed";
-                return result;
-            }
-
-            _logger.LogInformation("Pricing calculation successful: CurrentPrice={CurrentPrice}, CurrentValue={CurrentValue}", 
-                pricingResult.CurrentPrice, pricingResult.CurrentValue);
-
-            // Create new holding
-            _logger.LogInformation("Creating new holding: ValuationDate={ValuationDate}, InstrumentId={InstrumentId}, PlatformId={PlatformId}, PortfolioId={PortfolioId}, Units={Units}, BoughtValue={BoughtValue}, CurrentValue={CurrentValue}",
-                latestValuationDate.Value, instrument.Id, request.PlatformId, portfolioId, request.Units, request.BoughtValue, pricingResult.CurrentValue);
-                
-            var newHolding = new Holding(
-                DateTime.SpecifyKind(latestValuationDate.Value.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc),
-                instrument.Id,
-                request.PlatformId,
-                portfolioId,
-                request.Units,
-                request.BoughtValue,
-                pricingResult.CurrentValue);
-
-            _logger.LogInformation("Holding entity created with ID: {HoldingId}", newHolding.Id);
-
-            // Add to repository
-            _logger.LogInformation("Adding holding to repository");
-            await _holdingRepository.AddAsync(newHolding);
-            
-            _logger.LogInformation("Saving changes to database");
-            await _unitOfWork.SaveChangesAsync();
-            
-            _logger.LogInformation("Committing transaction");
-            await _unitOfWork.CommitTransactionAsync();
-
-            _logger.LogInformation("Transaction committed successfully");
-
-            // Set result
+            // Success
             result.Success = true;
-            result.CreatedHolding = newHolding;
-            result.CurrentPrice = pricingResult.CurrentPrice;
-            result.CurrentValue = pricingResult.CurrentValue;
+            result.CreatedHolding = holding;
             result.Message = $"Successfully added {request.Units:N4} units of {request.Ticker} to portfolio";
 
-            _logger.LogInformation("Successfully added holding {Ticker} to portfolio {PortfolioId}",
+            logger.LogInformation("Successfully added holding {Ticker} to portfolio {PortfolioId}",
                 request.Ticker, portfolioId);
 
             return result;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error adding holding {Ticker} to portfolio {PortfolioId}. Exception type: {ExceptionType}, Message: {Message}, StackTrace: {StackTrace}", 
-                request.Ticker, portfolioId, ex.GetType().Name, ex.Message, ex.StackTrace);
+            logger.LogError(ex, "Error adding holding {Ticker} to portfolio {PortfolioId}", 
+                request.Ticker, portfolioId);
             
-            try
-            {
-                _logger.LogInformation("Rolling back transaction due to error");
-                await _unitOfWork.RollbackTransactionAsync();
-                _logger.LogInformation("Transaction rollback completed");
-            }
-            catch (Exception rollbackEx)
-            {
-                _logger.LogError(rollbackEx, "Failed to rollback transaction: {RollbackError}", rollbackEx.Message);
-            }
+            await RollbackTransactionSafely(ex);
             
             result.Errors.Add($"An error occurred: {ex.Message}");
             result.Message = "Add operation failed due to system error";
             return result;
         }
     }
-
-    // Update Operations (from HoldingManagementService)
 
     /// <summary>
     /// Updates the unit amount for an existing holding on the latest valuation date
@@ -331,7 +167,7 @@ public class HoldingService : IHoldingService
 
         try
         {
-            _logger.LogInformation("Updating units for holding {HoldingId} to {NewUnits} for account {AccountId}",
+            logger.LogInformation("Updating units for holding {HoldingId} to {NewUnits} for account {AccountId}",
                 holdingId, newUnits, accountId);
 
             // Validate input
@@ -343,7 +179,7 @@ public class HoldingService : IHoldingService
             }
 
             // Get latest valuation date
-            var latestValuationDate = await _holdingRepository.GetLatestValuationDateAsync(cancellationToken);
+            var latestValuationDate = await holdingRepository.GetLatestValuationDateAsync(cancellationToken);
             if (latestValuationDate == null)
             {
                 result.Errors.Add("No holdings found in the system");
@@ -365,7 +201,7 @@ public class HoldingService : IHoldingService
             result.PreviousCurrentValue = holding.CurrentValue;
 
             // Calculate new current value with updated units
-            var pricingResult = await _pricingCalculationHelper.FetchAndCalculateHoldingValueAsync(
+            var pricingResult = await pricingCalculationHelper.FetchAndCalculateHoldingValueAsync(
                 holding.InstrumentId, holding.Instrument.Ticker, newUnits, 
                 holding.Instrument.QuoteUnit, holding.Instrument.CurrencyCode, 
                 latestValuationDate.Value, cancellationToken);
@@ -378,15 +214,15 @@ public class HoldingService : IHoldingService
             }
 
             // Begin transaction
-            await _unitOfWork.BeginTransactionAsync();
+            await unitOfWork.BeginTransactionAsync();
 
             // Update the holding
             holding.UpdatePosition(newUnits, holding.BoughtValue);
             holding.UpdateCurrentValue(pricingResult.CurrentValue);
 
             // Save changes
-            await _unitOfWork.SaveChangesAsync();
-            await _unitOfWork.CommitTransactionAsync();
+            await unitOfWork.SaveChangesAsync();
+            await unitOfWork.CommitTransactionAsync();
 
             // Set result
             result.Success = true;
@@ -394,23 +230,21 @@ public class HoldingService : IHoldingService
             result.NewCurrentValue = pricingResult.CurrentValue;
             result.Message = $"Successfully updated {holding.Instrument.Ticker} units from {result.PreviousUnits:N4} to {newUnits:N4}";
 
-            _logger.LogInformation("Successfully updated holding {HoldingId} units from {OldUnits} to {NewUnits}",
+            logger.LogInformation("Successfully updated holding {HoldingId} units from {OldUnits} to {NewUnits}",
                 holdingId, result.PreviousUnits, newUnits);
 
             return result;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error updating holding {HoldingId} units to {NewUnits}", holdingId, newUnits);
-            await _unitOfWork.RollbackTransactionAsync();
+            logger.LogError(ex, "Error updating holding {HoldingId} units to {NewUnits}", holdingId, newUnits);
+            await unitOfWork.RollbackTransactionAsync();
             
             result.Errors.Add($"An error occurred: {ex.Message}");
             result.Message = "Update failed due to system error";
             return result;
         }
     }
-
-    // Delete Operations (from HoldingManagementService)
 
     /// <summary>
     /// Removes a holding from the latest valuation date
@@ -424,10 +258,10 @@ public class HoldingService : IHoldingService
 
         try
         {
-            _logger.LogInformation("Deleting holding {HoldingId} for account {AccountId}", holdingId, accountId);
+            logger.LogInformation("Deleting holding {HoldingId} for account {AccountId}", holdingId, accountId);
 
             // Get latest valuation date
-            var latestValuationDate = await _holdingRepository.GetLatestValuationDateAsync(cancellationToken);
+            var latestValuationDate = await holdingRepository.GetLatestValuationDateAsync(cancellationToken);
             if (latestValuationDate == null)
             {
                 result.Errors.Add("No holdings found in the system");
@@ -449,26 +283,26 @@ public class HoldingService : IHoldingService
             result.PortfolioId = holding.PortfolioId;
 
             // Begin transaction
-            await _unitOfWork.BeginTransactionAsync();
+            await unitOfWork.BeginTransactionAsync();
 
             // Delete the holding
-            await _holdingRepository.DeleteAsync(holding);
-            await _unitOfWork.SaveChangesAsync();
-            await _unitOfWork.CommitTransactionAsync();
+            await holdingRepository.DeleteAsync(holding);
+            await unitOfWork.SaveChangesAsync();
+            await unitOfWork.CommitTransactionAsync();
 
             // Set result
             result.Success = true;
             result.Message = $"Successfully deleted holding for {holding.Instrument.Ticker}";
 
-            _logger.LogInformation("Successfully deleted holding {HoldingId} for {Ticker}",
+            logger.LogInformation("Successfully deleted holding {HoldingId} for {Ticker}",
                 holdingId, holding.Instrument.Ticker);
 
             return result;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error deleting holding {HoldingId}", holdingId);
-            await _unitOfWork.RollbackTransactionAsync();
+            logger.LogError(ex, "Error deleting holding {HoldingId}", holdingId);
+            await unitOfWork.RollbackTransactionAsync();
             
             result.Errors.Add($"An error occurred: {ex.Message}");
             result.Message = "Delete operation failed due to system error";
@@ -478,6 +312,191 @@ public class HoldingService : IHoldingService
 
     #region Private Helper Methods (from HoldingManagementService)
 
+    /// <summary>
+    /// Validates request and sets up prerequisites for adding a holding
+    /// </summary>
+    private async Task<bool> ValidateAndSetupAddHoldingAsync(
+        HoldingAddResult result,
+        AddHoldingRequest request,
+        int portfolioId,
+        int accountId,
+        CancellationToken cancellationToken)
+    {
+        // Validate input
+        var validationErrors = ValidateAddHoldingRequest(request);
+        if (validationErrors.Any())
+        {
+            result.Errors.AddRange(validationErrors);
+            result.Message = "Validation failed";
+            return false;
+        }
+
+        // Get latest valuation date
+        var latestValuationDate = await holdingRepository.GetLatestValuationDateAsync(cancellationToken);
+        if (latestValuationDate == null)
+        {
+            result.Errors.Add("No holdings found in the system");
+            result.Message = "Cannot add holdings - no valuation data available";
+            return false;
+        }
+
+        // Verify portfolio ownership
+        var portfolio = await portfolioRepository.GetByIdAsync(portfolioId);
+        if (portfolio == null || portfolio.AccountId != accountId)
+        {
+            logger.LogWarning("Portfolio access denied: PortfolioId={PortfolioId}, AccountId={AccountId}",
+                portfolioId, accountId);
+            result.Errors.Add("Portfolio not found or does not belong to your account");
+            result.Message = "Portfolio not accessible";
+            return false;
+        }
+
+        logger.LogInformation("Portfolio verification successful: PortfolioId={PortfolioId}, PortfolioName={PortfolioName}",
+            portfolio.Id, portfolio.Name);
+
+        // Validate dependency injection
+        if (unitOfWork == null)
+        {
+            logger.LogError("UnitOfWork is null - dependency injection failure");
+            result.Errors.Add("Internal service configuration error - UnitOfWork not available");
+            result.Message = "Service configuration error";
+            return false;
+        }
+
+        // Begin transaction
+        try
+        {
+            await unitOfWork.BeginTransactionAsync();
+            logger.LogInformation("Database transaction started successfully");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to begin database transaction: {ErrorMessage}", ex.Message);
+            result.Errors.Add($"Database transaction error: {ex.Message}");
+            result.Message = "Failed to begin database transaction";
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Processes instrument creation/retrieval and checks for duplicate holdings
+    /// </summary>
+    private async Task<Instrument?> ProcessInstrumentForAddAsync(
+        HoldingAddResult result,
+        AddHoldingRequest request,
+        int portfolioId,
+        DateOnly latestValuationDate,
+        CancellationToken cancellationToken)
+    {
+        // Ensure instrument exists
+        logger.LogInformation("Starting instrument processing for ticker: {Ticker}", request.Ticker);
+        var instrument = await EnsureInstrumentExistsAsync(request, cancellationToken);
+        if (instrument == null)
+        {
+            result.Errors.Add("Failed to create or retrieve instrument");
+            result.Message = "Instrument processing failed";
+            return null;
+        }
+
+        result.Instrument = instrument;
+        result.InstrumentCreated = await WasInstrumentJustCreated(request.Ticker, cancellationToken);
+
+        logger.LogInformation("Instrument processed: {InstrumentId}, Created: {InstrumentCreated}",
+            instrument.Id, result.InstrumentCreated);
+
+        // Check for duplicate holding
+        logger.LogInformation("Checking for duplicate holding: Portfolio={PortfolioId}, Instrument={InstrumentId}, Date={ValuationDate}",
+            portfolioId, instrument.Id, latestValuationDate);
+
+        var existingHolding = await GetExistingHoldingAsync(portfolioId, instrument.Id, latestValuationDate, cancellationToken);
+        if (existingHolding != null)
+        {
+            logger.LogWarning("Duplicate holding found: {ExistingHoldingId}", existingHolding.Id);
+            result.Errors.Add($"A holding for {request.Ticker} already exists in this portfolio for the current valuation date");
+            result.Message = "Duplicate holding detected";
+            return null;
+        }
+
+        logger.LogInformation("No duplicate holding found, proceeding with pricing calculation");
+        return instrument;
+    }
+
+    /// <summary>
+    /// Creates the holding entity with pricing and saves to database
+    /// </summary>
+    private async Task<Holding?> CreateAndSaveHoldingAsync(
+        HoldingAddResult result,
+        AddHoldingRequest request,
+        int portfolioId,
+        Instrument instrument,
+        DateOnly latestValuationDate,
+        CancellationToken cancellationToken)
+    {
+        // Calculate current value
+        logger.LogInformation("Starting pricing calculation for {Ticker}, Units={Units}",
+            instrument.Ticker, request.Units);
+
+        var pricingResult = await pricingCalculationHelper.FetchAndCalculateHoldingValueAsync(
+            instrument.Id, instrument.Ticker, request.Units,
+            instrument.QuoteUnit, instrument.CurrencyCode,
+            latestValuationDate, cancellationToken);
+
+        if (!pricingResult.Success)
+        {
+            logger.LogError("Pricing calculation failed: {ErrorMessage}", pricingResult.ErrorMessage);
+            result.Errors.Add(pricingResult.ErrorMessage ?? "Failed to calculate current value");
+            result.Message = "Pricing calculation failed";
+            return null;
+        }
+
+        logger.LogInformation("Pricing calculation successful: CurrentPrice={CurrentPrice}, CurrentValue={CurrentValue}",
+            pricingResult.CurrentPrice, pricingResult.CurrentValue);
+
+        // Create new holding
+        var newHolding = new Holding(
+            DateTime.SpecifyKind(latestValuationDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc),
+            instrument.Id,
+            request.PlatformId,
+            portfolioId,
+            request.Units,
+            request.BoughtValue,
+            pricingResult.CurrentValue);
+
+        logger.LogInformation("Holding entity created with ID: {HoldingId}", newHolding.Id);
+
+        // Save to database
+        await holdingRepository.AddAsync(newHolding);
+        await unitOfWork.SaveChangesAsync();
+        await unitOfWork.CommitTransactionAsync();
+
+        logger.LogInformation("Transaction committed successfully");
+
+        // Set pricing result data
+        result.CurrentPrice = pricingResult.CurrentPrice;
+        result.CurrentValue = pricingResult.CurrentValue;
+
+        return newHolding;
+    }
+
+    /// <summary>
+    /// Safely rolls back transaction and logs any errors
+    /// </summary>
+    private async Task RollbackTransactionSafely(Exception originalException)
+    {
+        try
+        {
+            logger.LogInformation("Rolling back transaction due to error");
+            await unitOfWork.RollbackTransactionAsync();
+            logger.LogInformation("Transaction rollback completed");
+        }
+        catch (Exception rollbackEx)
+        {
+            logger.LogError(rollbackEx, "Failed to rollback transaction: {RollbackError}", rollbackEx.Message);
+        }
+    }
+
     private async Task<Holding?> GetHoldingWithValidationAsync(
         int holdingId, 
         int accountId, 
@@ -486,7 +505,7 @@ public class HoldingService : IHoldingService
     {
         // Use the existing repository method that includes related entities
         var targetDate = DateTime.SpecifyKind(latestValuationDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
-        var holdingsOnDate = await _holdingRepository.GetHoldingsByAccountAndDateAsync(accountId, targetDate, cancellationToken);
+        var holdingsOnDate = await holdingRepository.GetHoldingsByAccountAndDateAsync(accountId, targetDate, cancellationToken);
         
         return holdingsOnDate.FirstOrDefault(h => h.Id == holdingId);
     }
@@ -498,7 +517,7 @@ public class HoldingService : IHoldingService
             if (string.IsNullOrEmpty(request.InstrumentName))
             {
                 // Try to find existing instrument by ticker
-                return await _instrumentManagementService.GetOrCreateInstrumentAsync(
+                return await instrumentManagementService.GetOrCreateInstrumentAsync(
                     request.Ticker,
                     request.Ticker, // Use ticker as name if name not provided
                     request.Description,
@@ -510,7 +529,7 @@ public class HoldingService : IHoldingService
             else
             {
                 // Use provided instrument details
-                return await _instrumentManagementService.GetOrCreateInstrumentAsync(
+                return await instrumentManagementService.GetOrCreateInstrumentAsync(
                     request.Ticker,
                     request.InstrumentName,
                     request.Description,
@@ -522,7 +541,7 @@ public class HoldingService : IHoldingService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error ensuring instrument exists for ticker {Ticker}", request.Ticker);
+            logger.LogError(ex, "Error ensuring instrument exists for ticker {Ticker}", request.Ticker);
             return null;
         }
     }
@@ -532,7 +551,7 @@ public class HoldingService : IHoldingService
         // This is a simple heuristic - could be improved with more sophisticated tracking
         try
         {
-            var instruments = await _instrumentRepository.FindAsync(i => i.Ticker == ticker);
+            var instruments = await instrumentRepository.FindAsync(i => i.Ticker == ticker);
             var instrument = instruments.FirstOrDefault();
             
             return instrument?.CreatedAt > DateTime.UtcNow.AddMinutes(-1);
@@ -551,7 +570,7 @@ public class HoldingService : IHoldingService
     {
         var targetDate = DateTime.SpecifyKind(valuationDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
         
-        var holdings = await _holdingRepository.GetByValuationDateAsync(targetDate);
+        var holdings = await holdingRepository.GetByValuationDateAsync(targetDate);
         return holdings.FirstOrDefault(h => h.PortfolioId == portfolioId && h.InstrumentId == instrumentId);
     }
 
@@ -571,13 +590,6 @@ public class HoldingService : IHoldingService
         if (request.PlatformId <= 0)
             errors.Add("Valid platform ID is required");
 
-        // If instrument name is not provided and ticker is not CASH, we need more details
-        if (string.IsNullOrWhiteSpace(request.InstrumentName) && 
-            !request.Ticker.Equals(ExchangeConstants.CASH_TICKER, StringComparison.OrdinalIgnoreCase))
-        {
-            // This is acceptable - we'll use ticker as name
-        }
-
         return errors;
     }
 
@@ -592,9 +604,9 @@ public class HoldingService : IHoldingService
     {
         try
         {
-            if (_eodMarketDataToolFactory == null)
+            if (eodMarketDataToolFactory == null)
             {
-                _logger.LogWarning("EOD market data tool not available for real-time pricing");
+                logger.LogWarning("EOD market data tool not available for real-time pricing");
                 return holdings;
             }
 
@@ -610,10 +622,10 @@ public class HoldingService : IHoldingService
             Dictionary<string, decimal> prices = new Dictionary<string, decimal>();
             if (tickers.Any())
             {
-                var eodTool = _eodMarketDataToolFactory();
+                var eodTool = eodMarketDataToolFactory();
                 prices = await eodTool.GetRealTimePricesAsync(null, tickers, cancellationToken);
 
-                _logger.LogInformation("Fetched {Count} real-time prices for {TotalTickers} tickers", 
+                logger.LogInformation("Fetched {Count} real-time prices for {TotalTickers} tickers", 
                     prices.Count, tickers.Count);
             }
 
@@ -627,7 +639,7 @@ public class HoldingService : IHoldingService
                     holding.SetDailyProfitLoss(0m, 0m);
                     holding.UpdateValuation(DateTime.UtcNow, holding.CurrentValue);
                     
-                    _logger.LogInformation("Updated CASH holding {HoldingId} for today - keeping value {CurrentValue:C}, setting daily P/L to zero", 
+                    logger.LogInformation("Updated CASH holding {HoldingId} for today - keeping value {CurrentValue:C}, setting daily P/L to zero", 
                         holding.Id, holding.CurrentValue);
                     continue;
                 }
@@ -638,14 +650,14 @@ public class HoldingService : IHoldingService
                     var originalValue = holding.CurrentValue;
                     
                     // Apply scaling factor for proxy instruments using shared service
-                    var scaledPrice = _pricingCalculationService.ApplyScalingFactor(realTimePrice, holding.Instrument.Ticker);
+                    var scaledPrice = pricingCalculationService.ApplyScalingFactor(realTimePrice, holding.Instrument.Ticker);
                     
                     // Use the shared pricing calculation service
-                    var newCurrentValue = await _pricingCalculationService.CalculateCurrentValueAsync(
+                    var newCurrentValue = await pricingCalculationService.CalculateCurrentValueAsync(
                         holding.UnitAmount, 
                         scaledPrice, // Use scaled price instead of raw price
                         holding.Instrument.QuoteUnit,
-                        _pricingCalculationService.GetCurrencyFromTicker(holding.Instrument.Ticker),
+                        pricingCalculationService.GetCurrencyFromTicker(holding.Instrument.Ticker),
                         DateOnly.FromDateTime(DateTime.UtcNow));
                     
                     // Calculate daily P&L based on the change from previous value to new real-time value
@@ -662,27 +674,20 @@ public class HoldingService : IHoldingService
                     
                     updatedCount++;
                     
-                    _logger.LogInformation("Updated holding {HoldingId} for {Ticker}: Original value {OriginalValue:C} -> New value {NewValue:C}, Daily P/L: {DailyChange:C} ({DailyChangePercentage:F2}%) (Real-time price: {RealTimePrice}, Scaled price: {ScaledPrice}, Quote unit: {QuoteUnit})", 
+                    logger.LogInformation("Updated holding {HoldingId} for {Ticker}: Original value {OriginalValue:C} -> New value {NewValue:C}, Daily P/L: {DailyChange:C} ({DailyChangePercentage:F2}%) (Real-time price: {RealTimePrice}, Scaled price: {ScaledPrice}, Quote unit: {QuoteUnit})", 
                         holding.Id, holding.Instrument.Ticker, originalValue, newCurrentValue, dailyChange, dailyChangePercentage, realTimePrice, scaledPrice, holding.Instrument.QuoteUnit ?? CurrencyConstants.DEFAULT_QUOTE_UNIT);
                 }
             }
 
-            _logger.LogInformation("Successfully updated {UpdatedCount} holdings with real-time pricing, {UnchangedCount} holdings kept with original dates", 
+            logger.LogInformation("Successfully updated {UpdatedCount} holdings with real-time pricing, {UnchangedCount} holdings kept with original dates", 
                 updatedCount, holdings.Count - updatedCount);
 
-            // IMPORTANT: Detach all holdings from EF context to prevent persistence of real-time calculations
-            // This ensures the modified entities are not tracked and won't be saved to the database
-            foreach (var holding in holdings)
-            {
-                // Note: We can't directly access the context from here, but the entities will be detached
-                // when they're returned as DTOs or when the scope ends, preventing persistence
-            }
 
             return holdings;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error applying real-time pricing, returning holdings with original prices");
+            logger.LogError(ex, "Error applying real-time pricing, returning holdings with original prices");
             return holdings;
         }
     }

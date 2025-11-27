@@ -1,7 +1,6 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.DependencyInjection;
 using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 using FtoConsulting.PortfolioManager.Domain.Repositories;
 
@@ -9,14 +8,14 @@ namespace FtoConsulting.PortfolioManager.Application.Services;
 
 public class CurrentUserService(
     IHttpContextAccessor httpContextAccessor,
+    IAccountRepository accountRepository,
+    IUnitOfWork unitOfWork,
     ILogger<CurrentUserService> logger) : ICurrentUserService
 {
-    private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
-    private readonly ILogger<CurrentUserService> _logger = logger;
 
     public string GetCurrentUserId()
     {
-        var user = _httpContextAccessor.HttpContext?.User;
+        var user = httpContextAccessor.HttpContext?.User;
         if (user?.Identity?.IsAuthenticated != true)
         {
             throw new UnauthorizedAccessException("User is not authenticated");
@@ -30,7 +29,7 @@ public class CurrentUserService(
 
         if (string.IsNullOrEmpty(userId))
         {
-            _logger.LogWarning("Unable to determine user ID from claims. Available claims: {Claims}",
+            logger.LogWarning("Unable to determine user ID from claims. Available claims: {Claims}",
                 string.Join(", ", user.Claims.Select(c => $"{c.Type}={c.Value}")));
             throw new InvalidOperationException("Unable to determine user ID from authentication token");
         }
@@ -40,7 +39,7 @@ public class CurrentUserService(
 
     public string GetCurrentUserEmail()
     {
-        var user = _httpContextAccessor.HttpContext?.User;
+        var user = httpContextAccessor.HttpContext?.User;
         if (user?.Identity?.IsAuthenticated != true)
         {
             throw new UnauthorizedAccessException("User is not authenticated");
@@ -64,11 +63,9 @@ public class CurrentUserService(
         var userId = GetCurrentUserId();
         var email = GetCurrentUserEmail();
         
-        _logger.LogInformation("Getting account for user {UserId} ({Email})", userId, email);
+        logger.LogInformation("Getting account for user {UserId} ({Email})", userId, email);
         
         // Try to get or create the account using proper account management
-        var accountRepository = GetAccountRepository();
-        
         // First, try to find existing account by external user ID
         var account = await accountRepository.GetByExternalUserIdAsync(userId);
         
@@ -82,8 +79,9 @@ public class CurrentUserService(
         {
             // Create new account for this external user
             var displayName = GetCurrentUserDisplayName();
-            _logger.LogInformation("Creating new account for external user {UserId} ({Email})", userId, email);
+            logger.LogInformation("Creating new account for external user {UserId} ({Email})", userId, email);
             account = await accountRepository.CreateOrUpdateExternalUserAsync(userId, email, displayName);
+            await unitOfWork.SaveChangesAsync();
         }
         else
         {
@@ -92,7 +90,8 @@ public class CurrentUserService(
             account.UpdateUserInfo(email, displayName);
             account.RecordLogin();
             await accountRepository.UpdateAsync(account);
-            _logger.LogInformation("Found existing account {AccountId} for user {Email}", account.Id, email);
+            await unitOfWork.SaveChangesAsync();
+            logger.LogInformation("Found existing account {AccountId} for user {Email}", account.Id, email);
         }
         
         if (!account.IsActive)
@@ -105,7 +104,7 @@ public class CurrentUserService(
     
     private string GetCurrentUserDisplayName()
     {
-        var user = _httpContextAccessor.HttpContext?.User;
+        var user = httpContextAccessor.HttpContext?.User;
         if (user?.Identity?.IsAuthenticated != true)
         {
             throw new UnauthorizedAccessException("User is not authenticated");
@@ -116,24 +115,5 @@ public class CurrentUserService(
                user.FindFirst("given_name")?.Value ??
                user.FindFirst("preferred_username")?.Value ??
                GetCurrentUserEmail(); // Fallback to email
-    }
-    
-    // This is a temporary hack until we implement proper dependency injection for repositories in services
-    // In a proper implementation, we would inject IAccountRepository through constructor
-    private IAccountRepository GetAccountRepository()
-    {
-        var httpContext = _httpContextAccessor.HttpContext;
-        if (httpContext?.RequestServices == null)
-        {
-            throw new InvalidOperationException("Cannot access HTTP context or request services");
-        }
-        
-        var accountRepository = httpContext.RequestServices.GetService(typeof(IAccountRepository)) as IAccountRepository;
-        if (accountRepository == null)
-        {
-            throw new InvalidOperationException("IAccountRepository is not registered in DI container");
-        }
-        
-        return accountRepository;
     }
 }

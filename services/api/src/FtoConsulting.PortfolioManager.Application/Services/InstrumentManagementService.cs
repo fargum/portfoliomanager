@@ -8,21 +8,11 @@ namespace FtoConsulting.PortfolioManager.Application.Services;
 /// <summary>
 /// Service for managing instrument creation and validation
 /// </summary>
-public class InstrumentManagementService : IInstrumentManagementService
+public class InstrumentManagementService(
+    IInstrumentRepository instrumentRepository,
+    IUnitOfWork unitOfWork,
+    ILogger<InstrumentManagementService> logger) : IInstrumentManagementService
 {
-    private readonly IInstrumentRepository _instrumentRepository;
-    private readonly IUnitOfWork _unitOfWork;
-    private readonly ILogger<InstrumentManagementService> _logger;
-
-    public InstrumentManagementService(
-        IInstrumentRepository instrumentRepository,
-        IUnitOfWork unitOfWork,
-        ILogger<InstrumentManagementService> logger)
-    {
-        _instrumentRepository = instrumentRepository ?? throw new ArgumentNullException(nameof(instrumentRepository));
-        _unitOfWork = unitOfWork ?? throw new ArgumentNullException(nameof(unitOfWork));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
 
     public async Task<Instrument> EnsureInstrumentExistsAsync(Instrument instrumentData, CancellationToken cancellationToken = default)
     {
@@ -32,18 +22,18 @@ public class InstrumentManagementService : IInstrumentManagementService
         if (string.IsNullOrEmpty(instrumentData.Ticker))
             throw new ArgumentException("Instrument ticker cannot be null or empty", nameof(instrumentData));
 
-        _logger.LogDebug("Ensuring instrument exists for ticker {Ticker}", instrumentData.Ticker);
+        logger.LogDebug("Ensuring instrument exists for ticker {Ticker}", instrumentData.Ticker);
 
         // Check if instrument already exists by ticker
-        var existingInstrument = await _instrumentRepository.GetByTickerAsync(instrumentData.Ticker);
+        var existingInstrument = await instrumentRepository.GetByTickerAsync(instrumentData.Ticker);
 
         if (existingInstrument == null)
         {
             // Create new instrument
-            await _instrumentRepository.AddAsync(instrumentData);
-            await _unitOfWork.SaveChangesAsync();
+            await instrumentRepository.AddAsync(instrumentData);
+            await unitOfWork.SaveChangesAsync();
             
-            _logger.LogInformation("Created new instrument {Ticker} - {Name}", instrumentData.Ticker, instrumentData.Name);
+            logger.LogInformation("Created new instrument {Ticker} - {Name}", instrumentData.Ticker, instrumentData.Name);
             return instrumentData;
         }
         else
@@ -63,8 +53,8 @@ public class InstrumentManagementService : IInstrumentManagementService
                     existingInstrument.UpdateInstrumentType(instrumentData.InstrumentTypeId);
                 }
 
-                await _unitOfWork.SaveChangesAsync();
-                _logger.LogDebug("Updated existing instrument {Ticker}", instrumentData.Ticker);
+                await unitOfWork.SaveChangesAsync();
+                logger.LogDebug("Updated existing instrument {Ticker}", instrumentData.Ticker);
             }
 
             return existingInstrument;
@@ -87,10 +77,10 @@ public class InstrumentManagementService : IInstrumentManagementService
             throw new ArgumentException("Name cannot be null or empty", nameof(name));
 
         // Try to get existing instrument first
-        var existingInstrument = await _instrumentRepository.GetByTickerAsync(ticker);
+        var existingInstrument = await instrumentRepository.GetByTickerAsync(ticker);
         if (existingInstrument != null)
         {
-            _logger.LogDebug("Found existing instrument for ticker {Ticker}", ticker);
+            logger.LogDebug("Found existing instrument for ticker {Ticker}", ticker);
             return existingInstrument;
         }
 
@@ -103,10 +93,10 @@ public class InstrumentManagementService : IInstrumentManagementService
             quoteUnit: quoteUnit,
             instrumentTypeId: instrumentTypeId ?? 1); // Default to equity if not specified
 
-        await _instrumentRepository.AddAsync(newInstrument);
-        await _unitOfWork.SaveChangesAsync();
+        await instrumentRepository.AddAsync(newInstrument);
+        await unitOfWork.SaveChangesAsync();
 
-        _logger.LogInformation("Created new instrument {Ticker} - {Name}", ticker, name);
+        logger.LogInformation("Created new instrument {Ticker} - {Name}", ticker, name);
         return newInstrument;
     }
 

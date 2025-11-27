@@ -12,21 +12,11 @@ namespace FtoConsulting.PortfolioManager.Application.Services.Ai;
 /// <summary>
 /// Azure OpenAI implementation of AI chat service
 /// </summary>
-public class AzureOpenAiChatService : IAiChatService
+public class AzureOpenAiChatService(
+    AzureOpenAIClient azureOpenAIClient,
+    IOptions<AzureFoundryOptions> azureFoundryOptions,
+    ILogger<AzureOpenAiChatService> logger) : IAiChatService
 {
-    private readonly AzureOpenAIClient _azureOpenAIClient;
-    private readonly AzureFoundryOptions _azureFoundryOptions;
-    private readonly ILogger<AzureOpenAiChatService> _logger;
-
-    public AzureOpenAiChatService(
-        AzureOpenAIClient azureOpenAIClient,
-        IOptions<AzureFoundryOptions> azureFoundryOptions,
-        ILogger<AzureOpenAiChatService> logger)
-    {
-        _azureOpenAIClient = azureOpenAIClient;
-        _azureFoundryOptions = azureFoundryOptions.Value;
-        _logger = logger;
-    }
 
     public async Task<string> CompleteChatAsync(OpenAI.Chat.ChatMessage[] messages, CancellationToken cancellationToken = default)
     {
@@ -55,7 +45,7 @@ public class AzureOpenAiChatService : IAiChatService
             });
 
             // Use instrumented chat client for telemetry
-            var instrumentedChatClient = _azureOpenAIClient.GetChatClient(_azureFoundryOptions.ModelName)
+            var instrumentedChatClient = azureOpenAIClient.GetChatClient(azureFoundryOptions.Value.ModelName)
                 .AsIChatClient()
                 .AsBuilder()
                 .UseOpenTelemetry(sourceName: "PortfolioManager.AI.DirectChat", 
@@ -67,7 +57,7 @@ public class AzureOpenAiChatService : IAiChatService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error completing chat with Azure OpenAI");
+            logger.LogError(ex, "Error completing chat with Azure OpenAI");
             throw;
         }
     }

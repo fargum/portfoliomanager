@@ -11,47 +11,47 @@ namespace FtoConsulting.PortfolioManager.Application.Services;
 /// <summary>
 /// Background service that automatically fetches EOD prices and revalues holdings on a scheduled basis
 /// </summary>
-public class AutomatedRevaluationBackgroundService : BackgroundService
+public class AutomatedRevaluationBackgroundService(
+    IServiceProvider serviceProvider,
+    ILogger<AutomatedRevaluationBackgroundService> logger,
+    IConfiguration configuration) : BackgroundService
 {
     private static readonly ActivitySource s_activitySource = new("PortfolioManager.AutomatedRevaluation");
     
-    private readonly IServiceProvider _serviceProvider;
-    private readonly ILogger<AutomatedRevaluationBackgroundService> _logger;
-    private readonly IConfiguration _configuration;
-    private readonly CronExpression _cronExpression;
+    private const string DEFAULT_CRON_SCHEDULE = "0 6 * * 1-5";
     
-    public AutomatedRevaluationBackgroundService(
-        IServiceProvider serviceProvider,
-        ILogger<AutomatedRevaluationBackgroundService> logger,
-        IConfiguration configuration)
+    private readonly CronExpression _cronExpression = InitializeCronExpression(configuration, logger);
+
+    private static CronExpression InitializeCronExpression(IConfiguration configuration, ILogger<AutomatedRevaluationBackgroundService> logger)
     {
-        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(logger);
 
         // Default: Run at 6:00 AM UTC Monday to Friday (before markets open, after all EOD data available)
-        var cronSchedule = _configuration["AutomatedRevaluation:CronSchedule"] ?? "0 6 * * 1-5";
+        var cronSchedule = configuration["AutomatedRevaluation:CronSchedule"] ?? DEFAULT_CRON_SCHEDULE;
         
         try
         {
-            _cronExpression = CronExpression.Parse(cronSchedule);
+            var cronExpression = CronExpression.Parse(cronSchedule);
             
-            _logger.LogInformation("Automated revaluation service configured with schedule '{Schedule}' in UTC timezone",
+            logger.LogInformation("Automated revaluation service configured with schedule '{Schedule}' in UTC timezone",
                 cronSchedule);
+                
+            return cronExpression;
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to parse cron schedule '{Schedule}'. Using default.", 
+            logger.LogError(ex, "Failed to parse cron schedule '{Schedule}'. Using default.", 
                 cronSchedule);
             
             // Fallback to default
-            _cronExpression = CronExpression.Parse("0 6 * * 1-5");
+            return CronExpression.Parse(DEFAULT_CRON_SCHEDULE);
         }
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("Automated revaluation background service started");
+        logger.LogInformation("Automated revaluation background service started");
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -62,7 +62,7 @@ public class AutomatedRevaluationBackgroundService : BackgroundService
                 {
                     var delay = next.Value - DateTimeOffset.UtcNow;
                     
-                    _logger.LogInformation("Next automated revaluation scheduled for {NextRun} ({Delay} from now)",
+                    logger.LogInformation("Next automated revaluation scheduled for {NextRun} ({Delay} from now)",
                         next.Value.ToString("yyyy-MM-dd HH:mm:ss zzz"), delay);
                     
                     if (delay > TimeSpan.Zero)
@@ -77,23 +77,23 @@ public class AutomatedRevaluationBackgroundService : BackgroundService
                 }
                 else
                 {
-                    _logger.LogWarning("No next occurrence found for cron schedule. Waiting 1 hour before retry.");
+                    logger.LogWarning("No next occurrence found for cron schedule. Waiting 1 hour before retry.");
                     await Task.Delay(TimeSpan.FromHours(1), stoppingToken);
                 }
             }
             catch (OperationCanceledException)
             {
-                _logger.LogInformation("Automated revaluation service cancellation requested");
+                logger.LogInformation("Automated revaluation service cancellation requested");
                 break;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error in automated revaluation service main loop");
+                logger.LogError(ex, "Error in automated revaluation service main loop");
                 await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
             }
         }
 
-        _logger.LogInformation("Automated revaluation background service stopped");
+        logger.LogInformation("Automated revaluation background service stopped");
     }
 
     private async Task PerformAutomatedRevaluation(CancellationToken cancellationToken)
@@ -105,16 +105,16 @@ public class AutomatedRevaluationBackgroundService : BackgroundService
         
         try
         {
-            _logger.LogInformation("Starting automated revaluation at {StartTime}", startTime);
+            logger.LogInformation("Starting automated revaluation at {StartTime}", startTime);
 
             // Get the target date for revaluation
             var targetDate = GetRevaluationTargetDate();
             activity?.SetTag("target.date", targetDate.ToString("yyyy-MM-dd"));
             
-            _logger.LogInformation("Performing automated revaluation for date {TargetDate}", targetDate);
+            logger.LogInformation("Performing automated revaluation for date {TargetDate}", targetDate);
 
             // Create a scope to get the required service
-            using var scope = _serviceProvider.CreateScope();
+            using var scope = serviceProvider.CreateScope();
             var revaluationService = scope.ServiceProvider.GetRequiredService<IHoldingRevaluationService>();
 
             // Perform the combined fetch and revaluation operation
@@ -123,7 +123,7 @@ public class AutomatedRevaluationBackgroundService : BackgroundService
             var duration = DateTime.UtcNow - startTime;
             
             // Log comprehensive results
-            _logger.LogInformation(
+            logger.LogInformation(
                 "Automated revaluation completed successfully in {Duration:mm\\:ss}. " +
                 "Prices - Success: {PriceSuccess}, Failed: {PriceFailed}. " +
                 "Holdings - Success: {HoldingSuccess}, Failed: {HoldingFailed}. " +
@@ -147,7 +147,7 @@ public class AutomatedRevaluationBackgroundService : BackgroundService
             // Log warning if there were failures
             if (!result.OverallSuccess || result.PriceFetchResult.FailedPrices > 0 || result.HoldingRevaluationResult.FailedRevaluations > 0)
             {
-                _logger.LogWarning("Automated revaluation had some failures. Check detailed logs for specifics.");
+                logger.LogWarning("Automated revaluation had some failures. Check detailed logs for specifics.");
             }
         }
         catch (Exception ex)
@@ -158,7 +158,7 @@ public class AutomatedRevaluationBackgroundService : BackgroundService
             activity?.SetTag("error.type", ex.GetType().Name);
             activity?.SetTag("duration.ms", duration.TotalMilliseconds.ToString());
             
-            _logger.LogError(ex, "Automated revaluation failed after {Duration:mm\\:ss}", duration);
+            logger.LogError(ex, "Automated revaluation failed after {Duration:mm\\:ss}", duration);
             
             // Don't throw - we want the service to continue and try again at the next scheduled time
         }
@@ -167,8 +167,8 @@ public class AutomatedRevaluationBackgroundService : BackgroundService
     private DateOnly GetRevaluationTargetDate()
     {
         // Get configuration for target date logic
-        var useCurrentDate = _configuration.GetValue<bool>("AutomatedRevaluation:UseCurrentDate", false);
-        var daysBack = _configuration.GetValue<int>("AutomatedRevaluation:DaysBack", 1);
+        var useCurrentDate = configuration.GetValue<bool>("AutomatedRevaluation:UseCurrentDate", false);
+        var daysBack = configuration.GetValue<int>("AutomatedRevaluation:DaysBack", 1);
 
         if (useCurrentDate)
         {
@@ -194,7 +194,7 @@ public class AutomatedRevaluationBackgroundService : BackgroundService
 
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
-        _logger.LogInformation("Automated revaluation service is stopping");
+        logger.LogInformation("Automated revaluation service is stopping");
         await base.StopAsync(cancellationToken);
     }
 }

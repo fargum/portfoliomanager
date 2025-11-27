@@ -11,21 +11,14 @@ namespace FtoConsulting.PortfolioManager.Application.Services.Memory;
 /// <summary>
 /// AI-powered service for extracting meaningful information from conversations
 /// </summary>
-public class MemoryExtractionService : IMemoryExtractionService
+public class MemoryExtractionService(
+    ILogger<MemoryExtractionService> logger,
+    IAiChatService aiChatService,
+    IAgentPromptService promptService) : IMemoryExtractionService
 {
-    private readonly ILogger<MemoryExtractionService> _logger;
-    private readonly IAiChatService _aiChatService;
-    private readonly IAgentPromptService _promptService;
-
-    public MemoryExtractionService(
-        ILogger<MemoryExtractionService> logger,
-        IAiChatService aiChatService,
-        IAgentPromptService promptService)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _aiChatService = aiChatService ?? throw new ArgumentNullException(nameof(aiChatService));
-        _promptService = promptService ?? throw new ArgumentNullException(nameof(promptService));
-    }
+    private const int MaxRecentAssistantMessages = 5;
+    private const int MaxAssistantMessageLength = 200;
+    private const string MemoryExtractionPromptName = "MemoryExtractionAgent";
 
     /// <summary>
     /// Extract meaningful memories from a conversation thread using AI
@@ -35,42 +28,29 @@ public class MemoryExtractionService : IMemoryExtractionService
         int accountId,
         CancellationToken cancellationToken = default)
     {
-        try
+        var messageList = messages.ToList();
+        if (!messageList.Any())
         {
-            _logger.LogInformation("MEMORY SERVICE: ExtractMemoriesFromConversationAsync called for account {AccountId}", accountId);
-            
-            var messageList = messages.ToList();
-            if (!messageList.Any())
-            {
-                _logger.LogDebug("No messages provided for memory extraction");
-                return MemoryExtractionResult.Empty();
-            }
-
-            _logger.LogInformation("MEMORY SERVICE: Processing {MessageCount} messages for memory extraction", messageList.Count);
-
-            // Create conversation text for AI analysis
-            var conversationText = FormatConversationForAnalysis(messageList);
-            
-            _logger.LogInformation("MEMORY SERVICE: Formatted conversation text, calling AI service...");
-            
-            // Get AI-powered memory extraction
-            var extractionResult = await PerformAIMemoryExtractionAsync(conversationText, accountId, cancellationToken);
-            
-            _logger.LogInformation("Successfully extracted {FactCount} facts and {PreferenceCount} preferences from conversation with {MessageCount} messages",
-                extractionResult.ImportantFacts.Count, 
-                extractionResult.UserPreferences.Count,
-                messageList.Count);
-
-            return extractionResult;
+            logger.LogDebug("No messages provided for memory extraction");
+            return MemoryExtractionResult.Empty();
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error extracting memories from conversation for account {AccountId}", accountId);
-            throw;
-        }
-    }
 
-    /// <summary>
+        logger.LogInformation("Processing {MessageCount} messages for memory extraction for account {AccountId}", 
+            messageList.Count, accountId);
+
+        // Create conversation text for AI analysis
+        var conversationText = FormatConversationForAnalysis(messageList);
+        
+        // Get AI-powered memory extraction
+        var extractionResult = await PerformAIMemoryExtractionAsync(conversationText, accountId, cancellationToken);
+        
+        logger.LogInformation("Successfully extracted {FactCount} facts and {PreferenceCount} preferences from conversation with {MessageCount} messages",
+            extractionResult.ImportantFacts.Count, 
+            extractionResult.UserPreferences.Count,
+            messageList.Count);
+
+        return extractionResult;
+    }    /// <summary>
     /// Use AI to analyze conversation and extract structured memory information
     /// </summary>
     private async Task<MemoryExtractionResult> PerformAIMemoryExtractionAsync(
@@ -81,8 +61,8 @@ public class MemoryExtractionService : IMemoryExtractionService
         try
         {
             // Get the memory extraction prompt
-            var systemPrompt = _promptService.GetPrompt(
-                "MemoryExtractionAgent", 
+            var systemPrompt = promptService.GetPrompt(
+                MemoryExtractionPromptName, 
                 new Dictionary<string, object>
                 {
                     ["accountId"] = accountId,
@@ -96,7 +76,7 @@ public class MemoryExtractionService : IMemoryExtractionService
                 new UserChatMessage($"Please analyze this conversation and extract important memories:\n\n{conversationText}")
             };
 
-            var response = await _aiChatService.CompleteChatAsync(messages, cancellationToken);
+            var response = await aiChatService.CompleteChatAsync(messages, cancellationToken);
 
             // Parse the JSON response
             if (string.IsNullOrEmpty(response))
@@ -104,12 +84,8 @@ public class MemoryExtractionService : IMemoryExtractionService
                 throw new InvalidOperationException("AI returned empty response for memory extraction");
             }
 
-            _logger.LogInformation("AI memory extraction raw response: {Response}", response);
-
             // Extract JSON from response (AI might wrap it in text)
             var jsonContent = ExtractJsonFromResponse(response);
-            
-            _logger.LogInformation("Extracted JSON content: {JsonContent}", jsonContent);
 
             var extractionData = JsonSerializer.Deserialize<MemoryExtractionData>(jsonContent);
             if (extractionData == null)
@@ -128,7 +104,7 @@ public class MemoryExtractionService : IMemoryExtractionService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error in AI memory extraction for account {AccountId}", accountId);
+            logger.LogError(ex, "Error in AI memory extraction for account {AccountId}", accountId);
             throw;
         }
     }
@@ -183,7 +159,7 @@ public class MemoryExtractionService : IMemoryExtractionService
         var recentAssistantMessages = messages
             .Where(m => m.Role.ToUpperInvariant() == "ASSISTANT")
             .OrderByDescending(m => m.MessageTimestamp)
-            .Take(5)
+            .Take(MaxRecentAssistantMessages)
             .OrderBy(m => m.MessageTimestamp)
             .ToList();
 
@@ -226,14 +202,12 @@ public class MemoryExtractionService : IMemoryExtractionService
     /// </summary>
     private static string TruncateAssistantMessage(string content)
     {
-        const int maxLength = 200;
-        
         // If the message is short, return as-is
-        if (content.Length <= maxLength)
+        if (content.Length <= MaxAssistantMessageLength)
             return content;
         
         // If it's long, it's likely a tool call or verbose response - truncate intelligently
-        var truncated = content.Substring(0, maxLength);
+        var truncated = content.Substring(0, MaxAssistantMessageLength);
         
         // Try to end at a sentence boundary
         var lastPeriod = truncated.LastIndexOf('.');
@@ -242,7 +216,7 @@ public class MemoryExtractionService : IMemoryExtractionService
         
         var lastSentenceEnd = Math.Max(Math.Max(lastPeriod, lastQuestion), lastExclamation);
         
-        if (lastSentenceEnd > maxLength / 2) // If we found a good break point
+        if (lastSentenceEnd > MaxAssistantMessageLength / 2) // If we found a good break point
         {
             return content.Substring(0, lastSentenceEnd + 1) + " [...]";
         }
