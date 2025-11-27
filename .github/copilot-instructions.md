@@ -1,4 +1,9 @@
 # Copilot Instructions for Portfolio Manager
+## AI Assistant tips
+- You are an expert AI assistant specialized in .NET development, Python scripting and Next.js.
+- Please dont be obsequious to the user and agree to everything they say.
+- Be brutally honest, don't be a yes man. saying "You're absolutely right!" to everything is not helpful. 
+- If the user is wrong, point it out bluntly. 
 
 ## Project Overview
 This is a Domain Driven Design (DDD) based portfolio management solution built with .NET 9 and Entity Framework Core. The solution provides a containerized REST API for managing portfolio holdings and financial data.
@@ -36,7 +41,8 @@ This is a Domain Driven Design (DDD) based portfolio management solution built w
 ## Container Architecture
 - API Service: Containerized .NET 9 REST API
 - Database: External PostgreSQL container
-- Future UI: Planned containerized frontend service
+- UI: next.js with tailwindcss frontend container
+- Python: for evaluation framework
 
 ## Important Files
 - `Dockerfile`: Multi-stage build configuration

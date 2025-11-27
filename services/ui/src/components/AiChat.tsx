@@ -292,23 +292,23 @@ I can analyze your holdings, market conditions, and provide insights to help you
     const isSystem = message.type === 'system';
     
     return (
-      <div key={message.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
-        <div className={`flex items-start space-x-2 max-w-[95%] ${isUser ? 'flex-row-reverse space-x-reverse' : ''}`}>
+      <div key={message.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-6`}>
+        <div className={`flex items-start space-x-3 max-w-[95%] ${isUser ? 'flex-row-reverse space-x-reverse' : ''}`}>
           {/* Avatar */}
-          <div className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
-            isUser ? 'bg-blue-600 text-white' : 
-            isSystem ? 'bg-gray-500 text-white' : 
-            'bg-green-600 text-white'
+          <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center shadow-lg ${
+            isUser ? 'bg-gradient-to-br from-financial-blue-500 to-financial-indigo-600 text-white' : 
+            isSystem ? 'bg-gradient-to-br from-financial-slate-500 to-financial-slate-600 text-white' : 
+            'bg-gradient-to-br from-financial-emerald-500 to-financial-emerald-600 text-white'
           }`}>
-            {isUser ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
+            {isUser ? <User className="h-5 w-5" /> : <Bot className="h-5 w-5" />}
           </div>
           
           {/* Message Content */}
-          <div className={`rounded-xl px-4 py-3 ${
-            isUser ? 'bg-blue-600 text-white' : 
-            isSystem ? 'bg-gray-100 text-gray-800 border' :
-            message.error ? 'bg-red-50 text-red-800 border border-red-200' :
-            'bg-white text-gray-800 border shadow-sm'
+          <div className={`rounded-2xl px-5 py-4 shadow-lg border backdrop-blur-sm ${
+            isUser ? 'bg-gradient-to-br from-financial-blue-600 to-financial-indigo-600 text-white border-financial-blue-200' : 
+            isSystem ? 'bg-gradient-to-br from-financial-slate-50 to-white text-financial-slate-800 border-financial-slate-200' :
+            message.error ? 'bg-gradient-to-br from-financial-rose-50 to-white text-financial-rose-800 border-financial-rose-200' :
+            'bg-gradient-to-br from-white to-financial-slate-50/30 text-financial-slate-800 border-financial-slate-200'
           }`}>
             {message.isLoading ? (
               <div className="flex items-center space-x-2">
@@ -491,13 +491,13 @@ I can analyze your holdings, market conditions, and provide insights to help you
         // Authenticated chat interface
         <>
           {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50">
+          <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gradient-to-br from-white to-financial-slate-50/30">
             {chatState.messages.map(renderMessage)}
             <div ref={messagesEndRef} />
           </div>
 
           {/* Input */}
-          <div className="border-t border-gray-200 p-4 bg-white">
+          <div className="border-t border-financial-slate-200 p-4 bg-white/95 backdrop-blur-sm">
             <form onSubmit={handleSubmit} className="flex space-x-3">
               <input
                 ref={inputRef}
@@ -506,12 +506,12 @@ I can analyze your holdings, market conditions, and provide insights to help you
                 onChange={(e) => setInputValue(e.target.value)}
                 placeholder="Ask me about your portfolio..."
                 disabled={chatState.isLoading}
-                className="flex-1 border border-gray-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed text-base"
+                className="flex-1 border border-financial-slate-300 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-financial-blue-500 focus:border-transparent disabled:bg-financial-slate-100 disabled:cursor-not-allowed text-base text-financial-slate-800 placeholder-financial-slate-500 shadow-sm"
               />
               <button
                 type="submit"
                 disabled={chatState.isLoading || !inputValue.trim()}
-                className="bg-blue-600 text-white px-6 py-3 rounded-xl hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium"
+                className="bg-gradient-to-r from-financial-blue-600 to-financial-indigo-600 text-white px-6 py-3 rounded-xl hover:from-financial-blue-700 hover:to-financial-indigo-700 disabled:from-financial-slate-400 disabled:to-financial-slate-400 disabled:cursor-not-allowed transition-all duration-300 transform hover:scale-105 shadow-lg font-medium"
               >
                 <Send className="h-5 w-5" />
               </button>

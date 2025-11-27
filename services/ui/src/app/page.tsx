@@ -6,7 +6,7 @@ import { AuthButton } from '@/components/AuthButton';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiClient } from '@/lib/api-client';
-import { Building2, AlertCircle, CheckCircle, Bot, BarChart3, MessageSquare } from 'lucide-react';
+import { Building2, AlertCircle, CheckCircle, Bot, BarChart3, MessageSquare, Sparkles } from 'lucide-react';
 
 const HARDCODED_ACCOUNT_ID = 1;
 
@@ -22,14 +22,18 @@ function Tab({ id, label, icon, isActive, onClick }: TabProps) {
   return (
     <button
       onClick={onClick}
-      className={`flex items-center space-x-2 px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+      className={`group flex items-center space-x-2 px-3 py-1.5 rounded-md font-medium transition-all duration-300 transform hover:scale-105 ${
         isActive
-          ? 'bg-blue-600 text-white shadow-md'
-          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+          ? 'bg-gradient-to-r from-financial-blue-600 to-financial-indigo-600 text-white shadow-lg shadow-financial-blue-600/30'
+          : 'text-financial-slate-600 hover:text-financial-blue-600 hover:bg-white/70 hover:shadow-md'
       }`}
     >
-      {icon}
-      <span className="text-sm">{label}</span>
+      <span className={`transition-transform duration-300 ${
+        isActive ? 'scale-110' : 'group-hover:scale-110'
+      }`}>
+        {icon}
+      </span>
+      <span className="text-xs font-semibold">{label}</span>
     </button>
   );
 }
@@ -74,23 +78,29 @@ export default function HomePage() {
   }, [isAuthenticated]); // Re-run when authentication state changes
 
   return (
-    <div className="h-screen bg-gradient-to-br from-financial-gray-50 to-financial-gray-100 flex flex-col">
+    <div className="h-screen bg-gradient-to-br from-financial-slate-50 via-financial-blue-50 to-financial-indigo-50 flex flex-col">
       {/* Header with Integrated Navigation */}
-      <header className="bg-white shadow-financial border-b border-financial-gray-200 flex-shrink-0">
-        <div className="w-full px-4 sm:px-6 lg:px-8 py-4">
+      <header className="bg-white/80 backdrop-blur-xl shadow-financial-lg border-b border-white/20 flex-shrink-0 relative">
+        <div className="absolute inset-0 bg-gradient-to-r from-financial-blue-500/5 to-financial-indigo-500/5"></div>
+        <div className="relative w-full px-4 sm:px-6 lg:px-8 py-2">
           <div className="flex items-center justify-between">
             {/* Left side - Branding and Navigation */}
-            <div className="flex items-center space-x-8">
+            <div className="flex items-center space-x-6">
               <div className="flex items-center space-x-3">
-                <Building2 className="h-8 w-8 text-primary-600" />
+                <div className="relative">
+                  <Building2 className="h-6 w-6 text-financial-blue-600 relative z-10" />
+                  <div className="absolute inset-0 bg-financial-blue-400/20 rounded-lg scale-150 animate-pulse-slow"></div>
+                </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-financial-gray-900">Portfolio Manager</h1>
-                  <p className="text-sm text-financial-gray-500">AI-Powered Investment Management</p>
+                  <h1 className="text-xl font-bold bg-gradient-to-r from-financial-slate-800 to-financial-blue-600 bg-clip-text text-transparent">
+                    Portfolio Manager
+                  </h1>
+                  <p className="text-xs text-financial-slate-500 font-medium">AI-Powered Investment Management</p>
                 </div>
               </div>
               
               {/* Tab Navigation in Header */}
-              <div className="flex space-x-2 bg-gray-50 p-1 rounded-lg">
+              <div className="flex space-x-1 bg-white/60 backdrop-blur-md p-1 rounded-lg border border-white/30 shadow-financial">
                 <Tab
                   id="holdings"
                   label="Portfolio Holdings"
@@ -111,7 +121,9 @@ export default function HomePage() {
             {/* Right side - Service Status Indicators and Auth */}
             <div className="flex items-center space-x-4">
               {/* Authentication */}
-              <AuthButton />
+              <div className="flex-shrink-0">
+                <AuthButton />
+              </div>
 
               {/* Divider */}
               <div className="h-6 w-px bg-gray-300"></div>
@@ -178,8 +190,8 @@ export default function HomePage() {
 
       {/* Service Status Warnings */}
       {(apiStatus === 'offline' || (aiStatus === 'offline' && isAuthenticated) || (!isAuthenticated && activeTab === 'chat')) && (
-        <div className="flex-shrink-0 px-4 sm:px-6 lg:px-8 pt-4">
-          <div className="space-y-4">
+        <div className="flex-shrink-0 px-4 sm:px-6 lg:px-8 pt-2">
+          <div className="space-y-2">
             {apiStatus === 'offline' && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-4">
                 <div className="flex items-center space-x-3">
@@ -226,29 +238,20 @@ export default function HomePage() {
       )}
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-hidden px-4 sm:px-6 lg:px-8 pt-4 pb-4">
-        <div className="h-full bg-white rounded-xl shadow-lg overflow-hidden">
+      <main className="flex-1 overflow-hidden px-4 sm:px-6 lg:px-8 pt-2 pb-2">
+        <div className="h-full bg-white/90 backdrop-blur-sm rounded-2xl shadow-financial-lg border border-white/20 overflow-hidden relative">
+          <div className="absolute inset-0 bg-gradient-to-br from-white/50 to-financial-blue-50/30 pointer-events-none"></div>
+          
           {/* Holdings Tab Content */}
-          <div className={activeTab === 'holdings' ? 'block h-full' : 'hidden'}>
-            <div className="bg-gray-50 border-b border-gray-200 p-4">
-              <div className="flex items-center space-x-3">
-                <BarChart3 className="h-5 w-5 text-blue-600" />
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-900">Portfolio Holdings</h2>
-                  <p className="text-sm text-gray-600">
-                    View and manage your portfolio holdings for Account {HARDCODED_ACCOUNT_ID}
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div className="h-[calc(100%-5rem)] overflow-hidden">
+          <div className={activeTab === 'holdings' ? 'block h-full relative z-10' : 'hidden'}>
+            <div className="h-full overflow-hidden">
               <HoldingsGrid />
             </div>
           </div>
 
           {/* Chat Tab Content */}
           <div className={activeTab === 'chat' ? 'block h-full' : 'hidden'}>
-            <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white p-4">
+            <div className="bg-gradient-to-r from-financial-blue-600 to-financial-indigo-600 text-white p-4 relative z-10">
               <div className="flex items-center space-x-3">
                 <MessageSquare className="h-5 w-5" />
                 <div>

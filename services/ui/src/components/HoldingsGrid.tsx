@@ -4,8 +4,9 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { HoldingResponse } from '@/types/api';
 import { apiClient } from '@/lib/api-client';
+import { useAuth } from '@/contexts/AuthContext';
 import { getHoldingsColumnDefs, getGridOptions, calculateTotalValue, calculateTotalBoughtValue, calculateTotalGainLoss, calculateTotalGainLossPercentage, calculateTotalDailyPnL, calculateAverageDailyPnLPercentage, formatCurrency } from '@/lib/grid-utils';
-import { Calendar, Search, TrendingUp, PoundSterling, PieChart, RefreshCw, Trash2, Plus, X } from 'lucide-react';
+import { Calendar, Search, TrendingUp, PoundSterling, PieChart, RefreshCw, Trash2, Plus, X, DollarSign, TrendingDown, Activity, Zap, Target, BarChart4, Wallet, CreditCard } from 'lucide-react';
 
 // AG Grid CSS imports (we'll handle these in the layout)
 import 'ag-grid-community/styles/ag-grid.css';
@@ -16,6 +17,7 @@ interface HoldingsGridProps {
 }
 
 export const HoldingsGrid: React.FC<HoldingsGridProps> = () => {
+  const { userInfo } = useAuth();
   const [holdings, setHoldings] = useState<HoldingResponse[]>([]);
   const holdingsRef = useRef<HoldingResponse[]>([]);
   const [loading, setLoading] = useState(false);
@@ -290,62 +292,96 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = () => {
   const avgDailyPnLPercentage = calculateAverageDailyPnLPercentage(holdings);
   const holdingsCount = holdings.length;
 
+  // Generate personalized header text
+  const getHeaderText = () => {
+    const firstName = userInfo?.name?.split(' ')[0] || 'Your';
+    return firstName === 'Your' ? 'Your Portfolio' : `${firstName}'s Portfolio`;
+  };
+
   return (
-    <div className="w-full h-full bg-white">
-      {/* Header Section - Simplified */}
-      <div className="bg-gradient-to-r from-primary-600 to-primary-700 p-4 text-white">
-        <div className="flex items-center justify-between">
+    <div className="w-full h-full bg-transparent flex flex-col">
+      {/* Header Section - Modern Financial Design */}
+      <div className="bg-gradient-to-r from-financial-blue-600 via-financial-indigo-600 to-financial-purple-600 px-4 py-3 text-white relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent transform -skew-x-12 translate-x-full animate-pulse"></div>
+        <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full transform translate-x-16 -translate-y-16"></div>
+        <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full transform -translate-x-12 translate-y-12"></div>
+        
+        <div className="relative flex items-center justify-between z-10">
           <div className="flex items-center space-x-3">
-            <PieChart className="h-6 w-6" />
+            <div className="relative">
+              <div className="absolute inset-0 bg-financial-emerald-400 rounded-lg opacity-20 animate-pulse"></div>
+              <PieChart className="h-6 w-6 relative z-10 filter drop-shadow-md" />
+            </div>
             <div>
-              <h2 className="text-lg font-bold">Portfolio Holdings</h2>
-              <p className="text-primary-100 text-sm">Authenticated User's Holdings</p>
+              <h2 className="text-lg font-bold tracking-wide">Portfolio Holdings</h2>
+              <p className="text-blue-100 text-sm font-medium">{getHeaderText()}</p>
             </div>
           </div>
           
-          <div className="flex items-center space-x-4">
-            {/* Date Input */}
-            <div className="flex items-center space-x-2">
-              <Calendar className="h-4 w-4" />
+          <div className="flex items-center space-x-3">
+            {/* Date Input with enhanced styling */}
+            <div className="flex items-center space-x-2 bg-white/20 backdrop-blur-sm rounded-lg px-3 py-2 border border-white/30">
+              <Calendar className="h-4 w-4 text-blue-200" />
               <input
                 type="date"
                 value={valuationDate}
                 onChange={(e) => setValuationDate(e.target.value)}
-                className="bg-transparent border-b border-white/30 text-white text-sm focus:border-white focus:outline-none"
+                className="bg-transparent border-0 text-white text-sm focus:outline-none placeholder-blue-200 font-medium"
               />
             </div>
             
-            {/* Compact Stats */}
+            {/* Enhanced Stats Display */}
             <div className="text-right">
               <div className="flex items-baseline space-x-6">
-                <div>
-                  <p className="text-xs text-primary-100">
-                    {filteredCount !== holdings.length ? 'Filtered' : 'Total'} Value
-                  </p>
-                  <p className="text-xl font-bold">
+                <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2 border border-white/20">
+                  <div className="flex items-center space-x-2 mb-1">
+                    <Wallet className="h-3 w-3 text-blue-200" />
+                    <p className="text-xs text-blue-100 font-medium uppercase tracking-wide">
+                      {filteredCount !== holdings.length ? 'Filtered' : 'Total'} Value
+                    </p>
+                  </div>
+                  <p className="text-xl font-bold tracking-tight">
                     {formatCurrency(filteredTotalValue > 0 ? filteredTotalValue : totalValue)}
                   </p>
                   {filteredCount !== holdings.length && (
-                    <p className="text-xs text-primary-200">
+                    <p className="text-xs text-blue-200 font-medium">
                       Total: {formatCurrency(totalValue)}
                     </p>
                   )}
                 </div>
-                <div>
-                  <p className="text-xs text-primary-100">Total P&L</p>
-                  <p className={`text-sm font-bold ${totalGainLoss >= 0 ? 'text-green-200' : 'text-red-200'}`}>
+                <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2 border border-white/20">
+                  <div className="flex items-center space-x-2 mb-1">
+                    {totalGainLoss >= 0 ? (
+                      <TrendingUp className="h-3 w-3 text-green-200" />
+                    ) : (
+                      <TrendingDown className="h-3 w-3 text-red-200" />
+                    )}
+                    <p className="text-xs text-blue-100 font-medium uppercase tracking-wide">Total P&L</p>
+                  </div>
+                  <p className={`text-sm font-bold ${
+                    totalGainLoss >= 0 ? 'text-green-200' : 'text-red-200'
+                  }`}>
                     {formatCurrency(totalGainLoss)}
                   </p>
-                  <p className={`text-xs ${totalGainLossPercentage >= 0 ? 'text-green-200' : 'text-red-200'}`}>
+                  <p className={`text-xs ${
+                    totalGainLossPercentage >= 0 ? 'text-green-200' : 'text-red-200'
+                  } font-medium`}>
                     ({totalGainLossPercentage >= 0 ? '+' : ''}{totalGainLossPercentage.toFixed(2)}%)
                   </p>
                 </div>
-                <div>
-                  <p className="text-xs text-primary-100">Daily P&L</p>
-                  <p className={`text-sm font-bold ${totalDailyPnL >= 0 ? 'text-green-200' : 'text-red-200'}`}>
+                <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2 border border-white/20">
+                  <div className="flex items-center space-x-2 mb-1">
+                    <Activity className="h-3 w-3 text-yellow-200" />
+                    <p className="text-xs text-blue-100 font-medium uppercase tracking-wide">Daily P&L</p>
+                  </div>
+                  <p className={`text-sm font-bold ${
+                    totalDailyPnL >= 0 ? 'text-green-200' : 'text-red-200'
+                  }`}>
                     {formatCurrency(totalDailyPnL)}
                   </p>
-                  <p className={`text-xs ${avgDailyPnLPercentage >= 0 ? 'text-green-200' : 'text-red-200'}`}>
+                  <p className={`text-xs ${
+                    avgDailyPnLPercentage >= 0 ? 'text-green-200' : 'text-red-200'
+                  } font-medium`}>
                     ({avgDailyPnLPercentage >= 0 ? '+' : ''}{avgDailyPnLPercentage.toFixed(2)}%)
                   </p>
                 </div>
@@ -355,48 +391,50 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = () => {
             <button
               onClick={fetchHoldings}
               disabled={loading}
-              className="flex items-center space-x-2 bg-white/20 hover:bg-white/30 px-3 py-2 rounded-lg transition-colors duration-200"
+              className="group flex items-center space-x-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm px-3 py-2 rounded-lg border border-white/30 transition-all duration-300 transform hover:scale-105 shadow-lg"
             >
-              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-              <span className="text-sm">Refresh</span>
+              <RefreshCw className={`h-4 w-4 transition-transform duration-300 ${
+                loading ? 'animate-spin' : 'group-hover:rotate-180'
+              }`} />
+              <span className="text-sm font-semibold">Refresh</span>
             </button>
             
             <button
               onClick={() => {
-                setError(null); // Clear any existing errors
+                setError(null);
                 setShowAddModal(true);
               }}
               disabled={loading || editingHoldings.size > 0 || isDeleting}
-              className="flex items-center space-x-2 bg-green-500/20 hover:bg-green-500/30 disabled:bg-green-500/10 px-3 py-2 rounded-lg transition-colors duration-200 disabled:cursor-not-allowed"
+              className="group flex items-center space-x-2 bg-financial-emerald-500/30 hover:bg-financial-emerald-400/40 disabled:bg-financial-emerald-500/10 backdrop-blur-sm px-3 py-2 rounded-lg border border-financial-emerald-400/30 transition-all duration-300 transform hover:scale-105 disabled:cursor-not-allowed shadow-lg"
             >
-              <Plus className="h-4 w-4" />
-              <span className="text-sm">Add Holding</span>
+              <Plus className="h-4 w-4 transition-transform duration-300 group-hover:rotate-90" />
+              <span className="text-sm font-semibold">Add</span>
             </button>
             
             {selectedRows.length > 0 && (
               <button
                 onClick={handleBulkDelete}
                 disabled={isDeleting || editingHoldings.size > 0}
-                className="flex items-center space-x-2 bg-red-500/20 hover:bg-red-500/30 disabled:bg-red-500/10 px-3 py-2 rounded-lg transition-colors duration-200 disabled:cursor-not-allowed"
+                className="group flex items-center space-x-2 bg-financial-rose-500/30 hover:bg-financial-rose-400/40 disabled:bg-financial-rose-500/10 backdrop-blur-sm px-3 py-2 rounded-lg border border-financial-rose-400/30 transition-all duration-300 transform hover:scale-105 disabled:cursor-not-allowed shadow-lg"
               >
                 {isDeleting ? (
                   <>
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                    <span className="text-sm">Deleting...</span>
+                    <span className="text-sm font-semibold">Deleting...</span>
                   </>
                 ) : (
                   <>
-                    <Trash2 className="h-4 w-4" />
-                    <span className="text-sm">Delete {selectedRows.length} Selected</span>
+                    <Trash2 className="h-4 w-4 transition-transform duration-300 group-hover:scale-110" />
+                    <span className="text-sm font-semibold">Delete {selectedRows.length}</span>
                   </>
                 )}
               </button>
             )}
             
             {editingHoldings.size > 0 && (
-              <div className="flex items-center space-x-2 bg-yellow-500/20 px-3 py-2 rounded-lg">
-                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                <span className="text-sm">Updating {editingHoldings.size} holding{editingHoldings.size > 1 ? 's' : ''}...</span>
+              <div className="flex items-center space-x-2 bg-financial-amber-500/20 backdrop-blur-sm px-3 py-2 rounded-lg border border-financial-amber-400/30 shadow-lg">
+                <Zap className="animate-pulse h-4 w-4 text-amber-200" />
+                <span className="text-sm font-semibold">Updating {editingHoldings.size} holding{editingHoldings.size > 1 ? 's' : ''}...</span>
               </div>
             )}
           </div>
@@ -404,7 +442,7 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = () => {
       </div>
 
       {/* Content Section */}
-      <div className="w-full h-[calc(100%-80px)] flex flex-col">
+      <div className="flex-1 flex flex-col min-h-0">
         {error && (
           <div className="mx-4 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
             <div className="flex items-center space-x-2 text-red-700">
@@ -418,7 +456,7 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = () => {
 
         {/* Grid Container - Full width with proper scrolling and space for row group panel */}
         <div className="flex-1 w-full px-4 pb-4">
-          <div className="ag-theme-alpine w-full h-full" style={{ minHeight: '500px' }}>
+          <div className="ag-theme-alpine w-full h-full">
             <AgGridReact
               rowData={holdings}
               columnDefs={getHoldingsColumnDefs(handleCellValueChanged)}
@@ -465,9 +503,9 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = () => {
           </div>
         </div>
 
-        {/* Footer Summary - Dynamic based on filters */}
+        {/* Footer Summary - Fixed height at bottom */}
         {holdings.length > 0 && (
-          <div className="px-4 pb-4">
+          <div className="px-4 pb-4 flex-shrink-0">
             <div className="bg-gray-50 rounded-lg p-3">
               <div className="flex justify-between items-center text-sm text-gray-600">
                 <div className="flex items-center space-x-4">
