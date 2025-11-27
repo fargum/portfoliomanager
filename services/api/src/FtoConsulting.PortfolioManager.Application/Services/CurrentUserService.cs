@@ -7,16 +7,12 @@ using FtoConsulting.PortfolioManager.Domain.Repositories;
 
 namespace FtoConsulting.PortfolioManager.Application.Services;
 
-public class CurrentUserService : ICurrentUserService
+public class CurrentUserService(
+    IHttpContextAccessor httpContextAccessor,
+    ILogger<CurrentUserService> logger) : ICurrentUserService
 {
-    private readonly IHttpContextAccessor _httpContextAccessor;
-    private readonly ILogger<CurrentUserService> _logger;
-
-    public CurrentUserService(IHttpContextAccessor httpContextAccessor, ILogger<CurrentUserService> logger)
-    {
-        _httpContextAccessor = httpContextAccessor;
-        _logger = logger;
-    }
+    private readonly IHttpContextAccessor _httpContextAccessor = httpContextAccessor;
+    private readonly ILogger<CurrentUserService> _logger = logger;
 
     public string GetCurrentUserId()
     {

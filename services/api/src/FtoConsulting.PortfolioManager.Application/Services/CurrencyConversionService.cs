@@ -9,22 +9,16 @@ namespace FtoConsulting.PortfolioManager.Application.Services;
 /// <summary>
 /// Service implementation for handling currency conversions
 /// </summary>
-public class CurrencyConversionService : ICurrencyConversionService
+public class CurrencyConversionService(
+    IExchangeRateRepository exchangeRateRepository,
+    ILogger<CurrencyConversionService> logger) : ICurrencyConversionService
 {
-    private readonly IExchangeRateRepository _exchangeRateRepository;
-    private readonly ILogger<CurrencyConversionService> _logger;
+    private readonly IExchangeRateRepository _exchangeRateRepository = exchangeRateRepository ?? throw new ArgumentNullException(nameof(exchangeRateRepository));
+    private readonly ILogger<CurrencyConversionService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     // Supported currency pairs for conversion
     private static readonly string[] SupportedCurrencies = { CurrencyConstants.GBP, CurrencyConstants.USD, CurrencyConstants.EUR, CurrencyConstants.GBX };
     private const string BaseCurrency = CurrencyConstants.DEFAULT_BASE_CURRENCY; // Portfolio base currency
-
-    public CurrencyConversionService(
-        IExchangeRateRepository exchangeRateRepository,
-        ILogger<CurrencyConversionService> logger)
-    {
-        _exchangeRateRepository = exchangeRateRepository ?? throw new ArgumentNullException(nameof(exchangeRateRepository));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
 
     public async Task<(decimal convertedAmount, decimal exchangeRate, string rateSource)> ConvertCurrencyAsync(
         decimal amount, 

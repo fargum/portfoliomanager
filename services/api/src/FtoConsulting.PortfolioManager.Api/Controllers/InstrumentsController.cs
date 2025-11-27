@@ -13,23 +13,13 @@ namespace FtoConsulting.PortfolioManager.Api.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-// [Authorize] // Temporarily disabled for testing
-public class InstrumentsController : ControllerBase
+[Authorize] 
+public class InstrumentsController(
+    IInstrumentRepository instrumentRepository,
+    ICurrentUserService currentUserService,
+    ILogger<InstrumentsController> logger) : ControllerBase
 {
-    private readonly IInstrumentRepository _instrumentRepository;
-    private readonly ICurrentUserService _currentUserService;
-    private readonly ILogger<InstrumentsController> _logger;
     private static readonly ActivitySource s_activitySource = new("PortfolioManager.Api.Instruments");
-
-    public InstrumentsController(
-        IInstrumentRepository instrumentRepository,
-        ICurrentUserService currentUserService,
-        ILogger<InstrumentsController> logger)
-    {
-        _instrumentRepository = instrumentRepository;
-        _currentUserService = currentUserService;
-        _logger = logger;
-    }
 
     /// <summary>
     /// Check if an instrument exists by ticker
@@ -53,8 +43,7 @@ public class InstrumentsController : ControllerBase
         using var activity = s_activitySource.StartActivity("CheckInstrument");
         
         // Get account ID from authenticated user
-        // var accountId = await _currentUserService.GetCurrentUserAccountIdAsync();
-        var accountId = 2; // Hardcoded for testing - remove when authentication is restored
+        var accountId = await currentUserService.GetCurrentUserAccountIdAsync();
         
         activity?.SetTag("account.id", accountId.ToString());
         activity?.SetTag("instrument.ticker", ticker);
@@ -64,7 +53,7 @@ public class InstrumentsController : ControllerBase
             // Validate ticker
             if (string.IsNullOrWhiteSpace(ticker))
             {
-                _logger.LogWarning("Invalid ticker provided for instrument check: {Ticker}", ticker);
+                logger.LogWarning("Invalid ticker provided for instrument check: {Ticker}", ticker);
                 return BadRequest(new ProblemDetails
                 {
                     Title = "Invalid Ticker",
@@ -76,11 +65,11 @@ public class InstrumentsController : ControllerBase
             // Clean and normalize ticker
             var normalizedTicker = ticker.Trim().ToUpperInvariant();
             
-            _logger.LogInformation("Checking if instrument exists for ticker {Ticker} (account {AccountId})", 
+            logger.LogInformation("Checking if instrument exists for ticker {Ticker} (account {AccountId})", 
                 normalizedTicker, accountId);
 
             // Check if instrument exists using repository
-            var existingInstrument = await _instrumentRepository.GetByTickerAsync(normalizedTicker);
+            var existingInstrument = await instrumentRepository.GetByTickerAsync(normalizedTicker);
             
             var response = new InstrumentCheckApiResponse
             {
@@ -102,12 +91,12 @@ public class InstrumentsController : ControllerBase
                     InstrumentTypeId = existingInstrument.InstrumentTypeId
                 };
                 
-                _logger.LogDebug("Instrument {Ticker} found with ID {InstrumentId}", 
+                logger.LogDebug("Instrument {Ticker} found with ID {InstrumentId}", 
                     normalizedTicker, existingInstrument.Id);
             }
             else
             {
-                _logger.LogDebug("Instrument {Ticker} not found in database", normalizedTicker);
+                logger.LogDebug("Instrument {Ticker} not found in database", normalizedTicker);
             }
 
             activity?.SetTag("instrument.exists", response.Exists.ToString());
@@ -117,7 +106,7 @@ public class InstrumentsController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error checking instrument existence for ticker {Ticker}", ticker);
+            logger.LogError(ex, "Error checking instrument existence for ticker {Ticker}", ticker);
             
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             

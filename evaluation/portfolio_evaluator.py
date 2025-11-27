@@ -80,8 +80,8 @@ class PortfolioManagerApiClient:
             await self.session.close()
     
     async def send_chat_query(self, query: str, account_id: int = 1, thread_id: Optional[int] = None) -> Dict[str, Any]:
-        """Send a chat query to the Portfolio Manager API."""
-        url = f"{self.base_url}/api/ai/chat/query"
+        """Send a chat query to the Portfolio Manager API using streaming endpoint."""
+        url = f"{self.base_url}/api/ai/chat/stream"
         
         payload = {
             "query": query,
@@ -93,13 +93,25 @@ class PortfolioManagerApiClient:
             async with self.session.post(
                 url, 
                 json=payload,
-                headers={"Content-Type": "application/json", "Accept": "application/json"}
+                headers={"Content-Type": "application/json", "Accept": "text/plain"}
             ) as response:
                 if response.status != 200:
                     error_text = await response.text()
                     raise Exception(f"API Error {response.status}: {error_text}")
                 
-                return await response.json()
+                # Read streaming response and accumulate
+                full_response = ""
+                async for line in response.content:
+                    if line:
+                        decoded_line = line.decode('utf-8').strip()
+                        if decoded_line and not decoded_line.startswith('data:'):
+                            full_response += decoded_line
+                
+                # Return in same format as before for compatibility
+                return {
+                    "response": full_response,
+                    "queryType": "General"  # Default value since streaming doesn't return this
+                }
         except Exception as ex:
             print(f"Error calling Portfolio Manager API: {ex}")
             raise

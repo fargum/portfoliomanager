@@ -6,7 +6,6 @@ using FtoConsulting.PortfolioManager.Application.DTOs.Ai;
 using FtoConsulting.PortfolioManager.Application.Configuration;
 using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 using System.Diagnostics;
-using System.Text;
 
 
 namespace FtoConsulting.PortfolioManager.Api.Controllers.Ai;
@@ -18,23 +17,12 @@ namespace FtoConsulting.PortfolioManager.Api.Controllers.Ai;
 [Route("api/ai/chat")]
 [Produces("application/json")]
 [Authorize(Policy = "RequirePortfolioScope")]
-public class ChatController : ControllerBase
+public class ChatController(
+    IAiOrchestrationService aiOrchestrationService,
+    ILogger<ChatController> logger,
+    IOptions<AzureFoundryOptions> azureFoundryOptions) : ControllerBase
 {
     private static readonly ActivitySource s_activitySource = new("PortfolioManager.AI.Controller");
-    
-    private readonly IAiOrchestrationService _aiOrchestrationService;
-    private readonly ILogger<ChatController> _logger;
-    private readonly AzureFoundryOptions _azureFoundryOptions;
-
-    public ChatController(
-        IAiOrchestrationService aiOrchestrationService,
-        ILogger<ChatController> logger,
-        IOptions<AzureFoundryOptions> azureFoundryOptions)
-    {
-        _aiOrchestrationService = aiOrchestrationService;
-        _logger = logger;
-        _azureFoundryOptions = azureFoundryOptions.Value;
-    }
 
     /// <summary>
     /// Process a natural language query about portfolio data with streaming response and memory
@@ -58,9 +46,9 @@ public class ChatController : ControllerBase
         
         try
         {
-            using (_logger.BeginScope("AI streaming chat query for account {AccountId}", request.AccountId))
+            using (logger.BeginScope("AI streaming chat query for account {AccountId}", request.AccountId))
             {
-                _logger.LogInformation("Processing streaming AI query with AccountId={AccountId}, ThreadId={ThreadId}, QueryLength={QueryLength}",
+                logger.LogInformation("Processing streaming AI query with AccountId={AccountId}, ThreadId={ThreadId}, QueryLength={QueryLength}",
                     request.AccountId, request.ThreadId, request.Query?.Length ?? 0);
             }
             
@@ -78,7 +66,7 @@ public class ChatController : ControllerBase
                 return BadRequest("Valid account ID is required");
             }
 
-            _logger.LogInformation("Processing streaming AI chat query with memory for account {AccountId}, thread {ThreadId}: {Query}", 
+            logger.LogInformation("Processing streaming AI chat query with memory for account {AccountId}, thread {ThreadId}: {Query}", 
                 request.AccountId, request.ThreadId, request.Query);
 
             // Set up Server-Sent Events headers
@@ -87,7 +75,7 @@ public class ChatController : ControllerBase
             Response.Headers["Connection"] = "keep-alive";
 
             // Use unified memory-aware streaming with status updates from the AI service
-            await _aiOrchestrationService.ProcessPortfolioQueryAsync(
+            await aiOrchestrationService.ProcessPortfolioQueryAsync(
                 request.Query, 
                 request.AccountId,
                 onStatusUpdate: async (status) =>
@@ -122,7 +110,7 @@ public class ChatController : ControllerBase
                 await Response.Body.FlushAsync(cancellationToken);
             }
 
-            _logger.LogInformation("Successfully completed streaming AI chat query with memory for account {AccountId}", 
+            logger.LogInformation("Successfully completed streaming AI chat query with memory for account {AccountId}", 
                 request.AccountId);
 
             activity?.SetStatus(ActivityStatusCode.Ok);
@@ -135,7 +123,7 @@ public class ChatController : ControllerBase
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             activity?.SetTag("error.type", "unexpected");
             
-            _logger.LogError(ex, "Error processing streaming AI chat query with memory for account {AccountId}: {Query}", 
+            logger.LogError(ex, "Error processing streaming AI chat query with memory for account {AccountId}: {Query}", 
                 request.AccountId, request.Query);
             
             if (!Response.HasStarted)
@@ -143,89 +131,6 @@ public class ChatController : ControllerBase
                 await Response.WriteAsync($"Error: {ex.Message}", cancellationToken);
             }
             return new EmptyResult();
-        }
-    }
-
-    /// <summary>
-    /// Process a natural language query about portfolio data with memory support
-    /// </summary>
-    /// <param name="request">Chat request containing query and account information</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>AI-generated response based on portfolio data with conversation memory</returns>
-    [HttpPost("query")]
-    [ProducesResponseType(typeof(ChatResponseDto), 200)]
-    [ProducesResponseType(400)]
-    [ProducesResponseType(500)]
-    public async Task<IActionResult> QueryPortfolio(
-        [FromBody] ChatRequestDto request,
-        CancellationToken cancellationToken = default)
-    {
-        using var activity = s_activitySource.StartActivity("QueryPortfolio");
-        activity?.SetTag("account.id", request.AccountId.ToString());
-        activity?.SetTag("thread.id", request.ThreadId?.ToString() ?? "none");
-        activity?.SetTag("query.length", request.Query?.Length.ToString() ?? "0");
-        activity?.SetTag("response.type", "direct");
-        
-        try
-        {
-            using (_logger.BeginScope("AI portfolio query for account {AccountId}", request.AccountId))
-            {
-                _logger.LogInformation("Processing AI portfolio query with AccountId={AccountId}, ThreadId={ThreadId}, QueryLength={QueryLength}",
-                    request.AccountId, request.ThreadId, request.Query?.Length ?? 0);
-            }
-            
-            if (string.IsNullOrWhiteSpace(request.Query))
-            {
-                activity?.SetStatus(ActivityStatusCode.Error, "Query cannot be empty");
-                activity?.SetTag("error.type", "validation");
-                return BadRequest("Query cannot be empty");
-            }
-
-            if (request.AccountId <= 0)
-            {
-                activity?.SetStatus(ActivityStatusCode.Error, "Valid account ID is required");
-                activity?.SetTag("error.type", "validation");
-                return BadRequest("Valid account ID is required");
-            }
-
-            _logger.LogInformation("Processing AI chat query with memory for account {AccountId}, thread {ThreadId}: {Query}", 
-                request.AccountId, request.ThreadId, request.Query);
-
-            // For non-streaming endpoint, accumulate response via streaming internally
-            var responseBuilder = new StringBuilder();
-            
-            await _aiOrchestrationService.ProcessPortfolioQueryAsync(
-                request.Query, 
-                request.AccountId,
-                onStatusUpdate: null, // No status updates for non-streaming endpoint
-                onTokenReceived: token => {
-                    responseBuilder.Append(token);
-                    return Task.CompletedTask;
-                },
-                threadId: request.ThreadId,
-                cancellationToken: cancellationToken);
-
-            var finalResponse = responseBuilder.ToString();
-
-            _logger.LogInformation("Successfully processed AI chat query with memory for account {AccountId}", 
-                request.AccountId);
-
-            activity?.SetStatus(ActivityStatusCode.Ok);
-            activity?.SetTag("response.completed", "true");
-
-            return Ok(new ChatResponseDto(
-                Response: finalResponse,
-                QueryType: "General"
-            ));
-        }
-        catch (Exception ex)
-        {
-            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
-            activity?.SetTag("error.type", "unexpected");
-            
-            _logger.LogError(ex, "Error processing AI chat query with memory for account {AccountId}: {Query}", 
-                request.AccountId, request.Query);
-            return StatusCode(500, "An error occurred processing your request");
         }
     }
 
@@ -239,12 +144,12 @@ public class ChatController : ControllerBase
     {
         try
         {
-            var tools = await _aiOrchestrationService.GetAvailableToolsAsync();
+            var tools = await aiOrchestrationService.GetAvailableToolsAsync();
             return Ok(tools);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving available AI tools");
+            logger.LogError(ex, "Error retrieving available AI tools");
             return StatusCode(500, "An error occurred retrieving available tools");
         }
     }
@@ -270,11 +175,11 @@ public class ChatController : ControllerBase
     {
         return Ok(new 
         { 
-            AzureFoundryConfigured = !string.IsNullOrEmpty(_azureFoundryOptions.Endpoint),
-            HasApiKey = !string.IsNullOrEmpty(_azureFoundryOptions.ApiKey),
-            Endpoint = string.IsNullOrEmpty(_azureFoundryOptions.Endpoint) ? "Not configured" : "***CONFIGURED***",
-            ApiKey = string.IsNullOrEmpty(_azureFoundryOptions.ApiKey) ? "Not configured" : "***CONFIGURED***",
-            TimeoutSeconds = _azureFoundryOptions.TimeoutSeconds
+            AzureFoundryConfigured = !string.IsNullOrEmpty(azureFoundryOptions.Value.Endpoint),
+            HasApiKey = !string.IsNullOrEmpty(azureFoundryOptions.Value.ApiKey),
+            Endpoint = string.IsNullOrEmpty(azureFoundryOptions.Value.Endpoint) ? "Not configured" : "***CONFIGURED***",
+            ApiKey = string.IsNullOrEmpty(azureFoundryOptions.Value.ApiKey) ? "Not configured" : "***CONFIGURED***",
+            TimeoutSeconds = azureFoundryOptions.Value.TimeoutSeconds
         });
     }
 }

@@ -10,18 +10,10 @@ namespace FtoConsulting.PortfolioManager.Api.Controllers.Ai;
 [ApiController]
 [Route("api/ai/mcp")]
 [Produces("application/json")]
-public class McpController : ControllerBase
+public class McpController(
+    IMcpServerService mcpServerService,
+    ILogger<McpController> logger) : ControllerBase
 {
-    private readonly IMcpServerService _mcpServerService;
-    private readonly ILogger<McpController> _logger;
-
-    public McpController(
-        IMcpServerService mcpServerService,
-        ILogger<McpController> logger)
-    {
-        _mcpServerService = mcpServerService;
-        _logger = logger;
-    }
 
     /// <summary>
     /// Get available MCP tools
@@ -33,12 +25,12 @@ public class McpController : ControllerBase
     {
         try
         {
-            var tools = await _mcpServerService.GetAvailableToolsAsync();
+            var tools = await mcpServerService.GetAvailableToolsAsync();
             return Ok(tools);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error retrieving MCP tools");
+            logger.LogError(ex, "Error retrieving MCP tools");
             return StatusCode(500, "An error occurred retrieving MCP tools");
         }
     }
@@ -61,9 +53,9 @@ public class McpController : ControllerBase
                 return BadRequest("Tool name is required");
             }
 
-            _logger.LogInformation("Executing MCP tool: {ToolName}", mcpRequest.ToolName);
+            logger.LogInformation("Executing MCP tool: {ToolName}", mcpRequest.ToolName);
 
-            var result = await _mcpServerService.ExecuteToolAsync(
+            var result = await mcpServerService.ExecuteToolAsync(
                 mcpRequest.ToolName, 
                 mcpRequest.Parameters ?? new Dictionary<string, object>());
 
@@ -71,12 +63,12 @@ public class McpController : ControllerBase
         }
         catch (ArgumentException ex)
         {
-            _logger.LogWarning("Invalid MCP tool request: {Message}", ex.Message);
+            logger.LogWarning("Invalid MCP tool request: {Message}", ex.Message);
             return BadRequest(ex.Message);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error executing MCP tool: {ToolName}", mcpRequest.ToolName);
+            logger.LogError(ex, "Error executing MCP tool: {ToolName}", mcpRequest.ToolName);
             return StatusCode(500, "An error occurred executing the tool");
         }
     }
@@ -91,7 +83,7 @@ public class McpController : ControllerBase
     {
         try
         {
-            var isHealthy = await _mcpServerService.IsHealthyAsync();
+            var isHealthy = await mcpServerService.IsHealthyAsync();
             return Ok(new { 
                 Status = isHealthy ? "Healthy" : "Unhealthy", 
                 Timestamp = DateTime.UtcNow,
@@ -100,7 +92,7 @@ public class McpController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error checking MCP server health");
+            logger.LogError(ex, "Error checking MCP server health");
             return Ok(new { 
                 Status = "Unhealthy", 
                 Timestamp = DateTime.UtcNow,

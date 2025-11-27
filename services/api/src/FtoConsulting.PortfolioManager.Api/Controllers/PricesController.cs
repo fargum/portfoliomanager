@@ -1,6 +1,5 @@
 using FtoConsulting.PortfolioManager.Api.Models.Responses;
 using FtoConsulting.PortfolioManager.Api.Services;
-using FtoConsulting.PortfolioManager.Application.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Net;
@@ -16,26 +15,11 @@ namespace FtoConsulting.PortfolioManager.Api.Controllers;
 [Route("api/[controller]")]
 [Produces("application/json")]
 [Authorize(Policy = "RequirePortfolioScope")]
-public class PricesController : ControllerBase
+public class PricesController(
+    IPriceFetching priceFetching,
+    ILogger<PricesController> logger) : ControllerBase
 {
     private static readonly ActivitySource s_activitySource = new("PortfolioManager.Prices");
-    
-    private readonly IPriceFetching _priceFetching;
-    private readonly IPortfolioMappingService _mappingService;
-    private readonly ILogger<PricesController> _logger;
-
-    /// <summary>
-    /// Initializes a new instance of the PricesController
-    /// </summary>
-    public PricesController(
-        IPriceFetching priceFetching,
-        IPortfolioMappingService mappingService,
-        ILogger<PricesController> logger)
-    {
-        _priceFetching = priceFetching ?? throw new ArgumentNullException(nameof(priceFetching));
-        _mappingService = mappingService ?? throw new ArgumentNullException(nameof(mappingService));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
 
     /// <summary>
     /// Fetch market prices for all distinct ISINs from holdings for a specific valuation date
@@ -85,18 +69,18 @@ public class PricesController : ControllerBase
         
         try
         {
-            using (_logger.BeginScope("Price fetching on {ValuationDate}", valuationDate))
+            using (logger.BeginScope("Price fetching on {ValuationDate}", valuationDate))
             {
-                _logger.LogInformation("Fetching market prices for holdings on ValuationDate={ValuationDate}",
+                logger.LogInformation("Fetching market prices for holdings on ValuationDate={ValuationDate}",
                     valuationDate);
             }
-            _logger.LogInformation("Fetching market prices for holdings on date {ValuationDate}", valuationDate);
+            logger.LogInformation("Fetching market prices for holdings on date {ValuationDate}", valuationDate);
 
             // Convert DateTime to DateOnly for business logic
             var dateOnly = DateOnly.FromDateTime(valuationDate);
 
             // Fetch and persist prices using application service
-            var pricesResult = await _priceFetching.FetchAndPersistPricesForDateAsync(dateOnly, cancellationToken);
+            var pricesResult = await priceFetching.FetchAndPersistPricesForDateAsync(dateOnly, cancellationToken);
 
             // Check if any prices were successfully fetched and persisted
             if (pricesResult == null || pricesResult.SuccessfulPrices == 0)
@@ -107,7 +91,7 @@ public class PricesController : ControllerBase
                 activity?.SetTag("prices.successful", "0");
                 activity?.SetTag("prices.failed", (pricesResult?.FailedPrices ?? 0).ToString());
                 
-                _logger.LogWarning("No prices could be fetched for valuation date {ValuationDate}. Failed ISINs: {FailedCount}", 
+                logger.LogWarning("No prices could be fetched for valuation date {ValuationDate}. Failed ISINs: {FailedCount}", 
                     dateOnly, pricesResult?.FailedPrices ?? 0);
                 
                 return NotFound(new ProblemDetails
@@ -139,7 +123,7 @@ public class PricesController : ControllerBase
             activity?.SetTag("prices.fetch_duration_ms", ((long)pricesResult.FetchDuration.TotalMilliseconds).ToString());
             activity?.SetStatus(ActivityStatusCode.Ok);
 
-            _logger.LogInformation("Successfully persisted {SuccessCount} prices for date {ValuationDate}", 
+            logger.LogInformation("Successfully persisted {SuccessCount} prices for date {ValuationDate}", 
                 pricesResult.SuccessfulPrices, dateOnly);
 
             return Ok(response);
@@ -150,7 +134,7 @@ public class PricesController : ControllerBase
             activity?.SetTag("error.type", "format");
             activity?.SetTag("error.reason", "invalid_date");
             
-            _logger.LogWarning(ex, "Invalid date format provided: {ValuationDate}", valuationDate);
+            logger.LogWarning(ex, "Invalid date format provided: {ValuationDate}", valuationDate);
             return BadRequest(new ProblemDetails
             {
                 Title = "Invalid Date Format",
@@ -163,7 +147,7 @@ public class PricesController : ControllerBase
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             activity?.SetTag("error.type", "unexpected");
             
-            _logger.LogError(ex, "Error fetching prices for date {ValuationDate}", valuationDate);
+            logger.LogError(ex, "Error fetching prices for date {ValuationDate}", valuationDate);
             return StatusCode((int)HttpStatusCode.InternalServerError, new ProblemDetails
             {
                 Title = "Internal Server Error",

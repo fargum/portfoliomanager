@@ -1,12 +1,10 @@
 using FtoConsulting.PortfolioManager.Api.Models.Responses;
 using FtoConsulting.PortfolioManager.Api.Models.Requests;
 using FtoConsulting.PortfolioManager.Api.Services;
-using FtoConsulting.PortfolioManager.Application.Services;
 using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 using FtoConsulting.PortfolioManager.Application.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.ComponentModel.DataAnnotations;
 using System.Net;
 using System.Diagnostics;
 
@@ -19,32 +17,14 @@ namespace FtoConsulting.PortfolioManager.Api.Controllers;
 [Route("api/[controller]")]
 [Produces("application/json")]
 [Authorize(Policy = "RequirePortfolioScope")]
-public class HoldingsController : ControllerBase
+public class HoldingsController(
+    IHoldingService holdingService,
+    IPortfolioMappingService mappingService,
+    ICurrentUserService currentUserService,
+    MetricsService metrics,
+    ILogger<HoldingsController> logger) : ControllerBase
 {
     private static readonly ActivitySource s_activitySource = new("PortfolioManager.Holdings");
-    
-    private readonly IHoldingService _holdingService;
-    private readonly IPortfolioMappingService _mappingService;
-    private readonly ICurrentUserService _currentUserService;
-    private readonly MetricsService _metrics;
-    private readonly ILogger<HoldingsController> _logger;
-
-    /// <summary>
-    /// Initializes a new instance of the HoldingsController
-    /// </summary>
-    public HoldingsController(
-        IHoldingService holdingService,
-        IPortfolioMappingService mappingService,
-        ICurrentUserService currentUserService,
-        MetricsService metrics,
-        ILogger<HoldingsController> logger)
-    {
-        _holdingService = holdingService;
-        _mappingService = mappingService;
-        _currentUserService = currentUserService;
-        _metrics = metrics;
-        _logger = logger;
-    }
 
     /// <summary>
     /// Retrieve all holdings for the current authenticated user and valuation date
@@ -59,36 +39,6 @@ public class HoldingsController : ControllerBase
     /// **Real-Time vs Historical Data:**
     /// - If the valuation date is today's date, holdings are returned with real-time market prices
     /// - If the valuation date is in the past, holdings are returned with historical data from the database
-    /// 
-    /// The response includes flattened data combining information from:
-    /// 
-    /// **Holdings Data:**
-    /// - Unit amounts, bought values, current values
-    /// - Calculated gain/loss amounts and percentages
-    /// - Valuation date information
-    /// 
-    /// **Portfolio Data:**
-    /// - Portfolio names and identifiers
-    /// - Account information
-    /// 
-    /// **Instrument Data:**
-    /// - ISIN, SEDOL identifiers
-    /// - Instrument names, descriptions, and types
-    /// 
-    /// **Platform Data:**
-    /// - Platform names where holdings are held
-    /// 
-    /// **Summary Information:**
-    /// - Total holdings count
-    /// - Aggregated current and bought values
-    /// - Overall gain/loss calculations
-    /// 
-    /// **Example Usage:**
-    /// ```
-    /// GET /api/holdings/date/2025-11-10  // Returns real-time data for today
-    /// GET /api/holdings/date/2025-09-27  // Returns historical data
-    /// ```
-    /// 
     /// **Response Features:**
     /// - All monetary values are returned as decimals with appropriate precision
     /// - Gain/loss percentages are calculated and rounded to 2 decimal places
@@ -113,33 +63,31 @@ public class HoldingsController : ControllerBase
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         
         // Get account ID from authenticated user
-        var accountId = await _currentUserService.GetCurrentUserAccountIdAsync();
-        _logger.LogInformation("GetHoldingsByDate: Retrieved AccountId from authentication: {AccountId}", accountId);
+        var accountId = await currentUserService.GetCurrentUserAccountIdAsync();
+        logger.LogInformation("GetHoldingsByDate: Retrieved AccountId from authentication: {AccountId}", accountId);
         
         activity?.SetTag("account.id", accountId.ToString());
         activity?.SetTag("valuation.date", valuationDate.ToString("yyyy-MM-dd"));
         activity?.SetTag("is.real_time", (valuationDate.Date == DateTime.Today).ToString());
         
         // Record request metric
-        _metrics.IncrementHoldingsRequests(accountId.ToString(), "requested");
+        metrics.IncrementHoldingsRequests(accountId.ToString(), "requested");
         
         try
         {
-            using (_logger.BeginScope("Holdings retrieval for account {AccountId} on {ValuationDate}", accountId, valuationDate))
+            using (logger.BeginScope("Holdings retrieval for account {AccountId} on {ValuationDate}", accountId, valuationDate))
             {
-                _logger.LogInformation("Processing holdings request with parameters: AccountId={AccountId}, ValuationDate={ValuationDate}, IsRealTime={IsRealTime}",
+                logger.LogInformation("Processing holdings request with parameters: AccountId={AccountId}, ValuationDate={ValuationDate}, IsRealTime={IsRealTime}",
                     accountId, valuationDate, valuationDate.Date == DateTime.Today);
             }
             
-            // Validate input parameters - no need to validate accountId since it's controlled by the system
-            
             // Convert DateTime to DateOnly for service call
             var dateOnly = DateOnly.FromDateTime(valuationDate);
-            _logger.LogDebug("Converted valuation date to {DateOnly} for service call", dateOnly);
+            logger.LogDebug("Converted valuation date to {DateOnly} for service call", dateOnly);
 
             // Retrieve holdings from the service - it will handle both real-time and historical data automatically
-            _logger.LogInformation("Calling holdings retrieval service for account {AccountId}", accountId);
-            var holdings = await _holdingService.GetHoldingsByAccountAndDateAsync(accountId, dateOnly, cancellationToken);
+            logger.LogInformation("Calling holdings retrieval service for account {AccountId}", accountId);
+            var holdings = await holdingService.GetHoldingsByAccountAndDateAsync(accountId, dateOnly, cancellationToken);
 
             // Check if any holdings were found
             if (!holdings.Any())
@@ -149,7 +97,7 @@ public class HoldingsController : ControllerBase
                 activity?.SetTag("error.reason", "no_holdings");
                 activity?.SetTag("holdings.count", "0");
                 
-                _logger.LogInformation("No holdings found for account {AccountId} on date {ValuationDate}", accountId, dateOnly);
+                logger.LogInformation("No holdings found for account {AccountId} on date {ValuationDate}", accountId, dateOnly);
                 return NotFound(new ProblemDetails
                 {
                     Title = "Holdings Not Found",
@@ -159,7 +107,7 @@ public class HoldingsController : ControllerBase
             }
 
             // Map to response DTO
-            var response = _mappingService.MapToAccountHoldingsResponse(holdings, accountId, dateOnly);
+            var response = mappingService.MapToAccountHoldingsResponse(holdings, accountId, dateOnly);
 
             activity?.SetTag("holdings.count", response.TotalHoldings.ToString());
             activity?.SetTag("response.total_current_value", response.TotalCurrentValue.ToString());
@@ -168,10 +116,10 @@ public class HoldingsController : ControllerBase
 
             // Record metrics
             stopwatch.Stop();
-            _metrics.RecordHoldingsRequestDuration(stopwatch.Elapsed.TotalSeconds, accountId.ToString(), "success");
-            _metrics.IncrementHoldingsRequests(accountId.ToString(), "success");
+            metrics.RecordHoldingsRequestDuration(stopwatch.Elapsed.TotalSeconds, accountId.ToString(), "success");
+            metrics.IncrementHoldingsRequests(accountId.ToString(), "success");
 
-            _logger.LogInformation("Successfully retrieved {Count} holdings for account {AccountId} on date {ValuationDate}", 
+            logger.LogInformation("Successfully retrieved {Count} holdings for account {AccountId} on date {ValuationDate}", 
                 response.TotalHoldings, accountId, dateOnly);
 
             return Ok(response);
@@ -182,7 +130,7 @@ public class HoldingsController : ControllerBase
             activity?.SetTag("error.type", "format");
             activity?.SetTag("error.reason", "invalid_date");
             
-            _logger.LogWarning(ex, "Invalid date format provided: {ValuationDate}", valuationDate);
+            logger.LogWarning(ex, "Invalid date format provided: {ValuationDate}", valuationDate);
             return BadRequest(new ProblemDetails
             {
                 Title = "Invalid Date Format",
@@ -193,12 +141,12 @@ public class HoldingsController : ControllerBase
         catch (Exception ex)
         {
             stopwatch.Stop();
-            _metrics.RecordHoldingsRequestDuration(stopwatch.Elapsed.TotalSeconds, accountId.ToString(), "error");
-            _metrics.IncrementHoldingsRequests(accountId.ToString(), "error");
+            metrics.RecordHoldingsRequestDuration(stopwatch.Elapsed.TotalSeconds, accountId.ToString(), "error");
+            metrics.IncrementHoldingsRequests(accountId.ToString(), "error");
             
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             activity?.SetTag("error.type", "unexpected");
-            _logger.LogError(ex, "Error retrieving holdings for account {AccountId} on date {ValuationDate}", accountId, valuationDate);
+            logger.LogError(ex, "Error retrieving holdings for account {AccountId} on date {ValuationDate}", accountId, valuationDate);
             return StatusCode((int)HttpStatusCode.InternalServerError, new ProblemDetails
             {
                 Title = "Internal Server Error",
@@ -221,7 +169,7 @@ public class HoldingsController : ControllerBase
     /// **Key Features:**
     /// - Creates instrument if it doesn't exist
     /// - Validates portfolio ownership
-    /// - Prevents duplicate holdings for same instrument/date
+    /// - Prevents duplicate holdings for same instrument/date and platform
     /// - Calculates current value using real-time pricing
     /// - Full transaction support with rollback on errors
     /// 
@@ -264,19 +212,9 @@ public class HoldingsController : ControllerBase
         using var activity = s_activitySource.StartActivity("AddHolding");
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         
-        // DETAILED DEBUGGING - Log everything about this request
-        _logger.LogInformation("=== ADD HOLDING DEBUG START ===");
-        _logger.LogInformation("Request Headers: {Headers}", string.Join(", ", Request.Headers.Select(h => $"{h.Key}={string.Join(";", h.Value.ToArray())}")));
-        _logger.LogInformation("Portfolio ID: {PortfolioId}", portfolioId);
-        _logger.LogInformation("Request Body - Ticker: {Ticker}, Units: {Units}, PlatformId: {PlatformId}, BoughtValue: {BoughtValue}, InstrumentName: {InstrumentName}, Description: {Description}, CurrencyCode: {CurrencyCode}, QuoteUnit: {QuoteUnit}", 
-            request.Ticker, request.Units, request.PlatformId, request.BoughtValue, request.InstrumentName, request.Description, request.CurrencyCode, request.QuoteUnit);
-        _logger.LogInformation("Content-Type: {ContentType}", Request.ContentType);
-        _logger.LogInformation("User-Agent: {UserAgent}", Request.Headers.UserAgent.ToString());
-        _logger.LogInformation("=== ADD HOLDING DEBUG END ===");
-        
-        // Get account ID from authenticated user
-        var accountId = await _currentUserService.GetCurrentUserAccountIdAsync();
-        _logger.LogInformation("AddHolding: Retrieved AccountId from authentication: {AccountId}", accountId);
+       // Get account ID from authenticated user
+        var accountId = await currentUserService.GetCurrentUserAccountIdAsync();
+        logger.LogInformation("AddHolding: Retrieved AccountId from authentication: {AccountId}", accountId);
         
         activity?.SetTag("account.id", accountId.ToString());
         activity?.SetTag("portfolio.id", portfolioId.ToString());
@@ -285,10 +223,10 @@ public class HoldingsController : ControllerBase
         
         try
         {
-            using (_logger.BeginScope("Adding holding for account {AccountId}, portfolio {PortfolioId}, ticker {Ticker}", 
+            using (logger.BeginScope("Adding holding for account {AccountId}, portfolio {PortfolioId}, ticker {Ticker}", 
                 accountId, portfolioId, request.Ticker))
             {
-                _logger.LogInformation("Processing add holding request: AccountId={AccountId}, PortfolioId={PortfolioId}, Ticker={Ticker}, Units={Units}",
+                logger.LogInformation("Processing add holding request: AccountId={AccountId}, PortfolioId={PortfolioId}, Ticker={Ticker}, Units={Units}",
                     accountId, portfolioId, request.Ticker, request.Units);
             }
 
@@ -307,7 +245,7 @@ public class HoldingsController : ControllerBase
             };
 
             // Call the holding service
-            var result = await _holdingService.AddHoldingAsync(portfolioId, addRequest, accountId, cancellationToken);
+            var result = await holdingService.AddHoldingAsync(portfolioId, addRequest, accountId, cancellationToken);
 
             // Map application result to API response
             var response = new AddHoldingApiResponse
@@ -375,7 +313,7 @@ public class HoldingsController : ControllerBase
             activity?.SetStatus(ActivityStatusCode.Ok);
 
             stopwatch.Stop();
-            _logger.LogInformation("Successfully added holding {HoldingId} for ticker {Ticker} to portfolio {PortfolioId}", 
+            logger.LogInformation("Successfully added holding {HoldingId} for ticker {Ticker} to portfolio {PortfolioId}", 
                 response.HoldingId, request.Ticker, portfolioId);
 
             return CreatedAtAction(nameof(GetHoldingsByDate), 
@@ -388,7 +326,7 @@ public class HoldingsController : ControllerBase
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             activity?.SetTag("error.type", "unexpected");
             
-            _logger.LogError(ex, "Error adding holding for ticker {Ticker} to portfolio {PortfolioId}", 
+            logger.LogError(ex, "Error adding holding for ticker {Ticker} to portfolio {PortfolioId}", 
                 request.Ticker, portfolioId);
                 
             return StatusCode((int)HttpStatusCode.InternalServerError, new ProblemDetails
@@ -448,8 +386,8 @@ public class HoldingsController : ControllerBase
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         
         // Get account ID from authenticated user
-        var accountId = await _currentUserService.GetCurrentUserAccountIdAsync();
-        _logger.LogInformation("UpdateHoldingUnits: Retrieved AccountId from authentication: {AccountId}", accountId);
+        var accountId = await currentUserService.GetCurrentUserAccountIdAsync();
+        logger.LogInformation("UpdateHoldingUnits: Retrieved AccountId from authentication: {AccountId}", accountId);
         
         activity?.SetTag("account.id", accountId.ToString());
         activity?.SetTag("holding.id", holdingId.ToString());
@@ -457,15 +395,15 @@ public class HoldingsController : ControllerBase
         
         try
         {
-            using (_logger.BeginScope("Updating holding units for account {AccountId}, holding {HoldingId}", 
+            using (logger.BeginScope("Updating holding units for account {AccountId}, holding {HoldingId}", 
                 accountId, holdingId))
             {
-                _logger.LogInformation("Processing update holding units request: AccountId={AccountId}, HoldingId={HoldingId}, NewUnits={NewUnits}",
+                logger.LogInformation("Processing update holding units request: AccountId={AccountId}, HoldingId={HoldingId}, NewUnits={NewUnits}",
                     accountId, holdingId, request.Units);
             }
 
             // Call the holding service
-            var result = await _holdingService.UpdateHoldingUnitsAsync(holdingId, request.Units, accountId, cancellationToken);
+            var result = await holdingService.UpdateHoldingUnitsAsync(holdingId, request.Units, accountId, cancellationToken);
 
             // Map application result to API response
             var response = new UpdateHoldingApiResponse
@@ -509,7 +447,7 @@ public class HoldingsController : ControllerBase
             activity?.SetStatus(ActivityStatusCode.Ok);
 
             stopwatch.Stop();
-            _logger.LogInformation("Successfully updated holding {HoldingId} units from {PreviousUnits} to {NewUnits}", 
+            logger.LogInformation("Successfully updated holding {HoldingId} units from {PreviousUnits} to {NewUnits}", 
                 holdingId, response.PreviousUnits, response.NewUnits);
 
             return Ok(response);
@@ -520,7 +458,7 @@ public class HoldingsController : ControllerBase
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             activity?.SetTag("error.type", "unexpected");
             
-            _logger.LogError(ex, "Error updating holding {HoldingId} units to {NewUnits}", holdingId, request.Units);
+            logger.LogError(ex, "Error updating holding {HoldingId} units to {NewUnits}", holdingId, request.Units);
                 
             return StatusCode((int)HttpStatusCode.InternalServerError, new ProblemDetails
             {
@@ -570,23 +508,23 @@ public class HoldingsController : ControllerBase
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         
         // Get account ID from authenticated user
-        var accountId = await _currentUserService.GetCurrentUserAccountIdAsync();
-        _logger.LogInformation("DeleteHolding: Retrieved AccountId from authentication: {AccountId}", accountId);
+        var accountId = await currentUserService.GetCurrentUserAccountIdAsync();
+        logger.LogInformation("DeleteHolding: Retrieved AccountId from authentication: {AccountId}", accountId);
         
         activity?.SetTag("account.id", accountId.ToString());
         activity?.SetTag("holding.id", holdingId.ToString());
         
         try
         {
-            using (_logger.BeginScope("Deleting holding for account {AccountId}, holding {HoldingId}", 
+            using (logger.BeginScope("Deleting holding for account {AccountId}, holding {HoldingId}", 
                 accountId, holdingId))
             {
-                _logger.LogInformation("Processing delete holding request: AccountId={AccountId}, HoldingId={HoldingId}",
+                logger.LogInformation("Processing delete holding request: AccountId={AccountId}, HoldingId={HoldingId}",
                     accountId, holdingId);
             }
 
             // Call the holding service
-            var result = await _holdingService.DeleteHoldingAsync(holdingId, accountId, cancellationToken);
+            var result = await holdingService.DeleteHoldingAsync(holdingId, accountId, cancellationToken);
 
             // Map application result to API response
             var response = new DeleteHoldingApiResponse
@@ -627,7 +565,7 @@ public class HoldingsController : ControllerBase
             activity?.SetStatus(ActivityStatusCode.Ok);
 
             stopwatch.Stop();
-            _logger.LogInformation("Successfully deleted holding {HoldingId} for ticker {Ticker} from portfolio {PortfolioId}", 
+            logger.LogInformation("Successfully deleted holding {HoldingId} for ticker {Ticker} from portfolio {PortfolioId}", 
                 holdingId, response.DeletedTicker, response.PortfolioId);
 
             return Ok(response);
@@ -638,7 +576,7 @@ public class HoldingsController : ControllerBase
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
             activity?.SetTag("error.type", "unexpected");
             
-            _logger.LogError(ex, "Error deleting holding {HoldingId}", holdingId);
+            logger.LogError(ex, "Error deleting holding {HoldingId}", holdingId);
                 
             return StatusCode((int)HttpStatusCode.InternalServerError, new ProblemDetails
             {
