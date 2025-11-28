@@ -107,7 +107,8 @@ export const getHoldingsColumnDefs = (onCellValueChanged?: (params: any) => void
   {
     field: 'instrumentName',
     headerName: 'Instrument',
-    width: 400,
+    width: 500,
+    flex: 0, // Override default flex to use fixed width
     sortable: true,
     filter: true,
     tooltipField: 'instrumentName',
