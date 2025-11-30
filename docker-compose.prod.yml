@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  # Portfolio Manager API Service
+  portfoliomanager-api:
+    build: 
+      context: ./services/api
+      dockerfile: Dockerfile
+    image: portfoliomanager-api:latest
+    container_name: portfoliomanager-api
+    env_file:
+      - .env.production
+    environment:
+      # ASP.NET Core Configuration
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - ASPNETCORE_HTTP_PORTS=8080
+      
+      # Database Connection
+      - ConnectionStrings__DefaultConnection=Host=${DB_HOST};Port=${DB_PORT};Database=${DB_NAME};Username=${DB_USERNAME};Password=${Database:Password};Include Error Detail=false
+      
+      # Key Vault Configuration
+      - KeyVault__Name=${KEYVAULT__NAME}
+      
+      # Azure AD Configuration
+      - AZURE_AD_INSTANCE=${AZURE_AD_INSTANCE}
+      - AZURE_AD_DOMAIN=${AZURE_AD_DOMAIN}
+      - AZURE_AD_TENANT_ID=${AZURE_AD_TENANT_ID}
+      - AZURE_AD_AUDIENCE=${AZURE_AD_AUDIENCE}
+      
+      # Logging Configuration
+      - Logging__LogLevel__Default=Information
+      - Logging__LogLevel__Microsoft.AspNetCore=Warning
+      - Logging__LogLevel__Microsoft.EntityFrameworkCore=Warning
+      
+      - AllowedHosts=*
+    ports:
+      - "8080:8080"
+    networks:
+      - portfoliomanager-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Portfolio Manager UI Service
+  portfoliomanager-ui:
+    build: 
+      context: ./services/ui
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: https://your-api-domain.com
+        NEXT_PUBLIC_AZURE_CLIENT_ID: ${AZURE_AD_UI_CLIENT_ID}
+        NEXT_PUBLIC_AZURE_TENANT_ID: ${AZURE_AD_TENANT_ID}
+        NEXT_PUBLIC_AZURE_API_CLIENT_ID: ${AZURE_AD_CLIENT_ID}
+    image: portfoliomanager-ui:latest
+    container_name: portfoliomanager-ui
+    environment:
+      - API_BASE_URL=http://portfoliomanager-api:8080
+      - NEXT_PUBLIC_API_BASE_URL=https://your-api-domain.com
+      - NEXT_PUBLIC_AZURE_CLIENT_ID=${AZURE_AD_UI_CLIENT_ID}
+      - NEXT_PUBLIC_AZURE_TENANT_ID=${AZURE_AD_TENANT_ID}
+      - NEXT_PUBLIC_AZURE_API_CLIENT_ID=${AZURE_AD_CLIENT_ID}
+    ports:
+      - "3000:3000"
+    networks:
+      - portfoliomanager-network
+    depends_on:
+      - portfoliomanager-api
+    restart: unless-stopped
+
+networks:
+  portfoliomanager-network:
+    driver: bridge

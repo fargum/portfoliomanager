@@ -13,6 +13,8 @@ using OpenTelemetry.Trace;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Logs;
+using Azure.Identity;
+using Azure.Extensions.AspNetCore.Configuration.Secrets;
 
 // Configure culture for consistent date parsing
 var cultureInfo = new CultureInfo("en-GB"); // UK culture for dd/MM/yyyy preference
@@ -20,6 +22,14 @@ CultureInfo.DefaultThreadCurrentCulture = cultureInfo;
 CultureInfo.DefaultThreadCurrentUICulture = cultureInfo;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Add Azure Key Vault if configured (for production)
+var keyVaultName = builder.Configuration["KeyVault:Name"];
+if (!string.IsNullOrEmpty(keyVaultName))
+{
+    var keyVaultUri = new Uri($"https://{keyVaultName}.vault.azure.net/");
+    builder.Configuration.AddAzureKeyVault(keyVaultUri, new DefaultAzureCredential());
+}
 
 // Add environment variables to configuration with mapping
 builder.Configuration.AddEnvironmentVariables();
@@ -90,8 +100,15 @@ builder.Services.AddControllers();
 // Configure Entity Framework
 builder.Services.AddDbContext<PortfolioManagerDbContext>(options =>
 {
-    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") 
-        ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
+    // Build connection string from environment variables and Key Vault
+    var dbHost = builder.Configuration["DB_HOST"] ?? builder.Configuration["ConnectionStrings:Host"] ?? "localhost";
+    var dbPort = builder.Configuration["DB_PORT"] ?? builder.Configuration["ConnectionStrings:Port"] ?? "5432";
+    var dbName = builder.Configuration["DB_NAME"] ?? builder.Configuration["ConnectionStrings:Database"] ?? "portfolio_manager";
+    var dbUsername = builder.Configuration["DB_USERNAME"] ?? builder.Configuration["ConnectionStrings:Username"] ?? "postgres";
+    var dbPassword = builder.Configuration["Database:Password"] ?? throw new InvalidOperationException("Database password not found in configuration.");
+    
+    var connectionString = $"Host={dbHost};Port={dbPort};Database={dbName};Username={dbUsername};Password={dbPassword};Include Error Detail=false";
+    
     options.UseNpgsql(connectionString, npgsqlOptions => 
                npgsqlOptions.MigrationsHistoryTable("__EFMigrationsHistory", "app"))
            .EnableSensitiveDataLogging()
@@ -165,7 +182,11 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowUI", policy =>
     {
-        policy.WithOrigins("http://localhost:3000") // Allow the UI container
+        // Get allowed origins from configuration with fallback to localhost
+        var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() 
+            ?? new[] { "http://localhost:3000" };
+        
+        policy.WithOrigins(allowedOrigins)
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
@@ -304,6 +325,11 @@ builder.Services.AddSwaggerGen(c =>
 
 var app = builder.Build();
 
+// Log CORS configuration on startup
+var logger = app.Services.GetRequiredService<ILogger<Program>>();
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>();
+logger.LogInformation("CORS configured with allowed origins: {Origins}", allowedOrigins != null ? string.Join(", ", allowedOrigins) : "null (using fallback)");
+
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
 {
@@ -324,7 +350,7 @@ app.UseSwaggerUI(c =>
     });
 }
 
-// Enable CORS
+// Enable CORS - must be before UseHttpsRedirection
 app.UseCors("AllowUI");
 
 app.UseHttpsRedirection();
