@@ -10,6 +10,7 @@ using OpenAI;
 using Microsoft.Extensions.Logging;
 using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 using FtoConsulting.PortfolioManager.Application.Services.Ai.Guardrails;
+using FtoConsulting.PortfolioManager.Domain.Entities;
 using System.Diagnostics;
 
 
@@ -45,11 +46,22 @@ public class AiOrchestrationService(
         int? threadId = null, 
         CancellationToken cancellationToken = default)
     {
-        // Get or create conversation thread
-        var thread = threadId.HasValue
-            ? await conversationThreadService.GetThreadByIdAsync(threadId.Value, accountId, cancellationToken)
-                ?? await conversationThreadService.GetOrCreateActiveThreadAsync(accountId, cancellationToken)
-            : await conversationThreadService.GetOrCreateActiveThreadAsync(accountId, cancellationToken);        // GUARDRAILS: Validate input
+        // SECURITY: Validate threadId belongs to authenticated account if provided
+        ConversationThread? thread = null;
+        if (threadId.HasValue)
+        {
+            thread = await conversationThreadService.GetThreadByIdAsync(threadId.Value, accountId, cancellationToken);
+            if (thread == null)
+            {
+                logger.LogWarning("ThreadId {ThreadId} not found or does not belong to account {AccountId}, creating new thread", 
+                    threadId.Value, accountId);
+            }
+        }
+        
+        // Get or create conversation thread if not already retrieved
+        thread ??= await conversationThreadService.GetOrCreateActiveThreadAsync(accountId, cancellationToken);
+        
+        // GUARDRAILS: Validate input
         var inputValidation = await guardrails.ValidateInputAsync(query, accountId);
         
         if (!inputValidation.IsValid)
@@ -89,12 +101,14 @@ public class AiOrchestrationService(
 
     /// <summary>
     /// Create AI functions that connect to our MCP server tools
+    /// SECURITY: accountId is injected from authenticated context, not exposed to AI
     /// </summary>
-    private IEnumerable<AITool> CreatePortfolioMcpFunctions()
+    private IEnumerable<AITool> CreatePortfolioMcpFunctions(int authenticatedAccountId)
     {
         // Create AI functions from the centralized tool registry
         // These will be used by the AI agent to call our MCP tools
-        return PortfolioToolRegistry.CreateAiFunctions(CallMcpTool);
+        // Pass the authenticated account ID to prevent cross-account data access
+        return PortfolioToolRegistry.CreateAiFunctions(authenticatedAccountId, CallMcpTool);
     }
 
     /// <summary>
@@ -156,7 +170,7 @@ For casual conversation, respond naturally without using tools.";
         string text = content switch
         {
             string str => str,
-            IEnumerable<ChatMessage> messages => string.Join(" ", messages.Select(m => m.Text ?? "")),
+            IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages => string.Join(" ", messages.Select(m => m.Text ?? "")),
             _ => content.ToString() ?? ""
         };
         
@@ -209,7 +223,7 @@ For casual conversation, respond naturally without using tools.";
     /// <summary>
     /// Setup memory-aware AI agent with optimized conversation history
     /// </summary>
-    private async Task<(AIAgent agent, List<ChatMessage> messagesToSend)> SetupMemoryAwareAgent(string query, int accountId, int threadId, CancellationToken cancellationToken)
+    private async Task<(AIAgent agent, List<Microsoft.Extensions.AI.ChatMessage> messagesToSend)> SetupMemoryAwareAgent(string query, int accountId, int threadId, CancellationToken cancellationToken)
     {
         // Validate Azure Foundry configuration
         if (string.IsNullOrEmpty(azureFoundryOptions.Value.Endpoint) || string.IsNullOrEmpty(azureFoundryOptions.Value.ApiKey))
@@ -233,7 +247,8 @@ For casual conversation, respond naturally without using tools.";
         var chatClient = new TokenTrackingChatClient(baseChatClient, tokenTrackingLogger, accountId, "portfolio-agent");
         
         // Create memory-aware AI agent with ChatClientAgentOptions and enhanced security
-        var portfolioTools = CreatePortfolioMcpFunctions();
+        // SECURITY: Pass authenticated accountId to tools to prevent cross-account access
+        var portfolioTools = CreatePortfolioMcpFunctions(accountId);
         var secureInstructions = guardrails.CreateSecureAgentInstructions(CreateAgentInstructions(accountId), accountId);
         var secureChatOptions = guardrails.CreateSecureChatOptions(portfolioTools, accountId);
         
@@ -252,7 +267,7 @@ For casual conversation, respond naturally without using tools.";
         var messageStore = chatMessageStoreFactory(accountId, threadId, null);
         
         // Use a smaller token budget for faster initial loading - prioritize recent context
-        List<ChatMessage> recentMessages;
+        List<Microsoft.Extensions.AI.ChatMessage> recentMessages;
         
         if (messageStore is ITokenAwareChatMessageStore tokenAwareStore)
         {

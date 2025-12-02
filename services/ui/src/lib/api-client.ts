@@ -190,7 +190,7 @@ export class PortfolioApiClient {
       
       const requestBody: ChatRequestDto = {
         query,
-        accountId,
+        // accountId removed - backend gets from authentication for security
         threadId
       };
 
@@ -269,9 +269,9 @@ export class PortfolioApiClient {
       
       console.log(`Sending chat query to: ${url}`, { threadId });
       
+      // NOTE: accountId removed from request body - backend retrieves from authentication for security
       const requestBody: ChatRequestDto = {
         query,
-        accountId,
         threadId
       };
 

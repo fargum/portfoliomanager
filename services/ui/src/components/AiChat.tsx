@@ -54,6 +54,30 @@ I can analyze your holdings, market conditions, and provide insights to help you
     }
   }, [isVisible]);
 
+  // SECURITY: Clear threadId when accountId changes to prevent cross-account thread access
+  useEffect(() => {
+    setCurrentThreadId(undefined);
+    // Optionally clear messages too when switching accounts
+    setChatState({
+      messages: [
+        {
+          id: '1',
+          type: 'system',
+          content: `Welcome! I'm your AI portfolio assistant. Ask me anything about your portfolio, such as:
+        
+• "How is my portfolio performing today?"
+• "What are my top holdings?"
+• "Show me market sentiment for my stocks"
+• "Compare my performance from last week"
+        
+I can analyze your holdings, market conditions, and provide insights to help you make informed decisions.`,
+          timestamp: new Date(),
+        }
+      ],
+      isLoading: false,
+    });
+  }, [accountId]);
+
   const generateMessageId = () => `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
   const handleSubmit = async (e: React.FormEvent) => {

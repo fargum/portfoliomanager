@@ -18,10 +18,9 @@ public static class PortfolioToolRegistry
     {
         new PortfolioToolDefinition(
             Name: "GetPortfolioHoldings",
-            Description: "Retrieve portfolio holdings for a specific account and date. For current/today performance, use 'today' or current date to get real-time data.",
+            Description: "Retrieve portfolio holdings for the authenticated user's account and date. For current/today performance, use 'today' or current date to get real-time data.",
             Parameters: new Dictionary<string, ToolParameterDefinition>
             {
-                ["accountId"] = new ToolParameterDefinition("integer", "Account ID", true),
                 ["date"] = new ToolParameterDefinition("string", "Date for holdings analysis. Use 'today' for real-time data, or specify historical date in various formats (YYYY-MM-DD, DD/MM/YYYY, DD MMMM YYYY, etc.)", true)
             },
             Category: "Portfolio Data"
@@ -29,10 +28,9 @@ public static class PortfolioToolRegistry
         
         new PortfolioToolDefinition(
             Name: "AnalyzePortfolioPerformance", 
-            Description: "Analyze portfolio performance and generate insights for a specific date. For current/today performance, use 'today' or current date to get real-time analysis.",
+            Description: "Analyze portfolio performance and generate insights for the authenticated user's account on a specific date. For current/today performance, use 'today' or current date to get real-time analysis.",
             Parameters: new Dictionary<string, ToolParameterDefinition>
             {
-                ["accountId"] = new ToolParameterDefinition("integer", "Account ID", true),
                 ["analysisDate"] = new ToolParameterDefinition("string", "Analysis date. Use 'today' for real-time analysis, or specify historical date in various formats (YYYY-MM-DD, DD/MM/YYYY, DD MMMM YYYY, etc.)", true)
             },
             Category: "Portfolio Analysis"
@@ -40,10 +38,9 @@ public static class PortfolioToolRegistry
         
         new PortfolioToolDefinition(
             Name: "ComparePortfolioPerformance",
-            Description: "Compare portfolio performance between two dates", 
+            Description: "Compare portfolio performance for the authenticated user's account between two dates", 
             Parameters: new Dictionary<string, ToolParameterDefinition>
             {
-                ["accountId"] = new ToolParameterDefinition("integer", "Account ID", true),
                 ["startDate"] = new ToolParameterDefinition("string", "Start date in various formats (YYYY-MM-DD, DD/MM/YYYY, DD MMMM YYYY, etc.) or relative terms (today, yesterday, tomorrow)", true),
                 ["endDate"] = new ToolParameterDefinition("string", "End date in various formats (YYYY-MM-DD, DD/MM/YYYY, DD MMMM YYYY, etc.) or relative terms (today, yesterday, tomorrow)", true)
             },
@@ -111,25 +108,26 @@ public static class PortfolioToolRegistry
 
     /// <summary>
     /// Create AI functions for the Microsoft Agent Framework
+    /// NOTE: accountId is NOT exposed to the AI - it's injected from authenticated context for security
     /// </summary>
-    public static IEnumerable<AITool> CreateAiFunctions(Func<string, Dictionary<string, object>, Task<object>> toolExecutor)
+    public static IEnumerable<AITool> CreateAiFunctions(int authenticatedAccountId, Func<string, Dictionary<string, object>, Task<object>> toolExecutor)
     {
         var functions = new List<AITool>
         {
             AIFunctionFactory.Create(
-                method: (int accountId, string date) => toolExecutor("GetPortfolioHoldings", new Dictionary<string, object> { ["accountId"] = accountId, ["date"] = date }),
+                method: (string date) => toolExecutor("GetPortfolioHoldings", new Dictionary<string, object> { ["accountId"] = authenticatedAccountId, ["date"] = date }),
                 name: "GetPortfolioHoldings",
-                description: "Retrieve portfolio holdings for a specific account and date. For current/today performance, use 'today' or current date to get real-time data."),
+                description: "Retrieve portfolio holdings for the authenticated user's account and date. For current/today performance, use 'today' or current date to get real-time data."),
 
             AIFunctionFactory.Create(
-                method: (int accountId, string analysisDate) => toolExecutor("AnalyzePortfolioPerformance", new Dictionary<string, object> { ["accountId"] = accountId, ["analysisDate"] = analysisDate }),
+                method: (string analysisDate) => toolExecutor("AnalyzePortfolioPerformance", new Dictionary<string, object> { ["accountId"] = authenticatedAccountId, ["analysisDate"] = analysisDate }),
                 name: "AnalyzePortfolioPerformance",
-                description: "Analyze portfolio performance and generate insights for a specific date. For current/today performance, use 'today' or current date to get real-time analysis."),
+                description: "Analyze portfolio performance and generate insights for the authenticated user's account on a specific date. For current/today performance, use 'today' or current date to get real-time analysis."),
 
             AIFunctionFactory.Create(
-                method: (int accountId, string startDate, string endDate) => toolExecutor("ComparePortfolioPerformance", new Dictionary<string, object> { ["accountId"] = accountId, ["startDate"] = startDate, ["endDate"] = endDate }),
+                method: (string startDate, string endDate) => toolExecutor("ComparePortfolioPerformance", new Dictionary<string, object> { ["accountId"] = authenticatedAccountId, ["startDate"] = startDate, ["endDate"] = endDate }),
                 name: "ComparePortfolioPerformance",
-                description: "Compare portfolio performance between two dates"),
+                description: "Compare portfolio performance for the authenticated user's account between two dates"),
 
             AIFunctionFactory.Create(
                 method: (string[] tickers, string date) => toolExecutor("GetMarketContext", new Dictionary<string, object> { ["tickers"] = tickers, ["date"] = date }),

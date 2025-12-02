@@ -2,10 +2,10 @@ namespace FtoConsulting.PortfolioManager.Application.DTOs.Ai;
 
 /// <summary>
 /// Request DTO for chat-based portfolio queries
+/// NOTE: AccountId is NOT in the request - it's retrieved from authenticated user context for security
 /// </summary>
 public record ChatRequestDto(
     string Query,
-    int AccountId,
     DateTime? ContextDate = null,
     int? ThreadId = null,
     string? ThreadTitle = null,

@@ -19,6 +19,7 @@ namespace FtoConsulting.PortfolioManager.Api.Controllers.Ai;
 [Authorize(Policy = "RequirePortfolioScope")]
 public class ChatController(
     IAiOrchestrationService aiOrchestrationService,
+    ICurrentUserService currentUserService,
     ILogger<ChatController> logger,
     IOptions<AzureFoundryOptions> azureFoundryOptions) : ControllerBase
 {
@@ -39,17 +40,21 @@ public class ChatController(
         CancellationToken cancellationToken = default)
     {
         using var activity = s_activitySource.StartActivity("StreamPortfolioQuery");
-        activity?.SetTag("account.id", request.AccountId.ToString());
+        
+        // SECURITY: Get accountId from authenticated user, NOT from request body
+        var accountId = await currentUserService.GetCurrentUserAccountIdAsync();
+        
+        activity?.SetTag("account.id", accountId.ToString());
         activity?.SetTag("thread.id", request.ThreadId?.ToString() ?? "none");
         activity?.SetTag("query.length", request.Query?.Length.ToString() ?? "0");
         activity?.SetTag("response.type", "streaming");
         
         try
         {
-            using (logger.BeginScope("AI streaming chat query for account {AccountId}", request.AccountId))
+            using (logger.BeginScope("AI streaming chat query for account {AccountId}", accountId))
             {
                 logger.LogInformation("Processing streaming AI query with AccountId={AccountId}, ThreadId={ThreadId}, QueryLength={QueryLength}",
-                    request.AccountId, request.ThreadId, request.Query?.Length ?? 0);
+                    accountId, request.ThreadId, request.Query?.Length ?? 0);
             }
             
             if (string.IsNullOrWhiteSpace(request.Query))
@@ -59,15 +64,8 @@ public class ChatController(
                 return BadRequest("Query cannot be empty");
             }
 
-            if (request.AccountId <= 0)
-            {
-                activity?.SetStatus(ActivityStatusCode.Error, "Valid account ID is required");
-                activity?.SetTag("error.type", "validation");
-                return BadRequest("Valid account ID is required");
-            }
-
             logger.LogInformation("Processing streaming AI chat query with memory for account {AccountId}, thread {ThreadId}: {Query}", 
-                request.AccountId, request.ThreadId, request.Query);
+                accountId, request.ThreadId, request.Query);
 
             // Set up Server-Sent Events headers
             Response.Headers["Content-Type"] = "text/plain; charset=utf-8";
@@ -77,7 +75,7 @@ public class ChatController(
             // Use unified memory-aware streaming with status updates from the AI service
             await aiOrchestrationService.ProcessPortfolioQueryAsync(
                 request.Query, 
-                request.AccountId,
+                accountId,  // SECURITY: Use authenticated accountId, not from request
                 onStatusUpdate: async (status) =>
                 {
                     if (!cancellationToken.IsCancellationRequested)
@@ -111,7 +109,7 @@ public class ChatController(
             }
 
             logger.LogInformation("Successfully completed streaming AI chat query with memory for account {AccountId}", 
-                request.AccountId);
+                accountId);
 
             activity?.SetStatus(ActivityStatusCode.Ok);
             activity?.SetTag("response.completed", "true");
@@ -124,7 +122,7 @@ public class ChatController(
             activity?.SetTag("error.type", "unexpected");
             
             logger.LogError(ex, "Error processing streaming AI chat query with memory for account {AccountId}: {Query}", 
-                request.AccountId, request.Query);
+                accountId, request.Query);
             
             if (!Response.HasStarted)
             {

@@ -2,7 +2,7 @@
 
 export interface ChatRequestDto {
   query: string;
-  accountId: number;
+  // NOTE: accountId removed - backend retrieves from authenticated user for security
   threadId?: number; // Optional thread ID for memory context
 }
 
