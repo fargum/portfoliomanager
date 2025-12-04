@@ -64,23 +64,6 @@ public class MarketIntelligenceService : IMarketIntelligenceService
         }
     }
 
-    public async Task<IEnumerable<NewsItemDto>> SearchFinancialNewsAsync(IEnumerable<string> tickers, DateTime fromDate, DateTime toDate, CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            _logger.LogInformation("Searching financial news for {Tickers} from {FromDate} to {ToDate}", 
-                string.Join(", ", tickers), fromDate, toDate);
-
-            // Call the internal method that uses EOD service
-            return await GetNewsAsync(tickers, toDate);
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error searching financial news for tickers: {Tickers}", string.Join(", ", tickers));
-            throw;
-        }
-    }
-
     public async Task<MarketSentimentDto> GetMarketSentimentAsync(DateTime date, CancellationToken cancellationToken = default)
     {
         try

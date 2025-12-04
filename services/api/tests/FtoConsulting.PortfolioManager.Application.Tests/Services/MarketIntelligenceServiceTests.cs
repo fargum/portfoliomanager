@@ -162,22 +162,6 @@ public class MarketIntelligenceServiceTests
     }
 
     [Fact]
-    public async Task SearchFinancialNewsAsync_WithoutEodService_ReturnsEmptyNews()
-    {
-        // Arrange
-        var tickers = new[] { "AAPL", "MSFT" };
-        var fromDate = DateTime.Now.AddDays(-7);
-        var toDate = DateTime.Now;
-
-        // Act
-        var result = await _service.SearchFinancialNewsAsync(tickers, fromDate, toDate);
-        
-        // Assert
-        Assert.NotNull(result);
-        Assert.Empty(result);
-    }
-
-    [Fact]
     public async Task GetMarketSentimentAsync_WithoutEodService_ReturnsFallbackSentiment()
     {
         // Arrange

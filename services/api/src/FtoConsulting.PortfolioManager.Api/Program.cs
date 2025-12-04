@@ -13,6 +13,7 @@ using OpenTelemetry.Trace;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Logs;
+using Azure.Monitor.OpenTelemetry.AspNetCore;
 using Azure.Identity;
 using Azure.Extensions.AspNetCore.Configuration.Secrets;
 
@@ -80,7 +81,8 @@ builder.Logging.AddOpenTelemetry(options =>
         
     options.AddOtlpExporter(otlpOptions =>
     {
-        otlpOptions.Endpoint = new Uri("http://host.docker.internal:18889");
+        var otlpEndpoint = builder.Configuration["OTLP_ENDPOINT"] ?? "http://host.docker.internal:18889";
+        otlpOptions.Endpoint = new Uri(otlpEndpoint);
     });
     options.AddConsoleExporter();
 });
@@ -205,8 +207,15 @@ var resourceBuilder = ResourceBuilder.CreateDefault()
         ["service.instance.id"] = Environment.MachineName
     });
 
+// Get OTLP endpoint from configuration
+// Azure Container Apps injects OTEL_EXPORTER_OTLP_ENDPOINT automatically when environment telemetry is configured
+// Fall back to OTLP_ENDPOINT for backward compatibility, then to local dev default
+var otlpEndpoint = builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"] 
+    ?? builder.Configuration["OTLP_ENDPOINT"] 
+    ?? "http://host.docker.internal:18889";
+
 // Configure tracing
-builder.Services.AddOpenTelemetry()
+var openTelemetry = builder.Services.AddOpenTelemetry()
     .WithTracing(tracing =>
     {
         tracing
@@ -217,9 +226,15 @@ builder.Services.AddOpenTelemetry()
             .AddHttpClientInstrumentation()
             .AddOtlpExporter(options =>
             {
-                options.Endpoint = new Uri("http://host.docker.internal:18889");
+                options.Endpoint = new Uri(otlpEndpoint);
             });
     });
+
+// Add Azure Monitor when connection string is available (production)
+if (!string.IsNullOrEmpty(builder.Configuration["APPLICATIONINSIGHTS_CONNECTION_STRING"]))
+{
+    openTelemetry.UseAzureMonitor();
+}
 
 // Configure metrics separately using Sdk.CreateMeterProviderBuilder
 var meterProvider = Sdk.CreateMeterProviderBuilder()
@@ -243,7 +258,7 @@ var meterProvider = Sdk.CreateMeterProviderBuilder()
     .AddMeter("Microsoft.Extensions.Hosting")
     .AddOtlpExporter(options =>
     {
-        options.Endpoint = new Uri("http://host.docker.internal:18889");
+        options.Endpoint = new Uri(otlpEndpoint);
     })
     .Build();
 
@@ -257,7 +272,7 @@ builder.Logging.AddOpenTelemetry(logging =>
     logging.IncludeScopes = true;
     logging.AddOtlpExporter(options =>
     {
-        options.Endpoint = new Uri("http://host.docker.internal:18889");
+        options.Endpoint = new Uri(otlpEndpoint);
     });
 });
 

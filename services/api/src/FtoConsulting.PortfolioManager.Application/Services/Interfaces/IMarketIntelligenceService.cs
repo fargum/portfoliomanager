@@ -17,16 +17,6 @@ public interface IMarketIntelligenceService
     Task<MarketContextDto> GetMarketContextAsync(IEnumerable<string> tickers, DateTime date, CancellationToken cancellationToken = default);
     
     /// <summary>
-    /// Search for financial news related to specific instruments
-    /// </summary>
-    /// <param name="tickers">Stock tickers to search news for</param>
-    /// <param name="fromDate">Start date for news search</param>
-    /// <param name="toDate">End date for news search</param>
-    /// <param name="cancellationToken">Cancellation token</param>
-    /// <returns>Relevant financial news</returns>
-    Task<IEnumerable<NewsItemDto>> SearchFinancialNewsAsync(IEnumerable<string> tickers, DateTime fromDate, DateTime toDate, CancellationToken cancellationToken = default);
-    
-    /// <summary>
     /// Get general market sentiment and indices performance
     /// </summary>
     /// <param name="date">Date for market analysis</param>

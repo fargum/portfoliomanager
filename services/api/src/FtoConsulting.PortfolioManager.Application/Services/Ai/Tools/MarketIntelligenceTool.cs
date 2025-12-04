@@ -41,32 +41,6 @@ public class MarketIntelligenceTool
         };
     }
 
-    [Description("Search for financial news related to specific tickers within a date range")]
-    public async Task<object> SearchFinancialNews(
-        [Description("List of stock tickers")] string[] tickers,
-        [Description("Start date in various formats (YYYY-MM-DD, DD/MM/YYYY, DD MMMM YYYY, etc.)")] string fromDate,
-        [Description("End date in various formats (YYYY-MM-DD, DD/MM/YYYY, DD MMMM YYYY, etc.)")] string toDate,
-        CancellationToken cancellationToken = default)
-    {
-        if (_marketIntelligenceServiceFactory == null)
-        {
-            return new { Error = "Market intelligence service not available" };
-        }
-
-        var marketIntelligenceService = _marketIntelligenceServiceFactory();
-        var from = DateUtilities.ParseDateTime(fromDate);
-        var to = DateUtilities.ParseDateTime(toDate);
-        var news = await marketIntelligenceService.SearchFinancialNewsAsync(tickers, from, to, cancellationToken);
-        
-        return new
-        {
-            Tickers = tickers,
-            FromDate = fromDate,
-            ToDate = toDate,
-            News = news
-        };
-    }
-
     [Description("Get overall market sentiment and indicators for a specific date")]
     public async Task<object> GetMarketSentiment(
         [Description("Date for sentiment analysis in various formats (YYYY-MM-DD, DD/MM/YYYY, DD MMMM YYYY, etc.)")] string date,

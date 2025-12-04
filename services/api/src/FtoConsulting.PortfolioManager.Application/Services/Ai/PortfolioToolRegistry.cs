@@ -59,18 +59,6 @@ public static class PortfolioToolRegistry
         ),
         
         new PortfolioToolDefinition(
-            Name: "SearchFinancialNews",
-            Description: "Search for financial news related to specific tickers within a date range",
-            Parameters: new Dictionary<string, ToolParameterDefinition>
-            {
-                ["tickers"] = new ToolParameterDefinition("array", "List of stock tickers", true, "string"),
-                ["fromDate"] = new ToolParameterDefinition("string", "Start date in YYYY-MM-DD format", true),
-                ["toDate"] = new ToolParameterDefinition("string", "End date in YYYY-MM-DD format", true)
-            },
-            Category: "Market Intelligence"
-        ),
-        
-        new PortfolioToolDefinition(
             Name: "GetMarketSentiment",
             Description: "Get overall market sentiment and indicators for a specific date",
             Parameters: new Dictionary<string, ToolParameterDefinition>
@@ -133,11 +121,6 @@ public static class PortfolioToolRegistry
                 method: (string[] tickers, string date) => toolExecutor("GetMarketContext", new Dictionary<string, object> { ["tickers"] = tickers, ["date"] = date }),
                 name: "GetMarketContext",
                 description: "Get market context and news for specific stock tickers"),
-
-            AIFunctionFactory.Create(
-                method: (string[] tickers, string fromDate, string toDate) => toolExecutor("SearchFinancialNews", new Dictionary<string, object> { ["tickers"] = tickers, ["fromDate"] = fromDate, ["toDate"] = toDate }),
-                name: "SearchFinancialNews",
-                description: "Search for financial news related to specific tickers within a date range"),
 
             AIFunctionFactory.Create(
                 method: (string date) => toolExecutor("GetMarketSentiment", new Dictionary<string, object> { ["date"] = date }),

@@ -207,7 +207,6 @@ public class McpServerService(
                 "AnalyzePortfolioPerformance" => await ExecuteAnalyzePortfolioPerformance(parameters, cancellationToken),
                 "ComparePortfolioPerformance" => await ExecuteComparePortfolioPerformance(parameters, cancellationToken),
                 "GetMarketContext" => await ExecuteGetMarketContext(parameters, cancellationToken),
-                "SearchFinancialNews" => await ExecuteSearchFinancialNews(parameters, cancellationToken),
                 "GetMarketSentiment" => await ExecuteGetMarketSentiment(parameters, cancellationToken),
                 _ => throw new ArgumentException($"Unknown tool: {toolName}")
             };
@@ -275,15 +274,6 @@ public class McpServerService(
         var date = parameters["date"].ToString()!;
         
         return await marketIntelligenceTool.GetMarketContext(tickers, date, cancellationToken);
-    }
-
-    private async Task<object> ExecuteSearchFinancialNews(Dictionary<string, object> parameters, CancellationToken cancellationToken)
-    {
-        var tickers = ExtractStringArrayFromJsonParameter(parameters["tickers"]);
-        var fromDate = parameters["fromDate"].ToString()!;
-        var toDate = parameters["toDate"].ToString()!;
-        
-        return await marketIntelligenceTool.SearchFinancialNews(tickers, fromDate, toDate, cancellationToken);
     }
 
     private async Task<object> ExecuteGetMarketSentiment(Dictionary<string, object> parameters, CancellationToken cancellationToken)

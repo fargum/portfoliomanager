@@ -129,7 +129,6 @@ public class McpServerServiceIntegrationTests
         Assert.Contains("AnalyzePortfolioPerformance", toolNames);
         Assert.Contains("ComparePortfolioPerformance", toolNames);
         Assert.Contains("GetMarketContext", toolNames);
-        Assert.Contains("SearchFinancialNews", toolNames);
         Assert.Contains("GetMarketSentiment", toolNames);
         
         await mcpService.DisposeAsync();

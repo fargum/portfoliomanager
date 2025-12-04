@@ -462,6 +462,8 @@ httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
 
     /// <summary>
     /// Parse sentiment response from EOD API
+    /// EOD returns format: {"TICKER": [{"date": "2022-04-22", "count": 2, "normalized": 0.822}]}
+    /// where normalized is sentiment score from -1 (very negative) to +1 (very positive)
     /// </summary>
     private MarketSentimentDto? ParseSentimentResponse(string jsonContent, DateTime date)
     {
@@ -469,48 +471,74 @@ httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
         {
             var jsonElement = JsonSerializer.Deserialize<JsonElement>(jsonContent);
             
-            if (jsonElement.ValueKind == JsonValueKind.Array && jsonElement.GetArrayLength() > 0)
+            // EOD returns an object with ticker as key, array of sentiment data as value
+            if (jsonElement.ValueKind == JsonValueKind.Object)
             {
-                var sentiments = jsonElement.EnumerateArray().ToList();
-                var totalCount = sentiments.Count;
-                
-                if (totalCount == 0)
+                // Get the first (and usually only) ticker's sentiment array
+                var firstProperty = jsonElement.EnumerateObject().FirstOrDefault();
+                if (firstProperty.Value.ValueKind == JsonValueKind.Array)
                 {
-                    return CreateDefaultSentimentResponse(date);
+                    var sentiments = firstProperty.Value.EnumerateArray().ToList();
+                    
+                    if (sentiments.Count == 0)
+                    {
+                        return CreateDefaultSentimentResponse(date);
+                    }
+
+                    // Calculate average normalized sentiment score from recent data
+                    // EOD normalized score ranges from -1 (very negative) to +1 (very positive)
+                    var recentSentiments = sentiments.Take(10).ToList(); // Use last 10 days
+                    var avgNormalizedScore = 0.0;
+                    var validCount = 0;
+
+                    foreach (var sentiment in recentSentiments)
+                    {
+                        if (sentiment.TryGetProperty("normalized", out var normalized))
+                        {
+                            if (normalized.ValueKind == JsonValueKind.Number)
+                            {
+                                avgNormalizedScore += normalized.GetDouble();
+                                validCount++;
+                            }
+                        }
+                    }
+
+                    if (validCount == 0)
+                    {
+                        return CreateDefaultSentimentResponse(date);
+                    }
+
+                    avgNormalizedScore /= validCount;
+
+                    // Convert EOD's -1 to +1 scale to our 0 to 1 scale
+                    var sentimentScore = (decimal)((avgNormalizedScore + 1.0) / 2.0);
+                    sentimentScore = Math.Max(0m, Math.Min(1m, sentimentScore)); // Clamp between 0 and 1
+
+                    var sentimentLabel = sentimentScore switch
+                    {
+                        >= 0.7m => "Very Positive",
+                        >= 0.6m => "Positive", 
+                        >= 0.4m => "Neutral",
+                        >= 0.3m => "Negative",
+                        _ => "Very Negative"
+                    };
+
+                    // Calculate Fear & Greed index (0-100) from sentiment
+                    var fearGreedIndex = (decimal)(avgNormalizedScore * 50 + 50);
+                    fearGreedIndex = Math.Max(0m, Math.Min(100m, fearGreedIndex));
+
+                    _logger.LogInformation("Parsed sentiment for {Ticker}: Avg normalized={AvgScore:F3}, Score={Score:F2}, Label={Label}, FearGreed={FearGreed:F0}", 
+                        firstProperty.Name, avgNormalizedScore, sentimentScore, sentimentLabel, fearGreedIndex);
+
+                    return new MarketSentimentDto(
+                        Date: date,
+                        OverallSentimentScore: sentimentScore,
+                        SentimentLabel: sentimentLabel,
+                        FearGreedIndex: fearGreedIndex,
+                        SectorSentiments: Array.Empty<SectorSentimentDto>(),
+                        Indicators: Array.Empty<MarketIndicatorDto>()
+                    );
                 }
-
-                // Calculate overall sentiment score from the sentiment data
-                var positiveCount = sentiments.Count(s => 
-                    s.TryGetProperty("sentiment", out var sentiment) && 
-                    sentiment.ValueKind == JsonValueKind.String &&
-                    sentiment.GetString()?.ToLowerInvariant().Contains("positive") == true);
-
-                var negativeCount = sentiments.Count(s => 
-                    s.TryGetProperty("sentiment", out var sentiment) && 
-                    sentiment.ValueKind == JsonValueKind.String &&
-                    sentiment.GetString()?.ToLowerInvariant().Contains("negative") == true);
-
-                // Calculate sentiment score (0.0 = very negative, 1.0 = very positive, 0.5 = neutral)
-                var sentimentScore = totalCount > 0 ? (decimal)(positiveCount - negativeCount) / totalCount * 0.5m + 0.5m : 0.5m;
-                sentimentScore = Math.Max(0m, Math.Min(1m, sentimentScore)); // Clamp between 0 and 1
-
-                var sentimentLabel = sentimentScore switch
-                {
-                    >= 0.7m => "Very Positive",
-                    >= 0.6m => "Positive", 
-                    >= 0.4m => "Neutral",
-                    >= 0.3m => "Negative",
-                    _ => "Very Negative"
-                };
-
-                return new MarketSentimentDto(
-                    Date: date,
-                    OverallSentimentScore: sentimentScore,
-                    SentimentLabel: sentimentLabel,
-                    FearGreedIndex: 50m, // EOD doesn't provide Fear & Greed index, use neutral
-                    SectorSentiments: Array.Empty<SectorSentimentDto>(),
-                    Indicators: Array.Empty<MarketIndicatorDto>()
-                );
             }
 
             return CreateDefaultSentimentResponse(date);
