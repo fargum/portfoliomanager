@@ -10,6 +10,8 @@ Agent assisted coding is a gamechanger in software development and needs to be e
 
 Finally, I followed a DDD approach with this repo, which closely represents the systems I work with every day in finance. It's almost certainly overkill for this use case, but I wanted to see how fast and how well Claude could set it all up for me. 
 
+More detailed documentation can be found in the docs folder. I probably need a bit of cleanup of it - particularly the memory section which i went back and forth with many times. I think its a fascinating and very powerful feature of these systems.
+
 ## Quick Start
 
 ```bash
