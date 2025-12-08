@@ -1,284 +1,172 @@
-# PortfolioManager
+# Portfolio Manager
 
-A Domain Driven Design (DDD) based portfolio management solution built with .NET 9 and Entity Framework Core. The solution provides a containerized REST API for managing portfolio holdings and financial data.
+AI-powered portfolio management platform with intelligent market analysis, automated revaluation, and conversational insights.
+I built this to create and manage personal and model portfolios across multiple accounts.
 
-## Quick Start with Docker
+I also wanted to extend my work into full agentic workflows with tools like Microsoft Agent Framework which was released October / November 2025 after speaking to several senior engineers from Microsoft I met at the 2025 Azure dev conference I attended in Lisbon.
+
+This also gave me an opportunity to really kick the tires of Claude sonnet 4.5 on Github copilot far beyond my usage of it at work.
+Agent assisted coding is a gamechanger in software development and needs to be embraced. But its not a magic wand and requires careful steering. I have established an iterative, collaborative approach with the tool, holding a mantra I picked up from one of the devs at Microsoft : "Never trust a thing your llm produces. Once you've understood that, you're well on the way to working with them effectively"....AI without direction, care and correction becomes slop...I need to keep reminding myself every day of that.
+
+Finally, I followed a DDD approach with this repo, which closely represents the systems I work with every day in finance. It's almost certainly overkill for this use case, but I wanted to see how fast and how well Claude could set it all up for me. 
+
+## Quick Start
 
 ```bash
-# Build and run all services with Docker Compose
+# Local development
 docker-compose up -d
 
-# Or build individual services
-docker build -t portfoliomanager-api:latest ./services/api
-docker build -t portfoliomanager-ui:latest ./services/ui
+# Deploy to Azure
+.\build-api.ps1    # API deployment
+.\build-ui.ps1     # UI deployment
 ```
 
-**API Access:**
-- Health Check: http://localhost:8080/health
-- Swagger UI: http://localhost:8080/swagger
-- Holdings API: http://localhost:8080/api/holdings/
-
-📖 **See [Docker Deployment Guide](docs/Docker-Deployment-Guide.md) for comprehensive setup instructions**
+**Access:**
+- **API**: http://localhost:8080 | [Azure Production](https://pm-api.thankfulbay-b96a666e.uksouth.azurecontainerapps.io)
+- **UI**: http://localhost:3000 | [Azure Production](https://pm-ui.thankfulbay-b96a666e.uksouth.azurecontainerapps.io)
+- **Swagger**: /swagger
 
 ## Architecture
 
-This solution follows Domain Driven Design (DDD) principles with a microservices architecture:
-
-### Monorepo Structure
+Microservices platform with DDD principles:
 
 ```
-PortfolioManager/
-├── services/
-│   ├── api/              # .NET 9 REST API Service
-│   │   ├── src/          # Domain, Application, Infrastructure, API layers
-│   │   ├── tests/        # Unit and integration tests
-│   │   └── Dockerfile    # API containerization
-│   └── ui/               # Frontend UI Service
-│       ├── src/          # UI application code
-│       └── Dockerfile    # UI containerization
-├── docker-compose.yml    # Multi-service orchestration
-└── docs/                 # Shared documentation
+services/
+├── api/                # .NET 9 REST API
+│   ├── Domain         # Core business logic
+│   ├── Application    # CQRS, AI agents, market intelligence
+│   ├── Infrastructure # EF Core, PostgreSQL, EOD integration
+│   └── Api            # Controllers, auth, telemetry
+├── ui/                # Next.js frontend with Azure AD auth
+└── evaluation/        # Python-based AI evaluation framework
 ```
 
-This solution follows Domain Driven Design (DDD) principles with a clean architecture approach:
+### Key Layers
 
-### Projects Structure
+- **Domain**: Entities, value objects, aggregates
+- **Application**: CQRS handlers, AI services, tools registry
+- **Infrastructure**: Database, external APIs, caching
+- **API**: REST endpoints, JWT auth, OpenTelemetry
 
-- **FtoConsulting.PortfolioManager.Domain** - Core business logic and domain entities
-- **FtoConsulting.PortfolioManager.Application** - Application services, CQRS handlers, and DTOs
-- **FtoConsulting.PortfolioManager.Infrastructure** - Data access, external services, and infrastructure concerns
-- **FtoConsulting.PortfolioManager.Api** - REST API controllers and presentation layer
+## Core Features
 
-### Domain Layer (`FtoConsulting.PortfolioManager.Domain`)
+### Portfolio Management
+- Real-time holdings tracking with automated revaluation
+- Multi-currency support with exchange rate integration
+- Historical performance analysis and comparison
+- Portfolio ingestion from various data sources
 
-Contains the core business logic and domain entities:
+### AI Intelligence
+- **Conversational Interface**: Natural language portfolio queries
+- **Market Context**: Real-time news and sentiment analysis via EOD API
+- **Agent Tools**: GetMarketContext, AnalyzePortfolio, ComparePerformance, GetMarketSentiment
+- **Memory System**: Persistent conversation context with Redis
+- **Evaluation Framework**: Python-based testing with quality metrics
 
-```
-├── Entities/           # Domain entities and base classes
-├── ValueObjects/       # Value objects for domain modeling
-├── Aggregates/         # Aggregate roots and domain aggregates
-├── DomainEvents/       # Domain events and event interfaces
-├── Repositories/       # Repository interfaces
-├── Services/           # Domain services
-└── Specifications/     # Domain specifications
-```
+### Integration & Security
+- **Azure AD B2C**: OAuth 2.0 authentication with JWT tokens
+- **Azure OpenAI**: GPT-4 powered chat with function calling
+- **OpenTelemetry**: Distributed tracing and monitoring
+- **EOD Historical Data**: Real-time pricing and sentiment data
 
-### Application Layer (`FtoConsulting.PortfolioManager.Application`)
+## Tech Stack
 
-Orchestrates business logic and handles cross-cutting concerns:
+**Backend**: .NET 9, EF Core, PostgreSQL, MediatR (CQRS)  
+**Frontend**: Next.js 15, React, TailwindCSS, Azure AD auth  
+**AI**: Azure OpenAI (GPT-4), Microsoft Agent Framework  
+**Infrastructure**: Docker, Azure Container Apps, Azure Cache for Redis  
+**Observability**: OpenTelemetry, Azure Monitor, Application Insights
 
-```
-├── Commands/           # CQRS command handlers
-├── Queries/            # CQRS query handlers
-├── DTOs/              # Data transfer objects
-├── Services/          # Application services
-├── Interfaces/        # Application service interfaces
-└── Validators/        # Input validation logic
-```
+## Configuration
 
-### Infrastructure Layer (`FtoConsulting.PortfolioManager.Infrastructure`)
-
-Implements data access and external service integrations:
-
-```
-├── Data/
-│   ├── Configurations/ # Entity Framework configurations
-│   └── Migrations/     # Database migrations
-├── Repositories/       # Repository implementations
-├── Services/          # Infrastructure service implementations
-└── ExternalServices/  # Third-party service integrations
-```
-
-### API Layer (`FtoConsulting.PortfolioManager.Api`)
-
-Provides REST API endpoints and handles HTTP concerns:
-
-```
-├── Controllers/        # API controllers
-├── Middleware/        # Custom middleware
-└── Extensions/        # Service registration extensions
-```
-
-## Technologies Used
-
-- **.NET 9** - Application framework
-- **Entity Framework Core 9.0** - Object-relational mapping (ORM)
-- **MediatR** - CQRS and mediator pattern implementation
-- **ASP.NET Core** - Web API framework
-
-## Getting Started
-
-### Prerequisites
-
-- .NET 9 SDK
-- PostgreSQL (for production - migrations will be set up later)
-
-### Building the Solution
+### Required Secrets
 
 ```bash
+# Database
+ConnectionStrings__DefaultConnection="Host=...;Database=portfolio_manager;..."
+
+# Azure AD B2C
+AzureAdB2C__Instance="https://login.microsoftonline.com/"
+AzureAdB2C__ClientId="<client-id>"
+AzureAdB2C__TenantId="<tenant-id>"
+
+# Azure OpenAI
+AzureOpenAI__Endpoint="https://<resource>.openai.azure.com/"
+AzureOpenAI__Key="<api-key>"
+AzureOpenAI__DeploymentName="gpt-4"
+
+# EOD Historical Data
+EodApi__Token="<eod-token>"
+
+# Redis (for memory)
+Redis__ConnectionString="<redis-connection>"
+```
+
+Use **Azure Key Vault** for production, **User Secrets** for local development.
+
+## Development
+
+### Local Setup
+
+```bash
+# Clone and build
+git clone https://github.com/fargum/portfoliomanager.git
+cd PortfolioManager
 dotnet build
+
+# Run with Docker Compose
+docker-compose up -d
+
+# Or run API locally
+cd services/api/src/FtoConsulting.PortfolioManager.Api
+dotnet run
 ```
 
-### Running the API
+### Database Migrations
+
+Migrations run automatically in Docker. For local development:
 
 ```bash
-dotnet run --project src/FtoConsulting.PortfolioManager.Api
-```
-
-The API will be available at `https://localhost:7000` (HTTPS) and `http://localhost:5000` (HTTP).
-
-## Development Notes
-
-- The solution uses a code-first approach with Entity Framework Core
-- Database migrations will be configured for PostgreSQL in future iterations
-- The Domain layer is technology-agnostic and contains no external dependencies
-- Repository pattern is implemented with Unit of Work for transaction management
-- CQRS pattern is implemented using MediatR for command and query separation
-
-## Project Structure
-
-```
-PortfolioManager/
-├── src/
-│   ├── FtoConsulting.PortfolioManager.Domain/
-│   ├── FtoConsulting.PortfolioManager.Application/
-│   ├── FtoConsulting.PortfolioManager.Infrastructure/
-│   └── FtoConsulting.PortfolioManager.Api/
-├── PortfolioManager.sln
-└── README.md
-```
-
-## Database Setup
-
-This project uses PostgreSQL with Entity Framework Core and snake_case naming conventions.
-
-### Prerequisites
-
-1. **For Docker Deployment (Recommended):**
-   - Docker and Docker Compose installed
-   - Existing PostgreSQL database container
-
-2. **For Local Development:**
-   ```bash
-   docker run --name portfolio-postgres -e POSTGRES_DB=portfolio_manager -e POSTGRES_USER=migrator -e POSTGRES_PASSWORD=your_password -p 5432:5432 -d postgres:15
-   ```
-
-### Configuration
-
-#### For Development (User Secrets - Recommended):
-```bash
-cd src/FtoConsulting.PortfolioManager.Api
-dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Host=localhost;Port=5432;Database=portfolio_manager;Username=your_username;Password=your_password"
-```
-
-#### For Production (Environment Variables):
-Set the environment variable:
-```bash
-PORTFOLIO_DB_CONNECTION="Host=localhost;Port=5432;Database=portfolio_manager;Username=your_username;Password=your_password"
-```
-
-### Database Migration
-
-**For Docker deployment:** Migrations run automatically when the container starts.
-
-**For local development:**
-```bash
-cd src/FtoConsulting.PortfolioManager.Infrastructure
+cd services/api/src/FtoConsulting.PortfolioManager.Infrastructure
 dotnet ef database update --startup-project ../FtoConsulting.PortfolioManager.Api
 ```
 
-## EOD Historical Data API Configuration
+Database uses **snake_case** conventions for PostgreSQL compatibility.
 
-The application uses EOD Historical Data API for fetching market prices. You need to configure your API token:
+## Deployment
 
-### Setup Steps
+### Azure Container Apps
 
-1. Get your API token from [EOD Historical Data](https://eodhd.com/)
-2. Copy `.env.example` to `.env`
-3. Update the `EOD_API_TOKEN` value in your `.env` file
+```powershell
+# Deploy API
+.\build-api.ps1
 
-```bash
-# In .env file
-EOD_API_TOKEN=your_actual_api_token_here
+# Deploy UI
+.\build-ui.ps1
 ```
 
-### Configuration Options
-
-The EOD API can be configured in `appsettings.json` or via environment variables:
-
-```json
-{
-  "EodApi": {
-    "Token": "",
-    "BaseUrl": "https://eodhd.com/api",
-    "TimeoutSeconds": 30
-  }
-}
-```
-
-**For Docker:** The token is passed via the `EOD_API_TOKEN` environment variable.
-**For local development:** Set the token in user secrets or environment variables.
-
-### Database Schema
-
-The database uses snake_case naming conventions for PostgreSQL compatibility:
-- Tables: `accounts`, `portfolios`, `instruments`, `holdings`, etc.
-- Columns: `user_name`, `created_at`, `instrument_type_id`, etc.
-
-## Docker Deployment
-
-The application is fully containerized and ready for microservices architecture:
-
-### 🐳 **Container Architecture**
-- **API Service**: Containerized .NET 9 REST API
-- **Database**: External PostgreSQL container (your existing setup)
-- **Future UI**: Planned containerized frontend service
-
-### 🚀 **Quick Docker Commands**
-```bash
-# Build and run
-docker build -t portfoliomanager-api:latest .
-docker-compose up -d
-
-# View logs
-docker-compose logs -f portfoliomanager-api
-
-# Health check
-curl http://localhost:8080/health
-```
-
-### 📚 **Complete Docker Guide**
-See [Docker Deployment Guide](docs/Docker-Deployment-Guide.md) for:
-- Container networking configuration
-- Database connection setup
-- Production deployment
-- Troubleshooting
-- Integration with UI services
+Scripts handle ACR build and container app updates with proper revision management.
 
 ## Documentation
 
-Comprehensive documentation is available in the `docs/` directory:
+**API & Platform**
+- [API Documentation](docs/API-Documentation.md) - REST endpoints
+- [Holdings API](docs/Holdings-API-Documentation.md) - Portfolio management
+- [Docker Deployment](docs/Docker-Deployment-Guide.md) - Container orchestration
+- [UI Build & Deployment](docs/UI-Build-Deployment.md) - Frontend deployment
+- [Security Configuration](docs/Security-Configuration.md) - Auth & secrets
 
-### API & Development
-- [API Documentation](docs/API-Documentation.md) - REST API endpoints and usage
-- [Holdings API Documentation](docs/Holdings-API-Documentation.md) - Portfolio holdings management
-- [Docker Deployment Guide](docs/Docker-Deployment-Guide.md) - Container setup and deployment
-- [Portfolio Ingest Service](docs/PortfolioIngestService.md) - Data ingestion processes
-- [Holding Revaluation Service](docs/HoldingRevaluationService.md) - Portfolio valuation engine
+**AI & Intelligence**
+- [AI Agent Architecture](docs/AI-Agent-Architecture.md) - Agent design patterns
+- [AI Evaluation Framework](docs/AI-Evaluation-Framework.md) - Testing & metrics
+- [Memory Architecture](docs/Memory-Architecture.md) - Conversation persistence
+- [Security Incident Management](docs/Security-Incident-Management.md) - AI guardrails
 
-### AI & Intelligence
-- [AI Agent Architecture](docs/AI-Agent-Architecture.md) - AI agent design and implementation  
-- [AI Chat Testing](docs/AI-Chat-Testing.md) - Testing AI chat functionality
-- [AI Evaluation Framework](docs/AI-Evaluation-Framework.md) - Comprehensive AI testing and metrics
-- [Memory Architecture](docs/Memory-Architecture.md) - AI conversation memory system
-- [Security Incident Management](docs/Security-Incident-Management.md) - AI guardrails and security
+**Services**
+- [Portfolio Ingest Service](docs/PortfolioIngestService.md) - Data ingestion
+- [Holding Revaluation Service](docs/HoldingRevaluationService.md) - Automated valuation
+- [OpenTelemetry Setup](docs/OpenTelemetry-Setup.md) - Observability
 
-### Sample Files
-- [Sample Portfolio Request](docs/sample-portfolio-request.json) - Example API payload
+## License
 
-## Security Notes
-
-- **Never commit database credentials to source control**
-- Use User Secrets for development
-- Use environment variables or Azure Key Vault for production
-- The connection string in `appsettings.json` contains placeholder values only
+Proprietary - FTO Consulting
