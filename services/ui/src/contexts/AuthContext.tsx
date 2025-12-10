@@ -29,13 +29,13 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
 
   // Acquire token when authentication state changes
   useEffect(() => {
-    if (isAuthenticated && !accessToken && !isAcquiringToken) {
+    if (isAuthenticated && !accessToken && !isAcquiringToken && inProgress === 'none') {
       acquireToken();
     } else if (!isAuthenticated && accessToken) {
       // User logged out - clear all state
       clearAuthState();
     }
-  }, [isAuthenticated, accessToken, isAcquiringToken]);
+  }, [isAuthenticated, accessToken, inProgress]);
 
   const clearAuthState = () => {
     console.log('Clearing authentication state');

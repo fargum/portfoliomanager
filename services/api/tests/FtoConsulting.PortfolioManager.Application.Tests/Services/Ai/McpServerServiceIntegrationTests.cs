@@ -48,6 +48,7 @@ public class McpServerServiceIntegrationTests
         services.AddTransient<PortfolioAnalysisTool>(sp => new PortfolioAnalysisTool(null!));
         services.AddTransient<PortfolioComparisonTool>(sp => new PortfolioComparisonTool(null!));
         services.AddTransient<MarketIntelligenceTool>(sp => new MarketIntelligenceTool(null!));
+        services.AddScoped<EodMarketDataTool>();
         
         // Mock core services  
         services.AddTransient<IHoldingService>(sp => new MockHoldingService());
@@ -62,7 +63,8 @@ public class McpServerServiceIntegrationTests
             serviceProvider.GetRequiredService<PortfolioHoldingsTool>(),
             serviceProvider.GetRequiredService<PortfolioAnalysisTool>(),
             serviceProvider.GetRequiredService<PortfolioComparisonTool>(),
-            serviceProvider.GetRequiredService<MarketIntelligenceTool>());
+            serviceProvider.GetRequiredService<MarketIntelligenceTool>(),
+            serviceProvider.GetRequiredService<EodMarketDataTool>());
 
         // Act & Assert - Should not throw
         await mcpService.InitializeAsync(CancellationToken.None);
@@ -101,6 +103,7 @@ public class McpServerServiceIntegrationTests
         services.AddTransient<PortfolioAnalysisTool>(sp => new PortfolioAnalysisTool(null!));
         services.AddTransient<PortfolioComparisonTool>(sp => new PortfolioComparisonTool(null!));
         services.AddTransient<MarketIntelligenceTool>(sp => new MarketIntelligenceTool(null!));
+        services.AddScoped<EodMarketDataTool>();
         services.AddTransient<IHoldingService>(sp => new MockHoldingService());
         
         var serviceProvider = services.BuildServiceProvider();
@@ -113,7 +116,8 @@ public class McpServerServiceIntegrationTests
             serviceProvider.GetRequiredService<PortfolioHoldingsTool>(),
             serviceProvider.GetRequiredService<PortfolioAnalysisTool>(),
             serviceProvider.GetRequiredService<PortfolioComparisonTool>(),
-            serviceProvider.GetRequiredService<MarketIntelligenceTool>());
+            serviceProvider.GetRequiredService<MarketIntelligenceTool>(),
+            serviceProvider.GetRequiredService<EodMarketDataTool>());
 
         // Act
         var tools = await mcpService.GetAvailableToolsAsync();

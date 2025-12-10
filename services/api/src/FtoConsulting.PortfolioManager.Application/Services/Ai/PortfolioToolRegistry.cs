@@ -66,6 +66,16 @@ public static class PortfolioToolRegistry
                 ["date"] = new ToolParameterDefinition("string", "Date for sentiment analysis in YYYY-MM-DD format", true)
             },
             Category: "Market Intelligence"
+        ),
+        
+        new PortfolioToolDefinition(
+            Name: "GetRealTimePrices",
+            Description: "Get current real-time stock prices for specific tickers. Use this when the user asks for current price, live price, real-time price, or what a stock is trading at right now.",
+            Parameters: new Dictionary<string, ToolParameterDefinition>
+            {
+                ["tickers"] = new ToolParameterDefinition("array", "List of stock tickers to get real-time prices for", true, "string")
+            },
+            Category: "Market Intelligence"
         )
     };
 
@@ -125,7 +135,12 @@ public static class PortfolioToolRegistry
             AIFunctionFactory.Create(
                 method: (string date) => toolExecutor("GetMarketSentiment", new Dictionary<string, object> { ["date"] = date }),
                 name: "GetMarketSentiment",
-                description: "Get overall market sentiment and indicators for a specific date")
+                description: "Get overall market sentiment and indicators for a specific date"),
+
+            AIFunctionFactory.Create(
+                method: (string[] tickers) => toolExecutor("GetRealTimePrices", new Dictionary<string, object> { ["tickers"] = tickers }),
+                name: "GetRealTimePrices",
+                description: "Get current real-time stock prices for specific tickers. Use this when the user asks for current price, live price, real-time price, or what a stock is trading at right now.")
         };
 
         return functions;

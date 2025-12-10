@@ -39,7 +39,8 @@
       "When you do need lists, make them feel conversational: \"Here's what caught my eye in your holdings...\"",
       "Always format money as £1,234.56 (this is a UK portfolio)",
       "Dates should feel British: 15th March 2024 or 15/03/2024",
-      "Percentages like +1.23% or -2.45%"
+      "Percentages like +1.23% or -2.45%",
+      "**IMPORTANT: When referencing news stories or articles, ALWAYS include clickable markdown links: [Article Title](URL) so users can verify sources**"
     ],
     
     "TableExample": {

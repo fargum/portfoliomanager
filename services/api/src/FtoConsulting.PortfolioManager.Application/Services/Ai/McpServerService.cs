@@ -21,7 +21,8 @@ public class McpServerService(
     PortfolioHoldingsTool portfolioHoldingsTool,
     PortfolioAnalysisTool portfolioAnalysisTool,
     PortfolioComparisonTool portfolioComparisonTool,
-    MarketIntelligenceTool marketIntelligenceTool) : IMcpServerService
+    MarketIntelligenceTool marketIntelligenceTool,
+    EodMarketDataTool eodMarketDataTool) : IMcpServerService
 {
 
     private readonly AzureFoundryOptions _azureFoundryOptions = azureFoundryOptions.Value;
@@ -208,6 +209,7 @@ public class McpServerService(
                 "ComparePortfolioPerformance" => await ExecuteComparePortfolioPerformance(parameters, cancellationToken),
                 "GetMarketContext" => await ExecuteGetMarketContext(parameters, cancellationToken),
                 "GetMarketSentiment" => await ExecuteGetMarketSentiment(parameters, cancellationToken),
+                "GetRealTimePrices" => await ExecuteGetRealTimePrices(parameters, cancellationToken),
                 _ => throw new ArgumentException($"Unknown tool: {toolName}")
             };
         }
@@ -281,6 +283,22 @@ public class McpServerService(
         var date = parameters["date"].ToString()!;
         
         return await marketIntelligenceTool.GetMarketSentiment(date, cancellationToken);
+    }
+
+    private async Task<object> ExecuteGetRealTimePrices(Dictionary<string, object> parameters, CancellationToken cancellationToken)
+    {
+        var tickers = ExtractStringArrayFromJsonParameter(parameters["tickers"]);
+        
+        logger.LogInformation("Executing GetRealTimePrices for tickers: {Tickers}", string.Join(", ", tickers));
+        
+        var prices = await eodMarketDataTool.GetRealTimePricesAsync(null, tickers, cancellationToken);
+        
+        return new
+        {
+            Tickers = tickers,
+            Prices = prices,
+            Timestamp = DateTime.UtcNow
+        };
     }
 
     /// <summary>

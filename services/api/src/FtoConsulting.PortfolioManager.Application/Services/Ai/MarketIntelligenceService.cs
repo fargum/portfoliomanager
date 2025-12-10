@@ -168,13 +168,18 @@ SECTOR SENTIMENT:
 {string.Join("\n", sentiment.SectorSentiments.Select(s => $"- {s.SectorName}: {s.SentimentScore:F2} ({s.Trend}) - Key factors: {string.Join(", ", s.KeyFactors)}"))}
 
 RECENT NEWS:
-{string.Join("\n", newsItems.Select(n => $"- {n.Title} (Sentiment: {n.SentimentScore:F2}) - {n.Summary}"))}
+{string.Join("\n", newsItems.Select(n => $"- [{n.Title}]({n.Url}) (Sentiment: {n.SentimentScore:F2}) - {n.Summary}"))}
+
+CRITICAL FORMATTING REQUIREMENT:
+When you mention ANY news story in your summary, you MUST include it as a clickable markdown link using this exact format: [Story Title](URL)
+For example: Recent reports indicate [HSBC faces regulatory scrutiny in Switzerland](https://example.com/article)
 
 Please provide a useful market summary that:
 1. Explains the current market environment in context of the portfolio holdings
 2. Highlights key opportunities or risks for these specific tickers
 3. Gives a forward-looking perspective based on the sentiment and news analysis
-4. If you were not able to find useful information, state that clearly.
+4. MUST include clickable markdown links for every news story you reference
+5. If you were not able to find useful information, state that clearly
 
 Keep the response professional, accurate, and useful for portfolio management decisions.";
 

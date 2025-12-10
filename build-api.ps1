@@ -25,11 +25,15 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host "`nBuild successful! Deploying to Container App..." -ForegroundColor Green
 
-# Deploy the image
+# Generate revision suffix with timestamp
+$revisionSuffix = Get-Date -Format "yyyyMMddHHmmss"
+
+# Deploy the image with revision suffix to force new revision
 az containerapp update `
     --name $AppName `
     --resource-group $ResourceGroup `
-    --image "$Registry.azurecr.io/portfoliomanager-api:latest"
+    --image "$Registry.azurecr.io/portfoliomanager-api:latest" `
+    --revision-suffix $revisionSuffix
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host "`nDeployment failed!" -ForegroundColor Red
