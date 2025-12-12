@@ -82,8 +82,42 @@ export default function HomePage() {
       {/* Header with Integrated Navigation */}
       <header className="bg-white/80 backdrop-blur-xl shadow-financial-lg border-b border-white/20 flex-shrink-0 relative">
         <div className="absolute inset-0 bg-gradient-to-r from-financial-blue-500/5 to-financial-indigo-500/5"></div>
-        <div className="relative w-full px-4 sm:px-6 lg:px-8 py-2">
-          <div className="flex items-center justify-between">
+        <div className="relative w-full px-2 sm:px-4 lg:px-8 py-2">
+          {/* Mobile Layout - Stacked */}
+          <div className="md:hidden flex flex-col space-y-2">
+            {/* Top row - Branding and Auth */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <Building2 className="h-5 w-5 text-financial-blue-600" />
+                <div>
+                  <h1 className="text-base font-bold bg-gradient-to-r from-financial-slate-800 to-financial-blue-600 bg-clip-text text-transparent">
+                    Portfolio Manager
+                  </h1>
+                </div>
+              </div>
+              <AuthButton />
+            </div>
+            {/* Bottom row - Tabs */}
+            <div className="flex space-x-1 bg-white/60 backdrop-blur-md p-1 rounded-lg border border-white/30 shadow-financial">
+              <Tab
+                id="holdings"
+                label="Holdings"
+                icon={<BarChart3 className="h-4 w-4" />}
+                isActive={activeTab === 'holdings'}
+                onClick={() => setActiveTab('holdings')}
+              />
+              <Tab
+                id="chat"
+                label="AI Chat"
+                icon={<MessageSquare className="h-4 w-4" />}
+                isActive={activeTab === 'chat'}
+                onClick={() => setActiveTab('chat')}
+              />
+            </div>
+          </div>
+
+          {/* Desktop Layout - Original */}
+          <div className="hidden md:flex items-center justify-between">
             {/* Left side - Branding and Navigation */}
             <div className="flex items-center space-x-6">
               <div className="flex items-center space-x-3">
@@ -125,11 +159,11 @@ export default function HomePage() {
                 <AuthButton />
               </div>
 
-              {/* Divider */}
-              <div className="h-6 w-px bg-gray-300"></div>
+              {/* Divider - Desktop only */}
+              <div className="hidden lg:block h-6 w-px bg-gray-300"></div>
 
-              {/* API Status */}
-              <div className="flex items-center space-x-2">
+              {/* API Status - Desktop only */}
+              <div className="hidden lg:flex items-center space-x-2">
                 {!isAuthenticated && (
                   <div className="flex items-center space-x-2 text-financial-gray-400">
                     <Building2 className="h-4 w-4" />
@@ -156,8 +190,8 @@ export default function HomePage() {
                 )}
               </div>
 
-              {/* AI Status */}
-              <div className="flex items-center space-x-2">
+              {/* AI Status - Desktop only */}
+              <div className="hidden lg:flex items-center space-x-2">
                 {!isAuthenticated && (
                   <div className="flex items-center space-x-2 text-financial-gray-400">
                     <Bot className="h-4 w-4" />
@@ -190,7 +224,7 @@ export default function HomePage() {
 
       {/* Service Status Warnings */}
       {(apiStatus === 'offline' || (aiStatus === 'offline' && isAuthenticated) || (!isAuthenticated && activeTab === 'chat')) && (
-        <div className="flex-shrink-0 px-4 sm:px-6 lg:px-8 pt-2">
+        <div className="flex-shrink-0 px-2 sm:px-4 lg:px-8 pt-2">
           <div className="space-y-2">
             {apiStatus === 'offline' && (
               <div className="bg-red-50 border border-red-200 rounded-xl p-4">
@@ -238,8 +272,8 @@ export default function HomePage() {
       )}
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-hidden px-4 sm:px-6 lg:px-8 pt-2 pb-2">
-        <div className="h-full bg-white/90 backdrop-blur-sm rounded-2xl shadow-financial-lg border border-white/20 overflow-hidden relative">
+      <main className="flex-1 overflow-hidden px-1 sm:px-2 lg:px-8 pt-1 sm:pt-2 pb-1 sm:pb-2">
+        <div className="h-full bg-white/90 backdrop-blur-sm rounded-lg sm:rounded-2xl shadow-financial-lg border border-white/20 overflow-hidden relative">
           <div className="absolute inset-0 bg-gradient-to-br from-white/50 to-financial-blue-50/30 pointer-events-none"></div>
           
           {/* Holdings Tab Content */}
@@ -251,18 +285,18 @@ export default function HomePage() {
 
           {/* Chat Tab Content */}
           <div className={activeTab === 'chat' ? 'block h-full' : 'hidden'}>
-            <div className="bg-gradient-to-r from-financial-blue-600 to-financial-indigo-600 text-white p-4 relative z-10">
-              <div className="flex items-center space-x-3">
-                <MessageSquare className="h-5 w-5" />
-                <div>
-                  <h2 className="text-lg font-semibold">AI Portfolio Assistant</h2>
-                  <p className="text-blue-100 text-sm">
+            <div className="bg-gradient-to-r from-financial-blue-600 to-financial-indigo-600 text-white p-2 sm:p-4 relative z-10">
+              <div className="flex items-center space-x-2 sm:space-x-3">
+                <MessageSquare className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+                <div className="min-w-0">
+                  <h2 className="text-sm sm:text-lg font-semibold">AI Portfolio Assistant</h2>
+                  <p className="text-blue-100 text-xs sm:text-sm hidden sm:block">
                     Ask questions about your portfolio and get AI-powered insights for Account {HARDCODED_ACCOUNT_ID}
                   </p>
                 </div>
               </div>
             </div>
-            <div className="h-[calc(100%-5rem)] overflow-hidden">
+            <div className="h-[calc(100%-3rem)] sm:h-[calc(100%-5rem)] overflow-hidden">
               <AiChat accountId={HARDCODED_ACCOUNT_ID} isVisible={activeTab === 'chat'} />
             </div>
           </div>

@@ -300,8 +300,93 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = () => {
 
   return (
     <div className="w-full h-full bg-transparent flex flex-col">
-      {/* Header Section - Modern Financial Design */}
-      <div className="bg-gradient-to-r from-financial-blue-600 via-financial-indigo-600 to-financial-purple-600 px-4 py-3 text-white relative overflow-hidden">
+      {/* Mobile Summary Card - Only visible on mobile */}
+      <div className="md:hidden bg-gradient-to-r from-financial-blue-600 to-financial-indigo-600 p-3 text-white">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center space-x-2">
+            <PieChart className="h-4 w-4" />
+            <h2 className="text-sm font-bold">{getHeaderText()}</h2>
+          </div>
+          <button
+            onClick={fetchHoldings}
+            disabled={loading}
+            className="bg-white/20 hover:bg-white/30 p-1.5 rounded-md"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+        
+        {/* Compact Stats Grid */}
+        <div className="grid grid-cols-2 gap-2 mb-2">
+          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-2">
+            <div className="flex items-center space-x-1 mb-1">
+              <Wallet className="h-3 w-3 text-blue-200" />
+              <p className="text-[10px] text-blue-100 uppercase tracking-wide">Value</p>
+            </div>
+            <p className="text-base font-bold">
+              {formatCurrency(filteredTotalValue > 0 ? filteredTotalValue : totalValue)}
+            </p>
+          </div>
+          
+          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-2">
+            <div className="flex items-center space-x-1 mb-1">
+              {totalGainLoss >= 0 ? (
+                <TrendingUp className="h-3 w-3 text-green-200" />
+              ) : (
+                <TrendingDown className="h-3 w-3 text-red-200" />
+              )}
+              <p className="text-[10px] text-blue-100 uppercase tracking-wide">Total P&L</p>
+            </div>
+            <p className={`text-sm font-bold ${
+              totalGainLoss >= 0 ? 'text-green-200' : 'text-red-200'
+            }`}>
+              {formatCurrency(totalGainLoss)}
+            </p>
+            <p className={`text-[10px] ${
+              totalGainLossPercentage >= 0 ? 'text-green-200' : 'text-red-200'
+            }`}>
+              ({totalGainLossPercentage >= 0 ? '+' : ''}{totalGainLossPercentage.toFixed(2)}%)
+            </p>
+          </div>
+          
+          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-2">
+            <div className="flex items-center space-x-1 mb-1">
+              <Activity className="h-3 w-3 text-yellow-200" />
+              <p className="text-[10px] text-blue-100 uppercase tracking-wide">Daily P&L</p>
+            </div>
+            <p className={`text-sm font-bold ${
+              totalDailyPnL >= 0 ? 'text-green-200' : 'text-red-200'
+            }`}>
+              {formatCurrency(totalDailyPnL)}
+            </p>
+            <p className={`text-[10px] ${
+              avgDailyPnLPercentage >= 0 ? 'text-green-200' : 'text-red-200'
+            }`}>
+              ({avgDailyPnLPercentage >= 0 ? '+' : ''}{avgDailyPnLPercentage.toFixed(2)}%)
+            </p>
+          </div>
+          
+          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-2">
+            <div className="flex items-center space-x-1 mb-1">
+              <Calendar className="h-3 w-3 text-blue-200" />
+              <p className="text-[10px] text-blue-100 uppercase tracking-wide">Date</p>
+            </div>
+            <input
+              type="date"
+              value={valuationDate}
+              onChange={(e) => setValuationDate(e.target.value)}
+              className="bg-transparent border-0 text-white text-xs focus:outline-none w-full font-medium"
+            />
+          </div>
+        </div>
+        
+        <p className="text-[10px] text-blue-200 text-center">
+          {holdings.length} holdings • Swipe table horizontally to see all columns
+        </p>
+      </div>
+
+      {/* Desktop Header Section - Hidden on mobile */}
+      <div className="hidden md:block bg-gradient-to-r from-financial-blue-600 via-financial-indigo-600 to-financial-purple-600 px-4 py-3 text-white relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent transform -skew-x-12 translate-x-full animate-pulse"></div>
         <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full transform translate-x-16 -translate-y-16"></div>
         <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full transform -translate-x-12 translate-y-12"></div>
