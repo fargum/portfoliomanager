@@ -77,7 +77,8 @@ export class PortfolioApiClient {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
+        const friendlyError = this.formatErrorMessage(response.status, errorText);
+        throw new Error(friendlyError);
       }
 
       const accountHoldingsResponse = await response.json();
@@ -142,25 +143,41 @@ export class PortfolioApiClient {
   private formatErrorMessage(status: number, errorText: string): string {
     // Handle authentication/authorization errors
     if (status === 401) {
-      return 'Please sign in to access the AI Assistant.';
+      return 'Your session has expired. Please sign in again to continue.';
     }
     if (status === 403) {
-      return 'You do not have permission to access this feature.';
+      return 'You do not have permission to perform this action. Please contact support if you believe this is an error.';
+    }
+    if (status === 404) {
+      return 'The requested item could not be found. It may have been deleted or moved.';
     }
     if (status === 500 && errorText.includes('AuthorizationPolicy')) {
       return 'Authentication required. Please sign in to continue.';
+    }
+    
+    // Try to extract a meaningful message from the error text
+    try {
+      const parsed = JSON.parse(errorText);
+      if (parsed.message) return parsed.message;
+      if (parsed.detail) return parsed.detail;
+      if (parsed.title) return parsed.title;
+    } catch {
+      // Not JSON, continue with status-based messages
     }
     
     // Handle other common errors
     if (status >= 500) {
       return 'The service is currently unavailable. Please try again later.';
     }
+    if (status === 400) {
+      return 'Invalid request. Please check your input and try again.';
+    }
     if (status >= 400 && status < 500) {
-      return 'There was a problem with your request. Please check your input and try again.';
+      return 'There was a problem with your request. Please try again.';
     }
     
     // Fallback to original error for unexpected cases
-    return `HTTP ${status}: ${errorText}`;
+    return `An error occurred (${status}). Please try again or contact support.`;
   }
 
   /**
@@ -360,6 +377,16 @@ export class PortfolioApiClient {
 
       const deleteResponse = await response.json();
       
+      // Check if the API returned success: false in the response body
+      if (deleteResponse.success === false) {
+        const errorMessage = deleteResponse.message || 
+                            deleteResponse.errors?.join(', ') || 
+                            'Delete operation failed. Please try again.';
+        return {
+          error: errorMessage,
+        };
+      }
+      
       return {
         data: deleteResponse,
         message: 'Holding deleted successfully',
@@ -450,7 +477,8 @@ export class PortfolioApiClient {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`HTTP ${response.status}: ${errorText}`);
+        const friendlyError = this.formatErrorMessage(response.status, errorText);
+        throw new Error(friendlyError);
       }
 
       const tools: AiToolDto[] = await response.json();
