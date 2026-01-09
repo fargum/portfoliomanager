@@ -141,8 +141,16 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton<FtoConsulting.PortfolioManager.Api.Services.MetricsService>();
 
 // Add Authentication - using environment variables through configuration binding
+// Support both Bearer (Azure AD) and SystemApiKey (for scheduled jobs) authentication
 builder.Services.AddAuthentication("Bearer")
     .AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"));
+
+// Add system API key authentication scheme for scheduled jobs
+builder.Services.AddAuthentication()
+    .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, 
+        FtoConsulting.PortfolioManager.Api.Authentication.SystemApiKeyAuthenticationHandler>(
+        FtoConsulting.PortfolioManager.Api.Authentication.SystemApiKeyAuthenticationHandler.SchemeName, 
+        options => { });
 
 // Add Authorization - fixed scope checking
 builder.Services.AddAuthorizationBuilder()
@@ -177,6 +185,14 @@ builder.Services.AddAuthorizationBuilder()
             
             return result;
         });
+    })
+    .AddPolicy("SystemApiAccess", policy =>
+    {
+        policy.AddAuthenticationSchemes(FtoConsulting.PortfolioManager.Api.Authentication.SystemApiKeyAuthenticationHandler.SchemeName);
+        policy.RequireAuthenticatedUser();
+        policy.RequireAssertion(context => 
+            context.User.Identity?.AuthenticationType == 
+            FtoConsulting.PortfolioManager.Api.Authentication.SystemApiKeyAuthenticationHandler.SchemeName);
     });
 
 // Add CORS

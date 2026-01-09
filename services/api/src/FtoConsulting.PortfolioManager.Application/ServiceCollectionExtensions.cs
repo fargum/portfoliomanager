@@ -163,7 +163,7 @@ public static class ServiceCollectionExtensions
         services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(ServiceCollectionExtensions).Assembly));
         
         // Register automated background services
-        services.AddHostedService<AutomatedRevaluationBackgroundService>();
+        // Note: AutomatedRevaluationBackgroundService removed - now triggered by Azure Logic App
         services.AddHostedService<McpServerInitializationService>();
         
         return services;

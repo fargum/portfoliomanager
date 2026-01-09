@@ -50,6 +50,9 @@ services:
       - AZURE_AD_CLIENT_ID=${AZURE_AD_CLIENT_ID}
       - AZURE_AD_AUDIENCE=${AZURE_AD_AUDIENCE}
       
+      # System API Configuration (for scheduled jobs/Azure Functions)
+      - SystemApi__ApiKey=${SYSTEM_API_KEY}
+      
       # Logging Configuration
       - Logging__LogLevel__Default=Information
       - Logging__LogLevel__Microsoft.AspNetCore=Warning
