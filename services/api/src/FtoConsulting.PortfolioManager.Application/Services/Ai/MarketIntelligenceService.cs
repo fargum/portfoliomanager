@@ -188,6 +188,7 @@ Keep the response professional, accurate, and useful for portfolio management de
 
     /// <summary>
     /// Get news data from EOD - returns empty collection if unavailable
+    /// Only retrieves news from the last 2 weeks
     /// </summary>
     private async Task<IEnumerable<NewsItemDto>> GetNewsAsync(IEnumerable<string> tickers, DateTime date)
     {
@@ -200,10 +201,13 @@ Keep the response professional, accurate, and useful for portfolio management de
         try
         {
             var eodMarketDataTool = _eodMarketDataToolFactory();
-            var realNews = await eodMarketDataTool.GetFinancialNewsAsync(_mcpServerService, tickers, date.AddDays(-7), date);
+            // Request only last 2 weeks of news using API's from parameter
+            var twoWeeksAgo = date.AddDays(-14);
+            var realNews = await eodMarketDataTool.GetFinancialNewsAsync(_mcpServerService, tickers, twoWeeksAgo, date);
+            
             if (realNews.Any())
             {
-                _logger.LogInformation("Retrieved {Count} news items from EOD", realNews.Count());
+                _logger.LogInformation("Retrieved {Count} news items from EOD (last 2 weeks)", realNews.Count());
                 return realNews;
             }
             else
