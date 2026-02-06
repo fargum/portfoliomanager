@@ -27,6 +27,29 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
   const [userInfo, setUserInfo] = useState<{ name?: string; email?: string } | null>(null);
   const [isAcquiringToken, setIsAcquiringToken] = useState(false);
 
+  // Decode JWT token to get expiration time
+  const getTokenExpiration = (token: string): number | null => {
+    try {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      return payload.exp ? payload.exp * 1000 : null; // Convert to milliseconds
+    } catch (error) {
+      console.error('Failed to decode token:', error);
+      return null;
+    }
+  };
+
+  // Check if token needs refresh (expires in less than 5 minutes)
+  const shouldRefreshToken = (token: string): boolean => {
+    const expirationTime = getTokenExpiration(token);
+    if (!expirationTime) return false;
+    
+    const now = Date.now();
+    const timeUntilExpiry = expirationTime - now;
+    const fiveMinutes = 5 * 60 * 1000; // 5 minutes in milliseconds
+    
+    return timeUntilExpiry <= fiveMinutes;
+  };
+
   // Acquire token when authentication state changes
   useEffect(() => {
     if (isAuthenticated && !accessToken && !isAcquiringToken && inProgress === 'none') {
@@ -36,6 +59,34 @@ export function AuthContextProvider({ children }: AuthContextProviderProps) {
       clearAuthState();
     }
   }, [isAuthenticated, accessToken, inProgress]);
+
+  // Set up automatic token refresh
+  useEffect(() => {
+    if (!accessToken || !isAuthenticated) return;
+
+    console.log('Setting up automatic token refresh...');
+    
+    // Check every 2 minutes if token needs refresh
+    const refreshInterval = setInterval(async () => {
+      if (accessToken && shouldRefreshToken(accessToken)) {
+        const expirationTime = getTokenExpiration(accessToken);
+        const timeUntilExpiry = expirationTime ? (expirationTime - Date.now()) / 1000 : 0;
+        console.log(`Token expires in ${Math.round(timeUntilExpiry)} seconds. Refreshing...`);
+        await acquireToken();
+      }
+    }, 2 * 60 * 1000); // Check every 2 minutes
+
+    // Also do an immediate check
+    if (shouldRefreshToken(accessToken)) {
+      console.log('Token needs immediate refresh');
+      acquireToken();
+    }
+
+    return () => {
+      console.log('Clearing token refresh interval');
+      clearInterval(refreshInterval);
+    };
+  }, [accessToken, isAuthenticated]);
 
   const clearAuthState = () => {
     console.log('Clearing authentication state');

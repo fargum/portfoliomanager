@@ -143,7 +143,19 @@ builder.Services.AddSingleton<FtoConsulting.PortfolioManager.Api.Services.Metric
 // Add Authentication - using environment variables through configuration binding
 // Support both Bearer (Azure AD) and SystemApiKey (for scheduled jobs) authentication
 builder.Services.AddAuthentication("Bearer")
-    .AddMicrosoftIdentityWebApi(builder.Configuration.GetSection("AzureAd"));
+    .AddMicrosoftIdentityWebApi(options =>
+    {
+        builder.Configuration.GetSection("AzureAd").Bind(options);
+        
+        // Add token validation parameters with extended clock skew for better session persistence
+        // This helps prevent premature token rejection due to slight time differences
+        options.TokenValidationParameters.ClockSkew = TimeSpan.FromMinutes(5);
+        options.TokenValidationParameters.ValidateLifetime = true;
+    }, 
+    options =>
+    {
+        builder.Configuration.GetSection("AzureAd").Bind(options);
+    });
 
 // Add system API key authentication scheme for scheduled jobs
 builder.Services.AddAuthentication()

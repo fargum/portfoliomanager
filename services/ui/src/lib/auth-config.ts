@@ -32,10 +32,12 @@ export const msalConfig: Configuration = {
     authority: `https://login.microsoftonline.com/${getTenantId()}`,
     redirectUri: typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000',
     postLogoutRedirectUri: typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000',
+    navigateToLoginRequestUrl: false, // Improves token caching
   },
   cache: {
-    cacheLocation: 'localStorage',
-    storeAuthStateInCookie: false,
+    cacheLocation: 'localStorage', // Use localStorage for longer persistence
+    storeAuthStateInCookie: false, // Set to true if you need IE11 support
+    secureCookies: false, // Set to true in production with HTTPS
   },
   system: {
     loggerOptions: {
@@ -66,6 +68,7 @@ export const msalConfig: Configuration = {
 export const loginRequest = {
   scopes: [`api://${getApiClientId()}/Portfolio.ReadWrite`],
   prompt: 'select_account' as const,
+  forceRefresh: false, // Use cached tokens when available to improve performance
 };
 
 // Add the endpoints here for Microsoft Graph API services you'd like to use.
