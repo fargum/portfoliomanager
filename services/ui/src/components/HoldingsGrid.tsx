@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { HoldingResponse } from '@/types/api';
 import { apiClient } from '@/lib/api-client';
@@ -11,6 +11,15 @@ import { Calendar, Search, TrendingUp, PoundSterling, PieChart, RefreshCw, Trash
 // AG Grid CSS imports (we'll handle these in the layout)
 import 'ag-grid-community/styles/ag-grid.css';
 import 'ag-grid-community/styles/ag-theme-alpine.css';
+
+// Debounce utility for filter changes
+function debounce<T extends (...args: any[]) => any>(func: T, wait: number): T {
+  let timeout: NodeJS.Timeout | null = null;
+  return ((...args: Parameters<T>) => {
+    if (timeout) clearTimeout(timeout);
+    timeout = setTimeout(() => func(...args), wait);
+  }) as T;
+}
 
 interface HoldingsGridProps {
   // No props needed - account is determined from authentication
@@ -99,9 +108,30 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = () => {
     }, 100);
   }, []);
 
+  // Debounced version of updateFilteredTotals to prevent filter popup from closing
+  const debouncedUpdateFilteredTotals = useMemo(
+    () => debounce(() => {
+      if (!gridApi) return;
+
+      let totalValue = 0;
+      let count = 0;
+
+      gridApi.forEachNodeAfterFilter((node: any) => {
+        if (node.data) {
+          totalValue += node.data.currentValue || 0;
+          count++;
+        }
+      });
+
+      setFilteredTotalValue(totalValue);
+      setFilteredCount(count);
+    }, 300),
+    [gridApi]
+  );
+
   const onFilterChanged = useCallback(() => {
-    updateFilteredTotals();
-  }, [updateFilteredTotals]);
+    debouncedUpdateFilteredTotals();
+  }, [debouncedUpdateFilteredTotals]);
 
   // Update filtered totals when holdings data changes (e.g., after date change)
   useEffect(() => {
@@ -558,6 +588,8 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = () => {
               // Enable cell editing
               singleClickEdit={true}
               stopEditingWhenCellsLoseFocus={true}
+              // Prevent filter popups from closing while typing
+              suppressMenuHide={true}
               // Enable row selection
               rowSelection={'multiple'}
               suppressRowClickSelection={false}

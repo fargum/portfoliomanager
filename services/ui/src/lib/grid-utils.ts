@@ -1,52 +1,5 @@
 import { ColDef } from 'ag-grid-community';
 import { HoldingResponse } from '@/types/api';
-import React from 'react';
-
-// Platform icon mapping for better visual representation
-const getPlatformIcon = (platformName: string): string => {
-  const name = platformName.toLowerCase();
-  
-  // Map platform names to appropriate emoji/icons
-  if (name.includes('hl') || name.includes('hargreaves')) return '🏦'; // Bank building for HL
-  if (name.includes('interactive') || name.includes('ib')) return '🌐'; // Globe for Interactive Brokers
-  if (name.includes('vanguard')) return '⭐'; // Star for Vanguard
-  if (name.includes('fidelity')) return '💎'; // Diamond for Fidelity
-  if (name.includes('schwab')) return '🔷'; // Blue diamond for Schwab
-  if (name.includes('etoro')) return '📈'; // Chart for eToro
-  if (name.includes('degiro')) return '🎯'; // Target for DeGiro
-  if (name.includes('trading212') || name.includes('212')) return '📱'; // Phone for Trading 212
-  if (name.includes('freetrade')) return '🚀'; // Rocket for Freetrade
-  if (name.includes('cash')) return '💰'; // Money bag for cash
-  
-  // Default icons based on type
-  return '💼'; // Briefcase as default
-};
-
-// Custom platform cell renderer
-const PlatformCellRenderer = (params: any) => {
-  const platformName = params.value || '';
-  const icon = getPlatformIcon(platformName);
-  
-  return React.createElement('div', {
-    className: 'flex items-center space-x-2 h-full',
-    style: { padding: '4px 8px', display: 'flex', alignItems: 'center' }
-  }, [
-    React.createElement('span', {
-      key: 'icon',
-      className: 'text-lg',
-      style: { 
-        fontSize: '18px',
-        filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.1))',
-        minWidth: '20px'
-      }
-    }, icon),
-    React.createElement('span', {
-      key: 'name',
-      className: 'text-sm font-medium text-financial-slate-700 truncate',
-      style: { maxWidth: '80px' }
-    }, platformName)
-  ]);
-};
 
 // Utility functions for formatting
 export const formatCurrency = (value: number): string => {
@@ -88,30 +41,28 @@ export const getHoldingsColumnDefs = (onCellValueChanged?: (params: any) => void
     filter: false,
     pinned: 'left',
   },
+  // Instrument column - pinned for visibility while scrolling
+  {
+    field: 'instrumentName',
+    headerName: 'Instrument',
+    width: 350,
+    flex: 0,
+    sortable: true,
+    filter: true,
+    pinned: 'left',
+    tooltipField: 'instrumentName',
+    cellStyle: {
+      backgroundColor: '#fafafa',
+      borderRight: '2px solid #f1f5f9'
+    },
+  },
+  // Platform column
   {
     field: 'platformName',
     headerName: 'Platform',
     width: 140,
     sortable: true,
     filter: true,
-    pinned: 'left',
-    cellRenderer: PlatformCellRenderer,
-    cellStyle: {
-      display: 'flex',
-      alignItems: 'center',
-      padding: '0',
-      backgroundColor: '#fafafa',
-      borderRight: '2px solid #f1f5f9'
-    },
-  },
-  {
-    field: 'instrumentName',
-    headerName: 'Instrument',
-    width: 500,
-    flex: 0, // Override default flex to use fixed width
-    sortable: true,
-    filter: true,
-    tooltipField: 'instrumentName',
   },
   {
     field: 'ticker',
