@@ -34,8 +34,7 @@ FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
 
-# Create a non-root user for security
-RUN adduser --disabled-password --gecos "" appuser && chown -R appuser /app
-USER appuser
+# Use the built-in non-root user from the .NET 10 base image
+USER app
 
 ENTRYPOINT ["dotnet", "FtoConsulting.PortfolioManager.Api.dll"]
