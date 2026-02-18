@@ -26,7 +26,7 @@ public class AiOrchestrationService(
     IConversationThreadService conversationThreadService,
     IAgentPromptService agentPromptService,
     AgentFrameworkGuardrails guardrails,
-    Func<int, int?, System.Text.Json.JsonSerializerOptions?, ChatMessageStore> chatMessageStoreFactory,
+    Func<int, int?, System.Text.Json.JsonSerializerOptions?, ChatHistoryProvider> chatMessageStoreFactory,
     Func<int, IChatClient, AIContextProvider> memoryContextProviderFactory,
     ILoggerFactory loggerFactory) : IAiOrchestrationService
 {
@@ -252,13 +252,15 @@ For casual conversation, respond naturally without using tools.";
         var secureInstructions = guardrails.CreateSecureAgentInstructions(CreateAgentInstructions(accountId), accountId);
         var secureChatOptions = guardrails.CreateSecureChatOptions(portfolioTools, accountId);
         
-        var agent = chatClient.CreateAIAgent(new ChatClientAgentOptions
+        // Set instructions on ChatOptions (moved from ChatClientAgentOptions in new Agent Framework API)
+        secureChatOptions.Instructions = secureInstructions;
+        
+        var agent = chatClient.AsAIAgent(new ChatClientAgentOptions
         {
-            Instructions = secureInstructions,
             ChatOptions = secureChatOptions,
-            ChatMessageStoreFactory = ctx => chatMessageStoreFactory(accountId, threadId, ctx.JsonSerializerOptions),
+            ChatHistoryProviderFactory = (ctx, ct) => new ValueTask<ChatHistoryProvider>(chatMessageStoreFactory(accountId, threadId, ctx.JsonSerializerOptions)),
             // Use existing context provider - optimization is in message loading instead
-            AIContextProviderFactory = ctx => memoryContextProviderFactory(accountId, chatClient)
+            AIContextProviderFactory = (ctx, ct) => new ValueTask<AIContextProvider>(memoryContextProviderFactory(accountId, chatClient))
         });
 
         logger.LogInformation("Memory store and context provider configured for agent on thread {ThreadId}", threadId);
@@ -279,13 +281,8 @@ For casual conversation, respond naturally without using tools.";
         }
         else
         {
-            // OPTIMIZATION: Reduced from 6 to 4 messages for faster loading
-            var allStoredMessages = await messageStore.GetMessagesAsync(cancellationToken);
-            recentMessages = allStoredMessages
-                .OrderByDescending(m => m.CreatedAt)
-                .Take(4) // Reduced for faster performance
-                .OrderBy(m => m.CreatedAt)
-                .ToList();
+            // Fallback: use empty message history when store doesn't support token-aware loading
+            recentMessages = new List<Microsoft.Extensions.AI.ChatMessage>();
         }
 
         // CONTEXT SIZE ANALYSIS: Measure each component for visibility

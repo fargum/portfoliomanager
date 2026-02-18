@@ -5,7 +5,7 @@ using FtoConsulting.PortfolioManager.Infrastructure.Data;
 using FtoConsulting.PortfolioManager.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Identity.Web;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using System.Globalization;
 using System.Reflection;
 using OpenTelemetry;
@@ -341,20 +341,13 @@ builder.Services.AddSwaggerGen(c =>
         }
     });
 
-    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    c.AddSecurityRequirement(doc => new OpenApiSecurityRequirement
     {
         {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference
-                    {
-                        Type = ReferenceType.SecurityScheme,
-                        Id = "oauth2"
-                    }
-        },
-        new[] { $"api://{builder.Configuration["AzureAd:ClientId"]}/Portfolio.ReadWrite" }
-    }
-});
+            new OpenApiSecuritySchemeReference("oauth2"),
+            new List<string> { $"api://{builder.Configuration["AzureAd:ClientId"]}/Portfolio.ReadWrite" }
+        }
+    });
     // Include XML comments for better documentation
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);

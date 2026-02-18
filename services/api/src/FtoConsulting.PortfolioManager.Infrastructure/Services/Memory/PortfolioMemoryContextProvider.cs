@@ -57,7 +57,7 @@ public class PortfolioMemoryContextProvider : AIContextProvider
     /// <summary>
     /// Called before each AI agent invocation to provide memory context
     /// </summary>
-    public override async ValueTask<AIContext> InvokingAsync(
+    protected override async ValueTask<AIContext> InvokingCoreAsync(
         InvokingContext context,
         CancellationToken cancellationToken = default)
     {
@@ -107,7 +107,7 @@ public class PortfolioMemoryContextProvider : AIContextProvider
     /// <summary>
     /// Called after each AI agent invocation to update memory
     /// </summary>
-    public override async ValueTask InvokedAsync(
+    protected override async ValueTask InvokedCoreAsync(
         InvokedContext context,
         CancellationToken cancellationToken = default)
     {
@@ -148,7 +148,7 @@ public class PortfolioMemoryContextProvider : AIContextProvider
     /// <summary>
     /// Serialize the memory state for persistence
     /// </summary>
-    public override JsonElement Serialize(JsonSerializerOptions? jsonSerializerOptions = null)
+    public override JsonElement Serialize(JsonSerializerOptions jsonSerializerOptions)
     {
         return JsonSerializer.SerializeToElement(_memoryState, jsonSerializerOptions);
     }

@@ -12,10 +12,10 @@ using AIChatMessage = Microsoft.Extensions.AI.ChatMessage;
 namespace FtoConsulting.PortfolioManager.Infrastructure.Services.Memory;
 
 /// <summary>
-/// PostgreSQL-based implementation of ChatMessageStore for the Microsoft Agent Framework
+/// PostgreSQL-based implementation of ChatHistoryProvider for the Microsoft Agent Framework
 /// Provides persistent storage for conversation messages scoped to accounts
 /// </summary>
-public class PostgreSqlChatMessageStore : ChatMessageStore, ITokenAwareChatMessageStore
+public class PostgreSqlChatMessageStore : ChatHistoryProvider, ITokenAwareChatMessageStore
 {
     private readonly PortfolioManagerDbContext _dbContext;
     private readonly ILogger<PostgreSqlChatMessageStore> _logger;
@@ -41,14 +41,19 @@ public class PostgreSqlChatMessageStore : ChatMessageStore, ITokenAwareChatMessa
     }
 
     /// <summary>
-    /// Add new messages to the conversation thread
+    /// Called after agent invocation to persist new messages to the conversation thread
     /// </summary>
-    public override async Task AddMessagesAsync(
-        IEnumerable<AIChatMessage> messages,
+    protected override async ValueTask InvokedCoreAsync(
+        InvokedContext context,
         CancellationToken cancellationToken = default)
     {
         try
         {
+            // Combine request and response messages for persistence
+            var messages = new List<AIChatMessage>();
+            if (context.RequestMessages != null) messages.AddRange(context.RequestMessages);
+            if (context.ResponseMessages != null) messages.AddRange(context.ResponseMessages);
+
             // Ensure we have a conversation thread
             await EnsureConversationThreadAsync(cancellationToken);
 
@@ -97,9 +102,10 @@ public class PostgreSqlChatMessageStore : ChatMessageStore, ITokenAwareChatMessa
     }
 
     /// <summary>
-    /// Retrieve messages from the conversation thread with context window management
+    /// Called before agent invocation to provide conversation history
     /// </summary>
-    public override async Task<IEnumerable<AIChatMessage>> GetMessagesAsync(
+    protected override async ValueTask<IEnumerable<AIChatMessage>> InvokingCoreAsync(
+        InvokingContext context,
         CancellationToken cancellationToken = default)
     {
         try
@@ -174,7 +180,7 @@ public class PostgreSqlChatMessageStore : ChatMessageStore, ITokenAwareChatMessa
     /// <summary>
     /// Serialize the store state for persistence
     /// </summary>
-    public override JsonElement Serialize(JsonSerializerOptions? jsonSerializerOptions = null)
+    public override JsonElement Serialize(JsonSerializerOptions jsonSerializerOptions)
     {
         // Serialize the conversation thread ID for restoration
         return JsonSerializer.SerializeToElement(_conversationThreadId);

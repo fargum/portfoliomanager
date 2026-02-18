@@ -30,7 +30,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IConversationThreadRepository, ConversationThreadRepository>();
         services.AddScoped<IChatMessageRepository, ChatMessageRepository>();
         services.AddScoped<IMemorySummaryRepository, MemorySummaryRepository>();
-        services.AddTransient<Func<int, int?, System.Text.Json.JsonSerializerOptions?, ChatMessageStore>>(serviceProvider =>
+        services.AddTransient<Func<int, int?, System.Text.Json.JsonSerializerOptions?, ChatHistoryProvider>>(serviceProvider =>
             (accountId, threadId, jsonOptions) =>
             {
                 var dbContext = serviceProvider.GetRequiredService<PortfolioManagerDbContext>();
