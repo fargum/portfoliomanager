@@ -16,9 +16,9 @@ public class AzureFoundryOptions
     public string Endpoint { get; set; } = string.Empty;
 
     /// <summary>
-    /// Azure AI Foundry project endpoint
-    /// e.g. https://neiltest.services.ai.azure.com/api/projects/proj-llms
-    /// All deployed models are reached through this single endpoint.
+    /// Azure AI Foundry inference endpoint — the /openai/v1/ path works for all deployed models
+    /// (OpenAI GPT, Grok, DeepSeek, etc.) via the OpenAI SDK with a custom endpoint.
+    /// e.g. https://neiltest.services.ai.azure.com/openai/v1/
     /// </summary>
     public string FoundryProjectEndpoint { get; set; } = string.Empty;
 

@@ -3,10 +3,9 @@ using FtoConsulting.PortfolioManager.Application.Services;
 using FtoConsulting.PortfolioManager.Application.Configuration;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.AI;
-using Azure;
-using Azure.AI.Inference;
 using Microsoft.Agents.AI;
 using OpenAI;
+using System.ClientModel;
 using Microsoft.Extensions.Logging;
 using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 using FtoConsulting.PortfolioManager.Application.Services.Ai.Guardrails;
@@ -32,11 +31,11 @@ public class AiOrchestrationService(
 {
     private static readonly ActivitySource s_activitySource = new("PortfolioManager.AI");
 
-    // Lazy-loaded Foundry ChatCompletionsClient — shared across requests, model selected per-call
-    private readonly Lazy<ChatCompletionsClient> _chatCompletionsClient = new Lazy<ChatCompletionsClient>(() =>
-        new ChatCompletionsClient(
-            new Uri(azureFoundryOptions.Value.FoundryProjectEndpoint),
-            new AzureKeyCredential(azureFoundryOptions.Value.ApiKey)));
+    // Lazy-loaded OpenAI client pointing to the Foundry /openai/v1/ endpoint — works for all deployed models
+    private readonly Lazy<OpenAIClient> _openAiClient = new Lazy<OpenAIClient>(() =>
+        new OpenAIClient(
+            new ApiKeyCredential(azureFoundryOptions.Value.ApiKey),
+            new OpenAIClientOptions { Endpoint = new Uri(azureFoundryOptions.Value.FoundryProjectEndpoint) }));
 
     public async Task ProcessPortfolioQueryAsync(
         string query, 
@@ -227,19 +226,20 @@ For casual conversation, respond naturally without using tools.";
     /// </summary>
     private async Task<(AIAgent agent, List<Microsoft.Extensions.AI.ChatMessage> messagesToSend)> SetupMemoryAwareAgent(string query, int accountId, int threadId, string? modelId, CancellationToken cancellationToken)
     {
-        // Validate Azure Foundry project configuration
+        // Validate Azure Foundry configuration
         if (string.IsNullOrEmpty(azureFoundryOptions.Value.FoundryProjectEndpoint) || string.IsNullOrEmpty(azureFoundryOptions.Value.ApiKey))
         {
-            throw new InvalidOperationException("Azure AI Foundry project configuration is not valid. Ensure FoundryProjectEndpoint and ApiKey are configured.");
+            throw new InvalidOperationException("Azure AI Foundry configuration is not valid. Ensure FoundryProjectEndpoint and ApiKey are configured.");
         }
 
         // Resolve model: use caller-supplied ID or fall back to configured default
         var effectiveModelId = modelId ?? azureFoundryOptions.Value.ModelName;
         logger.LogInformation("Using model {ModelId} for account {AccountId}, thread {ThreadId}", effectiveModelId, accountId, threadId);
 
-        // Get a chat client for the selected model via the shared Foundry ChatCompletionsClient
-        var baseChatClient = _chatCompletionsClient.Value
-            .AsIChatClient(effectiveModelId)
+        // Get a chat client for the selected model — OpenAI SDK routes all Foundry models via /openai/v1/
+        var baseChatClient = _openAiClient.Value
+            .GetChatClient(effectiveModelId)
+            .AsIChatClient()
             .AsBuilder()
             .UseOpenTelemetry(sourceName: "PortfolioManager.AI", 
                              configure: cfg => cfg.EnableSensitiveData = true) // Enable sensitive data for token metrics
