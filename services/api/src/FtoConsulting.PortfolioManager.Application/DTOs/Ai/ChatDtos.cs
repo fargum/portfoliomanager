@@ -9,7 +9,16 @@ public record ChatRequestDto(
     DateTime? ContextDate = null,
     int? ThreadId = null,
     string? ThreadTitle = null,
-    bool CreateNewThread = false
+    bool CreateNewThread = false,
+    string? ModelId = null
+);
+
+/// <summary>
+/// A model available for selection in the UI
+/// </summary>
+public record AiModelDto(
+    string Id,
+    string DisplayName
 );
 
 /// <summary>

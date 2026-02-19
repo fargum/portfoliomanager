@@ -1,5 +1,5 @@
 import { HoldingResponse, ApiResponse, HoldingsListResponse, AddHoldingRequest } from '@/types/api';
-import { ChatRequestDto, ChatResponseDto, AiToolDto } from '@/types/chat';
+import { ChatRequestDto, ChatResponseDto, AiToolDto, AiModelDto } from '@/types/chat';
 
 export class PortfolioApiClient {
   private readonly baseUrl: string;
@@ -95,6 +95,20 @@ export class PortfolioApiClient {
       return {
         error: error instanceof Error ? error.message : 'Unknown error occurred',
       };
+    }
+  }
+
+  /**
+   * Get the list of AI models available for selection
+   */
+  async getModels(): Promise<AiModelDto[]> {
+    try {
+      const url = `${this.baseUrl}/api/ai/chat/models`;
+      const response = await fetch(url, { method: 'GET', headers: this.getHeaders() });
+      if (!response.ok) return [];
+      return await response.json() as AiModelDto[];
+    } catch {
+      return [];
     }
   }
 
@@ -198,17 +212,18 @@ export class PortfolioApiClient {
     onComplete: () => void,
     onError: (error: string) => void,
     onStatusUpdate?: (status: import('@/types/chat').StatusUpdateDto) => void,
-    threadId?: number
+    threadId?: number,
+    modelId?: string
   ): Promise<void> {
     try {
       const url = `${this.baseUrl}/api/ai/chat/stream`;
       
-      console.log(`Sending streaming chat query to: ${url}`, { threadId });
+      console.log(`Sending streaming chat query to: ${url}`, { threadId, modelId });
       
       const requestBody: ChatRequestDto = {
         query,
-        // accountId removed - backend gets from authentication for security
-        threadId
+        threadId,
+        modelId
       };
 
       const response = await fetch(url, {
@@ -280,16 +295,17 @@ export class PortfolioApiClient {
   /**
    * Send a chat query to the AI assistant
    */
-  async sendChatQuery(query: string, accountId: number, threadId?: number): Promise<ApiResponse<ChatResponseDto>> {
+  async sendChatQuery(query: string, accountId: number, threadId?: number, modelId?: string): Promise<ApiResponse<ChatResponseDto>> {
     try {
       const url = `${this.baseUrl}/api/ai/chat/query`;
       
-      console.log(`Sending chat query to: ${url}`, { threadId });
+      console.log(`Sending chat query to: ${url}`, { threadId, modelId });
       
       // NOTE: accountId removed from request body - backend retrieves from authentication for security
       const requestBody: ChatRequestDto = {
         query,
-        threadId
+        threadId,
+        modelId
       };
 
       const response = await fetch(url, {

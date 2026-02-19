@@ -22,7 +22,8 @@ public interface IAiOrchestrationService
         int accountId, 
         Func<StatusUpdateDto, Task>? onStatusUpdate,
         Func<string, Task> onTokenReceived,
-        int? threadId = null, 
+        int? threadId = null,
+        string? modelId = null,
         CancellationToken cancellationToken = default);
     
     /// <summary>

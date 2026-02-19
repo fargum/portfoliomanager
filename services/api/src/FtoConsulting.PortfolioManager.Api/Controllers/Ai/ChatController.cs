@@ -97,6 +97,7 @@ public class ChatController(
                     }
                 },
                 request.ThreadId,
+                request.ModelId,
                 cancellationToken);
 
             // Send completion message
@@ -130,6 +131,20 @@ public class ChatController(
             }
             return new EmptyResult();
         }
+    }
+
+    /// <summary>
+    /// Get the list of AI models available for selection in the UI
+    /// </summary>
+    [HttpGet("models")]
+    [ProducesResponseType(typeof(IEnumerable<AiModelDto>), 200)]
+    public IActionResult GetAvailableModels()
+    {
+        var models = azureFoundryOptions.Value.AvailableModels
+            .Select(m => new AiModelDto(m.Id, m.DisplayName))
+            .ToList();
+
+        return Ok(models);
     }
 
     /// <summary>
@@ -173,10 +188,12 @@ public class ChatController(
     {
         return Ok(new 
         { 
-            AzureFoundryConfigured = !string.IsNullOrEmpty(azureFoundryOptions.Value.Endpoint),
+            AzureFoundryConfigured = !string.IsNullOrEmpty(azureFoundryOptions.Value.FoundryProjectEndpoint),
             HasApiKey = !string.IsNullOrEmpty(azureFoundryOptions.Value.ApiKey),
-            Endpoint = string.IsNullOrEmpty(azureFoundryOptions.Value.Endpoint) ? "Not configured" : "***CONFIGURED***",
+            FoundryProjectEndpoint = string.IsNullOrEmpty(azureFoundryOptions.Value.FoundryProjectEndpoint) ? "Not configured" : "***CONFIGURED***",
             ApiKey = string.IsNullOrEmpty(azureFoundryOptions.Value.ApiKey) ? "Not configured" : "***CONFIGURED***",
+            DefaultModel = azureFoundryOptions.Value.ModelName,
+            AvailableModelCount = azureFoundryOptions.Value.AvailableModels.Count,
             TimeoutSeconds = azureFoundryOptions.Value.TimeoutSeconds
         });
     }

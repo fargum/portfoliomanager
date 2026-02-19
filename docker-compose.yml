@@ -42,6 +42,7 @@ services:
       # Azure Foundry Inference Endpoint Configuration
       - AzureFoundry__Endpoint=${AZURE_FOUNDRY_ENDPOINT}
       - AzureFoundry__ApiKey=${AZURE_FOUNDRY_API_KEY}
+      - AzureFoundry__FoundryProjectEndpoint=${AZURE_FOUNDRY_PROJECT_ENDPOINT}
       
       # Azure Active Directory Configuration
       - AZURE_AD_INSTANCE=${AZURE_AD_INSTANCE}

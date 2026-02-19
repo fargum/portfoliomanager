@@ -1,4 +1,4 @@
-using Azure.AI.OpenAI;
+using Azure.AI.Inference;
 using OpenAI.Chat;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -10,10 +10,10 @@ using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 namespace FtoConsulting.PortfolioManager.Application.Services.Ai;
 
 /// <summary>
-/// Azure OpenAI implementation of AI chat service
+/// Azure AI Foundry implementation of AI chat service (used for memory extraction and market intelligence)
 /// </summary>
 public class AzureOpenAiChatService(
-    AzureOpenAIClient azureOpenAIClient,
+    ChatCompletionsClient chatCompletionsClient,
     IOptions<AzureFoundryOptions> azureFoundryOptions,
     ILogger<AzureOpenAiChatService> logger) : IAiChatService
 {
@@ -44,9 +44,9 @@ public class AzureOpenAiChatService(
                 return new Microsoft.Extensions.AI.ChatMessage(role, content);
             });
 
-            // Use instrumented chat client for telemetry
-            var instrumentedChatClient = azureOpenAIClient.GetChatClient(azureFoundryOptions.Value.ModelName)
-                .AsIChatClient()
+            // Use instrumented chat client for telemetry (uses default model for memory/intelligence tasks)
+            var instrumentedChatClient = chatCompletionsClient
+                .AsIChatClient(azureFoundryOptions.Value.ModelName)
                 .AsBuilder()
                 .UseOpenTelemetry(sourceName: "PortfolioManager.AI.DirectChat", 
                                  configure: cfg => cfg.EnableSensitiveData = true)

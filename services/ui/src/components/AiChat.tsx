@@ -6,7 +6,7 @@ import remarkGfm from 'remark-gfm';
 import { Send, Bot, User, AlertCircle, TrendingUp, TrendingDown, Activity, Clock, Lightbulb, LogIn } from 'lucide-react';
 import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@/contexts/AuthContext';
-import { ChatMessage, ChatState, InsightDto } from '@/types/chat';
+import { ChatMessage, ChatState, InsightDto, AiModelDto } from '@/types/chat';
 
 interface AiChatProps {
   accountId: number;
@@ -17,6 +17,8 @@ interface AiChatProps {
 export function AiChat({ accountId, className = '', isVisible = true }: AiChatProps) {
   const [inputValue, setInputValue] = useState('');
   const [currentThreadId, setCurrentThreadId] = useState<number | undefined>(undefined);
+  const [selectedModelId, setSelectedModelId] = useState<string | undefined>(undefined);
+  const [availableModels, setAvailableModels] = useState<AiModelDto[]>([]);
   const { isAuthenticated, login } = useAuth();
   const [chatState, setChatState] = useState<ChatState>({
     messages: [
@@ -79,6 +81,19 @@ I can analyze your holdings, market conditions, and provide insights to help you
   }, [accountId]);
 
   const generateMessageId = () => `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+  // Fetch available models when authenticated
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    apiClient.getModels().then(models => {
+      setAvailableModels(models);
+      // Pre-select the first model if none chosen yet
+      if (models.length > 0 && !selectedModelId) {
+        setSelectedModelId(models[0].id);
+      }
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -146,7 +161,7 @@ I can analyze your holdings, market conditions, and provide insights to help you
           
           // Fallback to regular API call
           try {
-            const response = await apiClient.sendChatQuery(query, accountId, currentThreadId);
+            const response = await apiClient.sendChatQuery(query, accountId, currentThreadId, selectedModelId);
             
             if (response.error) {
               throw new Error(response.error);
@@ -206,7 +221,8 @@ I can analyze your holdings, market conditions, and provide insights to help you
             ),
           }));
         },
-        currentThreadId
+        currentThreadId,
+        selectedModelId
       );
     } catch (error) {
       // If streaming is not supported, fall back to regular API
@@ -532,7 +548,23 @@ I can analyze your holdings, market conditions, and provide insights to help you
 
           {/* Input - compact on mobile */}
           <div className="border-t border-financial-slate-200 p-2 sm:p-4 bg-white/95 backdrop-blur-sm">
-            <form onSubmit={handleSubmit} className="flex space-x-2 sm:space-x-3">
+          {/* Model selector — shown above input when multiple models are available */}
+          {availableModels.length > 1 && (
+            <div className="flex items-center space-x-2 mb-2 px-1">
+              <span className="text-xs text-financial-slate-500 font-medium whitespace-nowrap">Model:</span>
+              <select
+                value={selectedModelId ?? ''}
+                onChange={(e) => setSelectedModelId(e.target.value)}
+                disabled={chatState.isLoading}
+                className="text-xs border border-financial-slate-200 rounded-lg px-2 py-1.5 text-financial-slate-700 bg-white focus:outline-none focus:ring-1 focus:ring-financial-blue-500 disabled:opacity-50 cursor-pointer"
+              >
+                {availableModels.map(m => (
+                  <option key={m.id} value={m.id}>{m.displayName}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          <form onSubmit={handleSubmit} className="flex space-x-2 sm:space-x-3">
               <input
                 ref={inputRef}
                 type="text"
