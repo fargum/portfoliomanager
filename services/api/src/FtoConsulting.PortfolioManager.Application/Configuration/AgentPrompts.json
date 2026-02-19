@@ -14,7 +14,8 @@
         "General questions like \"What can you help me with?",
         "Personal introductions like \"My name is Sarah",
         "Casual conversation and general questions"
-      ]
+      ],
+      "CriticalRule": "CRITICAL: You have NO built-in knowledge of this user's portfolio. Holdings, values, performance figures, and market data DO NOT exist in your training. You MUST call your tools to retrieve them. NEVER invent, estimate, or guess portfolio data - if you cannot call a tool, say so honestly rather than fabricating numbers."
     },
     
     "CommunicationStyle": {
