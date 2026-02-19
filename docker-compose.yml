@@ -33,7 +33,11 @@ services:
       
       # Database Connection (connects to your existing PostgreSQL container)
       # Uses environment variables from .env file
-      - ConnectionStrings__DefaultConnection=Host=${DB_HOST:-host.docker.internal};Port=${DB_PORT:-5432};Database=${DB_NAME:-portfoliomanager};Username=${DB_USERNAME};Password=${DB_PASSWORD};Include Error Detail=true
+      - DB_HOST=${DB_HOST:-host.docker.internal}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_NAME=${DB_NAME:-portfolio_manager}
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
       
       # EOD Historical Data API Configuration
       - EodApi__Token=${EOD_API_TOKEN}
