@@ -251,7 +251,12 @@ For casual conversation, respond naturally without using tools.";
         
         // Create memory-aware AI agent with ChatClientAgentOptions and enhanced security
         // SECURITY: Pass authenticated accountId to tools to prevent cross-account access
-        var portfolioTools = CreatePortfolioMcpFunctions(accountId);
+        // Some models (e.g. Llama, Phi via vLLM) don't support tool calling — skip tools for those
+        var modelConfig = azureFoundryOptions.Value.AvailableModels.FirstOrDefault(m => m.Id == effectiveModelId);
+        var modelSupportsTools = modelConfig?.SupportsTools ?? true;
+        var portfolioTools = modelSupportsTools ? CreatePortfolioMcpFunctions(accountId) : [];
+        if (!modelSupportsTools)
+            logger.LogInformation("Model {ModelId} does not support tool calling — running without MCP tools", effectiveModelId);
         var secureInstructions = guardrails.CreateSecureAgentInstructions(CreateAgentInstructions(accountId), accountId);
         var secureChatOptions = guardrails.CreateSecureChatOptions(portfolioTools, accountId);
         

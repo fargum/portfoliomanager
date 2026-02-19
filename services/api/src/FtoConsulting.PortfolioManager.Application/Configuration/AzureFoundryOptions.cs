@@ -54,4 +54,11 @@ public class ModelConfig
 
     /// <summary>Human-readable label shown in the UI dropdown.</summary>
     public string DisplayName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Whether this model supports tool/function calling.
+    /// Models hosted via vLLM (e.g. Llama, Phi) may not support auto tool choice.
+    /// Defaults to true.
+    /// </summary>
+    public bool SupportsTools { get; set; } = true;
 }
