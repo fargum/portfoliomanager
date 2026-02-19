@@ -1,11 +1,11 @@
-# Use the official .NET 9 runtime as base image
-FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS base
+# Use the official .NET 10 runtime as base image
+FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS base
 WORKDIR /app
 EXPOSE 8080
 EXPOSE 8081
 
-# Use the .NET 9 SDK for building
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+# Use the .NET 10 SDK for building
+FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 
@@ -34,8 +34,7 @@ FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
 
-# Create a non-root user for security
-RUN adduser --disabled-password --gecos "" appuser && chown -R appuser /app
-USER appuser
+# Use the built-in non-root user from the .NET 10 base image
+USER app
 
 ENTRYPOINT ["dotnet", "FtoConsulting.PortfolioManager.Api.dll"]

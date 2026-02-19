@@ -192,10 +192,9 @@ Always maintain a professional, helpful tone while staying within these safety b
         // Add existing messages (already validated)
         messages.AddRange(existingMessages);
         
-        // Create new user message with context
-        var currentDataDate = DateTime.UtcNow.ToString("yyyy-MM-dd");
-        var secureUserMessage = new AIChatMessage(ChatRole.User, 
-            $"User Query: {newUserInput}\nAccount ID: {accountId}\nThread ID: {threadId}\nData Available As Of: {currentDataDate}\n\nSAFETY REMINDER: Only provide portfolio analysis and market information. Do not execute trades or give specific investment advice.");
+        // Store only the raw user query — metadata (account ID, date, safety reminder)
+        // is already in the system prompt and must not be repeated in every history message.
+        var secureUserMessage = new AIChatMessage(ChatRole.User, newUserInput);
         
         messages.Add(secureUserMessage);
 

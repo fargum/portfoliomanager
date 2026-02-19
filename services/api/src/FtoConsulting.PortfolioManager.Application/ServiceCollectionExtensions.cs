@@ -9,8 +9,8 @@ using FtoConsulting.PortfolioManager.Domain.Repositories;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Azure;
-using Azure.AI.OpenAI;
+using OpenAI;
+using System.ClientModel;
 using Microsoft.Extensions.AI;
 
 namespace FtoConsulting.PortfolioManager.Application;
@@ -65,34 +65,33 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IInstrumentManagementService, InstrumentManagementService>();
         services.AddScoped<IPricingCalculationHelper, PricingCalculationHelper>();
         
-        // Register Azure OpenAI client and AI chat service for dependency injection
-        services.AddScoped<AzureOpenAIClient>(serviceProvider =>
+        // Register OpenAIClient pointing to the Foundry /openai/v1/ endpoint — works for all deployed models
+        services.AddScoped<OpenAIClient>(serviceProvider =>
         {
             var azureFoundryOptions = serviceProvider.GetRequiredService<IOptions<AzureFoundryOptions>>().Value;
             
-            if (string.IsNullOrEmpty(azureFoundryOptions.Endpoint) || string.IsNullOrEmpty(azureFoundryOptions.ApiKey))
+            if (string.IsNullOrEmpty(azureFoundryOptions.FoundryProjectEndpoint) || string.IsNullOrEmpty(azureFoundryOptions.ApiKey))
             {
-                // Return a null client if not configured - services will handle fallback
                 return null!;
             }
             
-            return new AzureOpenAIClient(
-                new Uri(azureFoundryOptions.Endpoint),
-                new AzureKeyCredential(azureFoundryOptions.ApiKey));
+            return new OpenAIClient(
+                new ApiKeyCredential(azureFoundryOptions.ApiKey),
+                new OpenAIClientOptions { Endpoint = new Uri(azureFoundryOptions.FoundryProjectEndpoint) });
         });
         
-        // Register AI chat service abstraction
+        // Register AI chat service abstraction (used for memory extraction and market intelligence)
         services.AddScoped<IAiChatService>(serviceProvider =>
         {
-            var azureOpenAIClient = serviceProvider.GetService<AzureOpenAIClient>();
-            if (azureOpenAIClient == null)
+            var openAiClient = serviceProvider.GetService<OpenAIClient>();
+            if (openAiClient == null)
             {
-                return null!; // Will cause services to use fallback behavior
+                return null!;
             }
             
             var logger = serviceProvider.GetRequiredService<ILogger<AzureOpenAiChatService>>();
             var azureFoundryOptions = serviceProvider.GetRequiredService<IOptions<AzureFoundryOptions>>();
-            return new AzureOpenAiChatService(azureOpenAIClient, azureFoundryOptions, logger);
+            return new AzureOpenAiChatService(openAiClient, azureFoundryOptions, logger);
         });
         
         // Register AI services (now in correct Application layer)

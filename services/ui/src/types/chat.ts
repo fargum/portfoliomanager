@@ -4,6 +4,13 @@ export interface ChatRequestDto {
   query: string;
   // NOTE: accountId removed - backend retrieves from authenticated user for security
   threadId?: number; // Optional thread ID for memory context
+  modelId?: string;  // Optional model deployment name (e.g. 'grok-4-fast-reasoning')
+}
+
+/// <summary>A model available for selection</summary>
+export interface AiModelDto {
+  id: string;
+  displayName: string;
 }
 
 export interface ChatResponseDto {

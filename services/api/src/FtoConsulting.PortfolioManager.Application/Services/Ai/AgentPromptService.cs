@@ -29,6 +29,14 @@ public class AgentPromptService(ILogger<AgentPromptService> logger) : IAgentProm
 
             // Tool usage guidance
             promptBuilder.AppendLine("WHEN TO USE YOUR TOOLS:");
+            
+            // Emit the critical rule first and prominently so all models see it
+            if (!string.IsNullOrEmpty(config.ToolUsageGuidance.CriticalRule))
+            {
+                promptBuilder.AppendLine(config.ToolUsageGuidance.CriticalRule);
+                promptBuilder.AppendLine();
+            }
+            
             promptBuilder.AppendLine("You have some great tools at your disposal, but only use them when someone actually wants portfolio or market information:");
             promptBuilder.AppendLine();
             
@@ -317,6 +325,7 @@ public class ToolUsageGuidanceConfig
 {
     public string[] WhenToUseTools { get; set; } = Array.Empty<string>();
     public string[] WhenNotToUseTools { get; set; } = Array.Empty<string>();
+    public string CriticalRule { get; set; } = string.Empty;
 }
 
 public class CommunicationStyleConfig

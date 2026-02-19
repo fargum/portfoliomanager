@@ -3,10 +3,9 @@ using FtoConsulting.PortfolioManager.Application.Services;
 using FtoConsulting.PortfolioManager.Application.Configuration;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.AI;
-using Azure;
-using Azure.AI.OpenAI;
 using Microsoft.Agents.AI;
 using OpenAI;
+using System.ClientModel;
 using Microsoft.Extensions.Logging;
 using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 using FtoConsulting.PortfolioManager.Application.Services.Ai.Guardrails;
@@ -26,24 +25,25 @@ public class AiOrchestrationService(
     IConversationThreadService conversationThreadService,
     IAgentPromptService agentPromptService,
     AgentFrameworkGuardrails guardrails,
-    Func<int, int?, System.Text.Json.JsonSerializerOptions?, ChatMessageStore> chatMessageStoreFactory,
+    Func<int, int?, System.Text.Json.JsonSerializerOptions?, ChatHistoryProvider> chatMessageStoreFactory,
     Func<int, IChatClient, AIContextProvider> memoryContextProviderFactory,
     ILoggerFactory loggerFactory) : IAiOrchestrationService
 {
     private static readonly ActivitySource s_activitySource = new("PortfolioManager.AI");
 
-    // Lazy-loaded Azure OpenAI client to avoid creating it on every request
-    private readonly Lazy<AzureOpenAIClient> _azureOpenAIClient = new Lazy<AzureOpenAIClient>(() =>
-        new AzureOpenAIClient(
-            new Uri(azureFoundryOptions.Value.Endpoint),
-            new AzureKeyCredential(azureFoundryOptions.Value.ApiKey)));
+    // Lazy-loaded OpenAI client pointing to the Foundry /openai/v1/ endpoint — works for all deployed models
+    private readonly Lazy<OpenAIClient> _openAiClient = new Lazy<OpenAIClient>(() =>
+        new OpenAIClient(
+            new ApiKeyCredential(azureFoundryOptions.Value.ApiKey),
+            new OpenAIClientOptions { Endpoint = new Uri(azureFoundryOptions.Value.FoundryProjectEndpoint) }));
 
     public async Task ProcessPortfolioQueryAsync(
         string query, 
         int accountId, 
         Func<StatusUpdateDto, Task>? onStatusUpdate,
         Func<string, Task> onTokenReceived,
-        int? threadId = null, 
+        int? threadId = null,
+        string? modelId = null,
         CancellationToken cancellationToken = default)
     {
         // SECURITY: Validate threadId belongs to authenticated account if provided
@@ -78,7 +78,8 @@ public class AiOrchestrationService(
             await ProcessWithStreamingComponents(
                 query, 
                 accountId, 
-                thread.Id, 
+                thread.Id,
+                modelId,
                 onStatusUpdate, 
                 onTokenReceived, 
                 cancellationToken
@@ -223,19 +224,21 @@ For casual conversation, respond naturally without using tools.";
     /// <summary>
     /// Setup memory-aware AI agent with optimized conversation history
     /// </summary>
-    private async Task<(AIAgent agent, List<Microsoft.Extensions.AI.ChatMessage> messagesToSend)> SetupMemoryAwareAgent(string query, int accountId, int threadId, CancellationToken cancellationToken)
+    private async Task<(AIAgent agent, List<Microsoft.Extensions.AI.ChatMessage> messagesToSend)> SetupMemoryAwareAgent(string query, int accountId, int threadId, string? modelId, CancellationToken cancellationToken)
     {
         // Validate Azure Foundry configuration
-        if (string.IsNullOrEmpty(azureFoundryOptions.Value.Endpoint) || string.IsNullOrEmpty(azureFoundryOptions.Value.ApiKey))
+        if (string.IsNullOrEmpty(azureFoundryOptions.Value.FoundryProjectEndpoint) || string.IsNullOrEmpty(azureFoundryOptions.Value.ApiKey))
         {
-            throw new InvalidOperationException("Azure Foundry configuration is not valid for memory processing.");
+            throw new InvalidOperationException("Azure AI Foundry configuration is not valid. Ensure FoundryProjectEndpoint and ApiKey are configured.");
         }
 
-        // Use the lazy-loaded Azure OpenAI client (avoids cold start penalty)
-        var azureOpenAIClient = _azureOpenAIClient.Value;
+        // Resolve model: use caller-supplied ID or fall back to configured default
+        var effectiveModelId = modelId ?? azureFoundryOptions.Value.ModelName;
+        logger.LogInformation("Using model {ModelId} for account {AccountId}, thread {ThreadId}", effectiveModelId, accountId, threadId);
 
-        // Get a chat client for the specific model and enable OpenTelemetry
-        var baseChatClient = azureOpenAIClient.GetChatClient(azureFoundryOptions.Value.ModelName)
+        // Get a chat client for the selected model — OpenAI SDK routes all Foundry models via /openai/v1/
+        var baseChatClient = _openAiClient.Value
+            .GetChatClient(effectiveModelId)
             .AsIChatClient()
             .AsBuilder()
             .UseOpenTelemetry(sourceName: "PortfolioManager.AI", 
@@ -248,17 +251,26 @@ For casual conversation, respond naturally without using tools.";
         
         // Create memory-aware AI agent with ChatClientAgentOptions and enhanced security
         // SECURITY: Pass authenticated accountId to tools to prevent cross-account access
-        var portfolioTools = CreatePortfolioMcpFunctions(accountId);
+        // Some models (e.g. Llama, Phi via vLLM) don't support tool calling — skip tools for those
+        var modelConfig = azureFoundryOptions.Value.AvailableModels.FirstOrDefault(m => m.Id == effectiveModelId);
+        var modelSupportsTools = modelConfig?.SupportsTools ?? true;
+        var portfolioTools = modelSupportsTools ? CreatePortfolioMcpFunctions(accountId) : [];
+        if (!modelSupportsTools)
+            logger.LogInformation("Model {ModelId} does not support tool calling — running without MCP tools", effectiveModelId);
         var secureInstructions = guardrails.CreateSecureAgentInstructions(CreateAgentInstructions(accountId), accountId);
         var secureChatOptions = guardrails.CreateSecureChatOptions(portfolioTools, accountId);
         
-        var agent = chatClient.CreateAIAgent(new ChatClientAgentOptions
+        // Set instructions on ChatOptions — inject current date so model knows what "today" means.
+        // This is ephemeral (not stored in history) and refreshed on every call.
+        var currentDate = DateTime.UtcNow.ToString("yyyy-MM-dd");
+        secureChatOptions.Instructions = secureInstructions + $"\n\nCurrent Date: {currentDate}";
+        
+        var agent = chatClient.AsAIAgent(new ChatClientAgentOptions
         {
-            Instructions = secureInstructions,
             ChatOptions = secureChatOptions,
-            ChatMessageStoreFactory = ctx => chatMessageStoreFactory(accountId, threadId, ctx.JsonSerializerOptions),
+            ChatHistoryProviderFactory = (ctx, ct) => new ValueTask<ChatHistoryProvider>(chatMessageStoreFactory(accountId, threadId, ctx.JsonSerializerOptions)),
             // Use existing context provider - optimization is in message loading instead
-            AIContextProviderFactory = ctx => memoryContextProviderFactory(accountId, chatClient)
+            AIContextProviderFactory = (ctx, ct) => new ValueTask<AIContextProvider>(memoryContextProviderFactory(accountId, chatClient))
         });
 
         logger.LogInformation("Memory store and context provider configured for agent on thread {ThreadId}", threadId);
@@ -279,13 +291,8 @@ For casual conversation, respond naturally without using tools.";
         }
         else
         {
-            // OPTIMIZATION: Reduced from 6 to 4 messages for faster loading
-            var allStoredMessages = await messageStore.GetMessagesAsync(cancellationToken);
-            recentMessages = allStoredMessages
-                .OrderByDescending(m => m.CreatedAt)
-                .Take(4) // Reduced for faster performance
-                .OrderBy(m => m.CreatedAt)
-                .ToList();
+            // Fallback: use empty message history when store doesn't support token-aware loading
+            recentMessages = new List<Microsoft.Extensions.AI.ChatMessage>();
         }
 
         // CONTEXT SIZE ANALYSIS: Measure each component for visibility
@@ -311,7 +318,7 @@ For casual conversation, respond naturally without using tools.";
     /// <summary>
     /// Process portfolio query with streaming components
     /// </summary>
-    private async Task ProcessWithStreamingComponents(string query, int accountId, int threadId, Func<StatusUpdateDto, Task>? onStatusUpdate, Func<string, Task> onTokenReceived, CancellationToken cancellationToken)
+    private async Task ProcessWithStreamingComponents(string query, int accountId, int threadId, string? modelId, Func<StatusUpdateDto, Task>? onStatusUpdate, Func<string, Task> onTokenReceived, CancellationToken cancellationToken)
     {
         try
         {
@@ -320,7 +327,7 @@ For casual conversation, respond naturally without using tools.";
                 await onStatusUpdate(new StatusUpdateDto(StatusUpdateType.ToolPlanning, "Setting up AI agent..."));
             }
             
-            var (agent, messagesToSend) = await SetupMemoryAwareAgent(query, accountId, threadId, cancellationToken);
+            var (agent, messagesToSend) = await SetupMemoryAwareAgent(query, accountId, threadId, modelId, cancellationToken);
             
             logger.LogInformation("Processing with streaming agent for thread {ThreadId}", threadId);
             

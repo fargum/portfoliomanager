@@ -5,7 +5,7 @@ using FtoConsulting.PortfolioManager.Infrastructure.Data;
 using FtoConsulting.PortfolioManager.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Identity.Web;
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 using System.Globalization;
 using System.Reflection;
 using OpenTelemetry;
@@ -102,14 +102,20 @@ builder.Services.AddControllers();
 // Configure Entity Framework
 builder.Services.AddDbContext<PortfolioManagerDbContext>(options =>
 {
-    // Build connection string from environment variables and Key Vault
-    var dbHost = builder.Configuration["DB_HOST"] ?? builder.Configuration["ConnectionStrings:Host"] ?? "localhost";
-    var dbPort = builder.Configuration["DB_PORT"] ?? builder.Configuration["ConnectionStrings:Port"] ?? "5432";
-    var dbName = builder.Configuration["DB_NAME"] ?? builder.Configuration["ConnectionStrings:Database"] ?? "portfolio_manager";
-    var dbUsername = builder.Configuration["DB_USERNAME"] ?? builder.Configuration["ConnectionStrings:Username"] ?? "postgres";
-    var dbPassword = builder.Configuration["Database:Password"] ?? throw new InvalidOperationException("Database password not found in configuration.");
+    // Use full connection string if provided (e.g. from docker-compose), 
+    // otherwise build from individual config values (e.g. Key Vault + env vars)
+    var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
     
-    var connectionString = $"Host={dbHost};Port={dbPort};Database={dbName};Username={dbUsername};Password={dbPassword};Include Error Detail=false";
+    if (string.IsNullOrEmpty(connectionString))
+    {
+        var dbHost = builder.Configuration["DB_HOST"] ?? builder.Configuration["ConnectionStrings:Host"] ?? "localhost";
+        var dbPort = builder.Configuration["DB_PORT"] ?? builder.Configuration["ConnectionStrings:Port"] ?? "5432";
+        var dbName = builder.Configuration["DB_NAME"] ?? builder.Configuration["ConnectionStrings:Database"] ?? "portfolio_manager";
+        var dbUsername = builder.Configuration["DB_USERNAME"] ?? builder.Configuration["ConnectionStrings:Username"] ?? "postgres";
+        var dbPassword = builder.Configuration["Database:Password"] ?? builder.Configuration["DB_PASSWORD"] ?? throw new InvalidOperationException("Database password not found in configuration.");
+        
+        connectionString = $"Host={dbHost};Port={dbPort};Database={dbName};Username={dbUsername};Password={dbPassword};Include Error Detail=false";
+    }
     
     options.UseNpgsql(connectionString, npgsqlOptions => 
                npgsqlOptions.MigrationsHistoryTable("__EFMigrationsHistory", "app"))
@@ -341,20 +347,13 @@ builder.Services.AddSwaggerGen(c =>
         }
     });
 
-    c.AddSecurityRequirement(new OpenApiSecurityRequirement
+    c.AddSecurityRequirement(doc => new OpenApiSecurityRequirement
     {
         {
-            new OpenApiSecurityScheme
-            {
-                Reference = new OpenApiReference
-                    {
-                        Type = ReferenceType.SecurityScheme,
-                        Id = "oauth2"
-                    }
-        },
-        new[] { $"api://{builder.Configuration["AzureAd:ClientId"]}/Portfolio.ReadWrite" }
-    }
-});
+            new OpenApiSecuritySchemeReference("oauth2"),
+            new List<string> { $"api://{builder.Configuration["AzureAd:ClientId"]}/Portfolio.ReadWrite" }
+        }
+    });
     // Include XML comments for better documentation
     var xmlFile = $"{Assembly.GetExecutingAssembly().GetName().Name}.xml";
     var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
