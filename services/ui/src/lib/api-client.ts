@@ -207,7 +207,6 @@ export class PortfolioApiClient {
    */
   async sendChatQueryStream(
     query: string, 
-    accountId: number, 
     onChunk: (chunk: string) => void,
     onComplete: () => void,
     onError: (error: string) => void,

@@ -133,7 +133,6 @@ I can analyze your holdings, market conditions, and provide insights to help you
     try {
       await apiClient.sendChatQueryStream(
         query,
-        accountId,
         // On chunk received
         (chunk: string) => {
           streamingContent += chunk;
