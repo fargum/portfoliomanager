@@ -260,8 +260,10 @@ For casual conversation, respond naturally without using tools.";
         var secureInstructions = guardrails.CreateSecureAgentInstructions(CreateAgentInstructions(accountId), accountId);
         var secureChatOptions = guardrails.CreateSecureChatOptions(portfolioTools, accountId);
         
-        // Set instructions on ChatOptions (moved from ChatClientAgentOptions in new Agent Framework API)
-        secureChatOptions.Instructions = secureInstructions;
+        // Set instructions on ChatOptions — inject current date so model knows what "today" means.
+        // This is ephemeral (not stored in history) and refreshed on every call.
+        var currentDate = DateTime.UtcNow.ToString("yyyy-MM-dd");
+        secureChatOptions.Instructions = secureInstructions + $"\n\nCurrent Date: {currentDate}";
         
         var agent = chatClient.AsAIAgent(new ChatClientAgentOptions
         {
