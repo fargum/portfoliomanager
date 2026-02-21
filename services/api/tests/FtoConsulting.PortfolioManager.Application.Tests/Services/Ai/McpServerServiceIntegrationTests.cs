@@ -49,12 +49,14 @@ public class McpServerServiceIntegrationTests
         services.AddTransient<PortfolioComparisonTool>(sp => new PortfolioComparisonTool(null!));
         services.AddTransient<MarketIntelligenceTool>(sp => new MarketIntelligenceTool(null!));
         services.AddScoped<EodMarketDataTool>();
-        
-        // Mock core services  
+        services.Configure<TavilyOptions>(options => { });
+        services.AddScoped<TavilySearchTool>();
+
+        // Mock core services
         services.AddTransient<IHoldingService>(sp => new MockHoldingService());
-        
+
         var serviceProvider = services.BuildServiceProvider();
-        
+
         var mcpService = new McpServerService(
             serviceProvider.GetRequiredService<IHoldingService>(),
             serviceProvider.GetRequiredService<ILogger<McpServerService>>(),
@@ -64,7 +66,8 @@ public class McpServerServiceIntegrationTests
             serviceProvider.GetRequiredService<PortfolioAnalysisTool>(),
             serviceProvider.GetRequiredService<PortfolioComparisonTool>(),
             serviceProvider.GetRequiredService<MarketIntelligenceTool>(),
-            serviceProvider.GetRequiredService<EodMarketDataTool>());
+            serviceProvider.GetRequiredService<EodMarketDataTool>(),
+            serviceProvider.GetRequiredService<TavilySearchTool>());
 
         // Act & Assert - Should not throw
         await mcpService.InitializeAsync(CancellationToken.None);
@@ -104,10 +107,12 @@ public class McpServerServiceIntegrationTests
         services.AddTransient<PortfolioComparisonTool>(sp => new PortfolioComparisonTool(null!));
         services.AddTransient<MarketIntelligenceTool>(sp => new MarketIntelligenceTool(null!));
         services.AddScoped<EodMarketDataTool>();
+        services.Configure<TavilyOptions>(options => { });
+        services.AddScoped<TavilySearchTool>();
         services.AddTransient<IHoldingService>(sp => new MockHoldingService());
-        
+
         var serviceProvider = services.BuildServiceProvider();
-        
+
         var mcpService = new McpServerService(
             serviceProvider.GetRequiredService<IHoldingService>(),
             serviceProvider.GetRequiredService<ILogger<McpServerService>>(),
@@ -117,7 +122,8 @@ public class McpServerServiceIntegrationTests
             serviceProvider.GetRequiredService<PortfolioAnalysisTool>(),
             serviceProvider.GetRequiredService<PortfolioComparisonTool>(),
             serviceProvider.GetRequiredService<MarketIntelligenceTool>(),
-            serviceProvider.GetRequiredService<EodMarketDataTool>());
+            serviceProvider.GetRequiredService<EodMarketDataTool>(),
+            serviceProvider.GetRequiredService<TavilySearchTool>());
 
         // Act
         var tools = await mcpService.GetAvailableToolsAsync();

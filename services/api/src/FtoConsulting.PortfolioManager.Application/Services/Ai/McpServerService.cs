@@ -22,7 +22,8 @@ public class McpServerService(
     PortfolioAnalysisTool portfolioAnalysisTool,
     PortfolioComparisonTool portfolioComparisonTool,
     MarketIntelligenceTool marketIntelligenceTool,
-    EodMarketDataTool eodMarketDataTool) : IMcpServerService
+    EodMarketDataTool eodMarketDataTool,
+    TavilySearchTool tavilySearchTool) : IMcpServerService
 {
 
     private readonly AzureFoundryOptions _azureFoundryOptions = azureFoundryOptions.Value;
@@ -210,6 +211,9 @@ public class McpServerService(
                 "GetMarketContext" => await ExecuteGetMarketContext(parameters, cancellationToken),
                 "GetMarketSentiment" => await ExecuteGetMarketSentiment(parameters, cancellationToken),
                 "GetRealTimePrices" => await ExecuteGetRealTimePrices(parameters, cancellationToken),
+                "SearchRecentNews" => await ExecuteSearchRecentNews(parameters, cancellationToken),
+                "ResearchCompanyFundamentals" => await ExecuteResearchCompanyFundamentals(parameters, cancellationToken),
+                "GetCompanyOverview" => await ExecuteGetCompanyOverview(parameters, cancellationToken),
                 _ => throw new ArgumentException($"Unknown tool: {toolName}")
             };
         }
@@ -299,6 +303,30 @@ public class McpServerService(
             Prices = prices,
             Timestamp = DateTime.UtcNow
         };
+    }
+
+    private async Task<object> ExecuteSearchRecentNews(Dictionary<string, object> parameters, CancellationToken cancellationToken)
+    {
+        var tickers = ExtractStringArrayFromJsonParameter(parameters["tickers"]);
+        var companyNames = parameters.TryGetValue("companyNames", out var cn) ? cn.ToString()! : string.Empty;
+
+        return await tavilySearchTool.SearchRecentNews(tickers, companyNames, cancellationToken);
+    }
+
+    private async Task<object> ExecuteResearchCompanyFundamentals(Dictionary<string, object> parameters, CancellationToken cancellationToken)
+    {
+        var ticker = parameters["ticker"].ToString()!;
+        var companyName = parameters.TryGetValue("companyName", out var cn) ? cn.ToString()! : ticker;
+
+        return await tavilySearchTool.ResearchCompanyFundamentals(ticker, companyName, cancellationToken);
+    }
+
+    private async Task<object> ExecuteGetCompanyOverview(Dictionary<string, object> parameters, CancellationToken cancellationToken)
+    {
+        var ticker = parameters["ticker"].ToString()!;
+        var companyName = parameters.TryGetValue("companyName", out var cn) ? cn.ToString()! : ticker;
+
+        return await tavilySearchTool.GetCompanyOverview(ticker, companyName, cancellationToken);
     }
 
     /// <summary>

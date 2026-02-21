@@ -76,6 +76,39 @@ public static class PortfolioToolRegistry
                 ["tickers"] = new ToolParameterDefinition("array", "List of stock tickers to get real-time prices for", true, "string")
             },
             Category: "Market Intelligence"
+        ),
+
+        new PortfolioToolDefinition(
+            Name: "SearchRecentNews",
+            Description: "Search for recent news articles about specific stock tickers from the past week. Use this for up-to-date market news, company announcements, and market-moving events.",
+            Parameters: new Dictionary<string, ToolParameterDefinition>
+            {
+                ["tickers"] = new ToolParameterDefinition("array", "List of stock tickers to search news for (e.g. AAPL, TSLA)", true, "string"),
+                ["companyNames"] = new ToolParameterDefinition("string", "Company names corresponding to the tickers, used to improve search accuracy (e.g. 'Apple Tesla')", false)
+            },
+            Category: "Market Intelligence"
+        ),
+
+        new PortfolioToolDefinition(
+            Name: "ResearchCompanyFundamentals",
+            Description: "Research company fundamentals including P/E ratio, earnings, EPS, analyst ratings, and price targets for a specific stock. Returns an AI-generated summary with sources.",
+            Parameters: new Dictionary<string, ToolParameterDefinition>
+            {
+                ["ticker"] = new ToolParameterDefinition("string", "Stock ticker symbol (e.g. AAPL)", true),
+                ["companyName"] = new ToolParameterDefinition("string", "Company name (e.g. Apple Inc)", false)
+            },
+            Category: "Market Intelligence"
+        ),
+
+        new PortfolioToolDefinition(
+            Name: "GetCompanyOverview",
+            Description: "Get a general overview of a company including its business model, competitive position, and recent strategic developments.",
+            Parameters: new Dictionary<string, ToolParameterDefinition>
+            {
+                ["ticker"] = new ToolParameterDefinition("string", "Stock ticker symbol (e.g. AAPL)", true),
+                ["companyName"] = new ToolParameterDefinition("string", "Company name (e.g. Apple Inc)", false)
+            },
+            Category: "Market Intelligence"
         )
     };
 
@@ -140,7 +173,22 @@ public static class PortfolioToolRegistry
             AIFunctionFactory.Create(
                 method: (string[] tickers) => toolExecutor("GetRealTimePrices", new Dictionary<string, object> { ["tickers"] = tickers }),
                 name: "GetRealTimePrices",
-                description: "Get current real-time stock prices for specific tickers. Use this when the user asks for current price, live price, real-time price, or what a stock is trading at right now.")
+                description: "Get current real-time stock prices for specific tickers. Use this when the user asks for current price, live price, real-time price, or what a stock is trading at right now."),
+
+            AIFunctionFactory.Create(
+                method: (string[] tickers, string companyNames) => toolExecutor("SearchRecentNews", new Dictionary<string, object> { ["tickers"] = tickers, ["companyNames"] = companyNames }),
+                name: "SearchRecentNews",
+                description: "Search for recent news articles about specific stock tickers from the past week. Use this for up-to-date market news, company announcements, and market-moving events."),
+
+            AIFunctionFactory.Create(
+                method: (string ticker, string companyName) => toolExecutor("ResearchCompanyFundamentals", new Dictionary<string, object> { ["ticker"] = ticker, ["companyName"] = companyName }),
+                name: "ResearchCompanyFundamentals",
+                description: "Research company fundamentals including P/E ratio, earnings, EPS, analyst ratings, and price targets for a specific stock. Returns an AI-generated summary with sources."),
+
+            AIFunctionFactory.Create(
+                method: (string ticker, string companyName) => toolExecutor("GetCompanyOverview", new Dictionary<string, object> { ["ticker"] = ticker, ["companyName"] = companyName }),
+                name: "GetCompanyOverview",
+                description: "Get a general overview of a company including its business model, competitive position, and recent strategic developments.")
         };
 
         return functions;

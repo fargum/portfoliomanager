@@ -127,6 +127,10 @@ builder.Services.AddInfrastructureServices();
 builder.Services.Configure<EodApiOptions>(
     builder.Configuration.GetSection(EodApiOptions.SectionName));
 
+// Configure Tavily search API options
+builder.Services.Configure<TavilyOptions>(
+    builder.Configuration.GetSection(TavilyOptions.SectionName));
+
 // Configure Azure Foundry options
 builder.Services.Configure<AzureFoundryOptions>(
     builder.Configuration.GetSection(AzureFoundryOptions.SectionName));

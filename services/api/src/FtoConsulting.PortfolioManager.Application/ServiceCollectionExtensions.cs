@@ -127,7 +127,8 @@ public static class ServiceCollectionExtensions
             return new MarketIntelligenceTool(factory);
         });
         services.AddScoped<EodMarketDataTool>();
-        
+        services.AddScoped<TavilySearchTool>();
+
         // Register AI services
         services.AddSingleton<IAgentPromptService, AgentPromptService>();
         
