@@ -151,6 +151,9 @@ public class MockHoldingService : IHoldingService
     public Task<IEnumerable<Holding>> GetHoldingsByAccountAndDateAsync(int accountId, DateOnly date, CancellationToken cancellationToken)
         => Task.FromResult(Enumerable.Empty<Holding>());
 
+    public Task<IEnumerable<Holding>> GetHoldingsByAccountDateAndTickerAsync(int accountId, DateOnly valuationDate, string ticker, CancellationToken cancellationToken)
+        => Task.FromResult(Enumerable.Empty<Holding>());
+
     public Task<HoldingAddResult> AddHoldingAsync(int portfolioId, AddHoldingRequest request, int accountId, CancellationToken cancellationToken)
         => Task.FromResult(new HoldingAddResult { Success = true, Message = "Mock add" });
         

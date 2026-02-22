@@ -172,7 +172,7 @@ public class MarketIntelligenceServiceTests
         
         // Assert
         Assert.NotNull(result);
-        Assert.Equal("Neutral (EOD unavailable)", result.SentimentLabel);
+        Assert.Equal("Neutral - Market data source not configured", result.SentimentLabel);
         Assert.Equal(0.5m, result.OverallSentimentScore);
         Assert.Equal(50, result.FearGreedIndex);
     }

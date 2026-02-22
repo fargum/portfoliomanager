@@ -23,20 +23,23 @@ public class PortfolioHoldingsTool
     public async Task<object> GetPortfolioHoldings(
         [Description("Account ID")] int accountId,
         [Description("Date for holdings analysis. Use 'today' or current date (YYYY-MM-DD) for real-time data, or specify historical date in various formats (YYYY-MM-DD, DD/MM/YYYY, DD MMMM YYYY, etc.)")] string date,
+        [Description("Optional ticker symbol to filter results (e.g. 'MSFT'). When provided, only returns holdings for that instrument.")] string? ticker = null,
         CancellationToken cancellationToken = default)
     {
         // Smart date handling: if asking for 'today', 'current', or similar, use today's date
         var effectiveDate = date;
-        if (string.IsNullOrEmpty(date) || 
-            date.ToLowerInvariant().Contains("today") || 
+        if (string.IsNullOrEmpty(date) ||
+            date.ToLowerInvariant().Contains("today") ||
             date.ToLowerInvariant().Contains("current") ||
             date.ToLowerInvariant().Contains("now"))
         {
             effectiveDate = DateTime.UtcNow.ToString("yyyy-MM-dd");
         }
-        
+
         var parsedDate = DateUtilities.ParseDate(effectiveDate);
-        var holdings = await _holdingService.GetHoldingsByAccountAndDateAsync(accountId, parsedDate, cancellationToken);
+        var holdings = !string.IsNullOrWhiteSpace(ticker)
+            ? await _holdingService.GetHoldingsByAccountDateAndTickerAsync(accountId, parsedDate, ticker, cancellationToken)
+            : await _holdingService.GetHoldingsByAccountAndDateAsync(accountId, parsedDate, cancellationToken);
         
         return new
         {

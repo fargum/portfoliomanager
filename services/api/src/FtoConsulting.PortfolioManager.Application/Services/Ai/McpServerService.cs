@@ -253,8 +253,9 @@ public class McpServerService(
     {
         var accountId = Convert.ToInt32(parameters["accountId"]);
         var date = parameters["date"].ToString()!;
+        var ticker = parameters.TryGetValue("ticker", out var tickerVal) ? tickerVal?.ToString() : null;
         
-        return await portfolioHoldingsTool.GetPortfolioHoldings(accountId, date, cancellationToken);
+        return await portfolioHoldingsTool.GetPortfolioHoldings(accountId, date, ticker, cancellationToken);
     }
 
     private async Task<object> ExecuteAnalyzePortfolioPerformance(Dictionary<string, object> parameters, CancellationToken cancellationToken)

@@ -157,6 +157,73 @@ public class HoldingsController(
     }
 
     /// <summary>
+    /// Retrieve holdings filtered by ticker symbol for the current authenticated user and valuation date
+    /// </summary>
+    /// <param name="ticker">The ticker symbol to filter by (e.g. MSFT)</param>
+    /// <param name="valuationDate">The valuation date to retrieve holdings for (YYYY-MM-DD format)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Collection of holdings for the specified ticker and date</returns>
+    /// <response code="200">Returns holdings matching the ticker for the authenticated user and date</response>
+    /// <response code="404">No holdings found for the specified ticker and date</response>
+    /// <response code="500">Internal server error occurred while retrieving holdings</response>
+    [HttpGet("ticker/{ticker}/date/{valuationDate:datetime}")]
+    [ProducesResponseType(typeof(AccountHoldingsResponse), (int)HttpStatusCode.OK)]
+    [ProducesResponseType(typeof(ProblemDetails), (int)HttpStatusCode.NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), (int)HttpStatusCode.InternalServerError)]
+    public async Task<ActionResult<AccountHoldingsResponse>> GetHoldingsByTickerAndDate(
+        [FromRoute] string ticker,
+        [FromRoute] DateTime valuationDate,
+        CancellationToken cancellationToken = default)
+    {
+        using var activity = s_activitySource.StartActivity("GetHoldingsByTickerAndDate");
+
+        var accountId = await currentUserService.GetCurrentUserAccountIdAsync();
+        logger.LogInformation("GetHoldingsByTickerAndDate: AccountId={AccountId}, Ticker={Ticker}, Date={Date}", accountId, ticker, valuationDate);
+
+        activity?.SetTag("account.id", accountId.ToString());
+        activity?.SetTag("ticker", ticker);
+        activity?.SetTag("valuation.date", valuationDate.ToString("yyyy-MM-dd"));
+
+        try
+        {
+            var dateOnly = DateOnly.FromDateTime(valuationDate);
+            var holdings = await holdingService.GetHoldingsByAccountDateAndTickerAsync(accountId, dateOnly, ticker, cancellationToken);
+
+            if (!holdings.Any())
+            {
+                activity?.SetStatus(ActivityStatusCode.Error, "Holdings not found");
+                logger.LogInformation("No holdings found for account {AccountId}, ticker {Ticker} on date {ValuationDate}", accountId, ticker, dateOnly);
+                return NotFound(new ProblemDetails
+                {
+                    Title = "Holdings Not Found",
+                    Detail = $"No holdings found for ticker {ticker} on date {dateOnly:yyyy-MM-dd}",
+                    Status = (int)HttpStatusCode.NotFound
+                });
+            }
+
+            var response = mappingService.MapToAccountHoldingsResponse(holdings, accountId, dateOnly);
+            activity?.SetStatus(ActivityStatusCode.Ok);
+            activity?.SetTag("holdings.count", response.TotalHoldings.ToString());
+
+            logger.LogInformation("Successfully retrieved {Count} holdings for ticker {Ticker}, account {AccountId} on {Date}",
+                response.TotalHoldings, ticker, accountId, dateOnly);
+
+            return Ok(response);
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            logger.LogError(ex, "Error retrieving holdings for ticker {Ticker}, account {AccountId}", ticker, accountId);
+            return StatusCode((int)HttpStatusCode.InternalServerError, new ProblemDetails
+            {
+                Title = "Internal Server Error",
+                Detail = "An error occurred while retrieving holdings data",
+                Status = (int)HttpStatusCode.InternalServerError
+            });
+        }
+    }
+
+    /// <summary>
     /// Add a new holding to a portfolio
     /// </summary>
     /// <param name="portfolioId">The portfolio ID to add the holding to</param>

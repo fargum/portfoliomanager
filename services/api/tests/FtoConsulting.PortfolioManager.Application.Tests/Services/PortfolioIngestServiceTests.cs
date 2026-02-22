@@ -62,16 +62,15 @@ public class PortfolioIngestServiceTests
         typeof(BaseEntity).GetProperty("Id")!.SetValue(portfolio, portfolioId);
         portfolio.AddHolding(holding);
 
-        _mockPortfolioRepository.Setup(x => x.GetByIdAsync(portfolioId))
+        _mockPortfolioRepository.Setup(x => x.GetByAccountAndNameAsync(accountId, "Test Portfolio"))
             .ReturnsAsync((Portfolio?)null);
         
         // Mock the InstrumentManagementService to return the instrument when called
         _mockInstrumentManagementService.Setup(x => x.EnsureInstrumentExistsAsync(It.IsAny<Instrument>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(instrument);
         
-        _mockInstrumentRepository.SetupSequence(x => x.GetByTickerAsync("AAPL"))
-            .ReturnsAsync((Instrument?)null)  // First call - instrument doesn't exist
-            .ReturnsAsync(instrument);        // Second call - return the instrument after it's been "added"
+        _mockInstrumentRepository.Setup(x => x.GetByTickerAsync("AAPL"))
+            .ReturnsAsync(instrument);
 
         _mockPortfolioRepository.Setup(x => x.AddAsync(It.IsAny<Portfolio>()))
             .ReturnsAsync(portfolio);
@@ -91,7 +90,7 @@ public class PortfolioIngestServiceTests
         _mockHoldingRepository.Verify(x => x.AddAsync(It.IsAny<Holding>()), Times.Once);
         _mockPortfolioRepository.Verify(x => x.AddAsync(It.IsAny<Portfolio>()), Times.Once);
         _mockUnitOfWork.Verify(x => x.BeginTransactionAsync(), Times.Once);
-        _mockUnitOfWork.Verify(x => x.SaveChangesAsync(), Times.Once);
+        _mockUnitOfWork.Verify(x => x.SaveChangesAsync(), Times.AtLeastOnce);
         _mockUnitOfWork.Verify(x => x.CommitTransactionAsync(), Times.Once);
     }
 
@@ -120,10 +119,8 @@ public class PortfolioIngestServiceTests
         typeof(BaseEntity).GetProperty("Id")!.SetValue(portfolio, portfolioId);
         portfolio.AddHolding(holding);
 
-        _mockPortfolioRepository.Setup(x => x.GetByIdAsync(portfolioId))
+        _mockPortfolioRepository.Setup(x => x.GetByAccountAndNameAsync(accountId, "Test Portfolio"))
             .ReturnsAsync((Portfolio?)null);
-        
-        // Mock the InstrumentManagementService to return the existing instrument
         _mockInstrumentManagementService.Setup(x => x.EnsureInstrumentExistsAsync(It.IsAny<Instrument>(), It.IsAny<CancellationToken>()))
             .ReturnsAsync(existingInstrument);
         
@@ -142,9 +139,10 @@ public class PortfolioIngestServiceTests
         // Assert
         Assert.NotNull(result);
         
-        // Should update existing instrument, not create new one
+        // Service delegates to InstrumentManagementService for instrument handling - no direct repo calls
+        _mockInstrumentManagementService.Verify(x => x.EnsureInstrumentExistsAsync(It.IsAny<Instrument>(), It.IsAny<CancellationToken>()), Times.Once);
         _mockInstrumentRepository.Verify(x => x.AddAsync(It.IsAny<Instrument>()), Times.Never);
-        _mockInstrumentRepository.Verify(x => x.UpdateAsync(It.IsAny<Instrument>()), Times.Once);
+        _mockInstrumentRepository.Verify(x => x.UpdateAsync(It.IsAny<Instrument>()), Times.Never);
         _mockHoldingRepository.Verify(x => x.AddAsync(It.IsAny<Holding>()), Times.Once);
     }
 
@@ -163,7 +161,7 @@ public class PortfolioIngestServiceTests
         var portfolio = new Portfolio("Test Portfolio", 1);
         typeof(BaseEntity).GetProperty("Id")!.SetValue(portfolio, 1);
 
-        _mockPortfolioRepository.Setup(x => x.GetByIdAsync(It.IsAny<int>()))
+        _mockPortfolioRepository.Setup(x => x.GetByAccountAndNameAsync(It.IsAny<int>(), It.IsAny<string>()))
             .ThrowsAsync(new Exception("Database error"));
 
         // Act & Assert

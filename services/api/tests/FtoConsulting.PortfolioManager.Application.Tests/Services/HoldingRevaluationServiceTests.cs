@@ -84,7 +84,7 @@ public class HoldingRevaluationServiceTests
         };
 
         _holdingRepositoryMock
-            .Setup(x => x.GetLatestValuationDateAsync(It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetLatestValuationDateBeforeAsync(valuationDate, It.IsAny<CancellationToken>()))
             .ReturnsAsync(sourceDate);
 
         _holdingRepositoryMock
@@ -98,6 +98,14 @@ public class HoldingRevaluationServiceTests
         _instrumentPriceRepositoryMock
             .Setup(x => x.GetByValuationDateAsync(valuationDate, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[] { instrumentPrice });
+
+        // GBX: 12000 pence / 100 = 120 GBP per unit × 100 units = 12,000 GBP
+        _pricingCalculationServiceMock
+            .Setup(x => x.ApplyScalingFactor(instrumentPrice.Price, "AAPL"))
+            .Returns(instrumentPrice.Price);
+        _pricingCalculationServiceMock
+            .Setup(x => x.CalculateCurrentValueAsync(100m, instrumentPrice.Price, "GBX", "GBX", valuationDate))
+            .ReturnsAsync(12000m);
 
         // Act
         var result = await _service.RevalueHoldingsAsync(valuationDate);
@@ -154,7 +162,7 @@ public class HoldingRevaluationServiceTests
 
         // Setup existing revaluation mocks
         _holdingRepositoryMock
-            .Setup(x => x.GetLatestValuationDateAsync(It.IsAny<CancellationToken>()))
+            .Setup(x => x.GetLatestValuationDateBeforeAsync(valuationDate, It.IsAny<CancellationToken>()))
             .ReturnsAsync(sourceDate);
 
         _holdingRepositoryMock
@@ -168,6 +176,14 @@ public class HoldingRevaluationServiceTests
         _instrumentPriceRepositoryMock
             .Setup(x => x.GetByValuationDateAsync(valuationDate, It.IsAny<CancellationToken>()))
             .ReturnsAsync(new[] { instrumentPrice });
+
+        // GBP: 105 × 100 units = 10,500 GBP
+        _pricingCalculationServiceMock
+            .Setup(x => x.ApplyScalingFactor(instrumentPrice.Price, "TEST.LSE"))
+            .Returns(instrumentPrice.Price);
+        _pricingCalculationServiceMock
+            .Setup(x => x.CalculateCurrentValueAsync(100m, instrumentPrice.Price, "GBP", "GBP", valuationDate))
+            .ReturnsAsync(10500m);
 
         // Act
         var result = await _service.FetchPricesAndRevalueHoldingsAsync(valuationDate);

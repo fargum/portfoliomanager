@@ -69,6 +69,24 @@ public class HoldingRepository : Repository<Holding>, IHoldingRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IEnumerable<Holding>> GetHoldingsByAccountDateAndTickerAsync(int accountId, DateOnly valuationDate, string ticker, CancellationToken cancellationToken)
+    {
+        var targetDate = DateTime.SpecifyKind(valuationDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
+        var upperTicker = ticker.ToUpperInvariant();
+        return await _dbSet
+            .Where(h => h.Portfolio.AccountId == accountId
+                       && h.ValuationDate.Date == targetDate.Date
+                       && h.Instrument.Ticker == upperTicker)
+            .Include(h => h.Instrument)
+                .ThenInclude(i => i.InstrumentType)
+            .Include(h => h.Platform)
+            .Include(h => h.Portfolio)
+                .ThenInclude(p => p.Account)
+            .OrderBy(h => h.Portfolio.Name)
+            .ThenBy(h => h.Instrument.Name)
+            .ToListAsync(cancellationToken);
+    }
+
     public async Task<IEnumerable<string>> GetDistinctTickersByDateAsync(DateTime valuationDate, CancellationToken cancellationToken = default)
     {
         return await _dbSet

@@ -19,6 +19,11 @@ public interface IHoldingService
     /// <returns>Collection of holdings with their related instrument and portfolio data</returns>
     Task<IEnumerable<Holding>> GetHoldingsByAccountAndDateAsync(int accountId, DateOnly valuationDate, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Retrieves holdings for a given account, date, and ticker symbol
+    /// </summary>
+    Task<IEnumerable<Holding>> GetHoldingsByAccountDateAndTickerAsync(int accountId, DateOnly valuationDate, string ticker, CancellationToken cancellationToken = default);
+
     // Create Operations
     
     /// <summary>

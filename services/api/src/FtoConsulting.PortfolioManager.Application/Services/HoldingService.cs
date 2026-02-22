@@ -99,6 +99,78 @@ public class HoldingService(
     }
 
     /// <summary>
+    /// Retrieves holdings for a given account, date, and ticker symbol
+    /// Mirrors GetHoldingsByAccountAndDateAsync but filters to a single ticker
+    /// </summary>
+    public async Task<IEnumerable<Holding>> GetHoldingsByAccountDateAndTickerAsync(int accountId, DateOnly valuationDate, string ticker, CancellationToken cancellationToken = default)
+    {
+        logger.LogInformation("Retrieving holdings for account {AccountId} on date {ValuationDate} filtered by ticker {Ticker}", accountId, valuationDate, ticker);
+
+        try
+        {
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            IEnumerable<Holding> holdings;
+
+            if (valuationDate < today)
+            {
+                holdings = await holdingRepository.GetHoldingsByAccountDateAndTickerAsync(accountId, valuationDate, ticker, cancellationToken);
+                logger.LogInformation("Retrieved {Count} historical holdings for account {AccountId} on date {ValuationDate} for ticker {Ticker}",
+                    holdings.Count(), accountId, valuationDate, ticker);
+                return holdings;
+            }
+
+            if (valuationDate > today)
+            {
+                logger.LogWarning("Future date {ValuationDate} requested, returning empty holdings", valuationDate);
+                return Enumerable.Empty<Holding>();
+            }
+
+            holdings = await holdingRepository.GetHoldingsByAccountDateAndTickerAsync(accountId, valuationDate, ticker, cancellationToken);
+            if (holdings.Any())
+            {
+                logger.LogInformation("Retrieved {Count} holdings for account {AccountId} on today's date {ValuationDate} for ticker {Ticker}",
+                    holdings.Count(), accountId, valuationDate, ticker);
+                return holdings;
+            }
+
+            // Real-time data - get the most recent holdings for this ticker and apply real-time pricing
+            var latestDate = await holdingRepository.GetLatestValuationDateAsync(cancellationToken);
+            if (latestDate.HasValue)
+            {
+                var allLatestHoldings = await holdingRepository.GetHoldingsByValuationDateWithInstrumentsNoTrackingAsync(latestDate.Value, cancellationToken);
+                var upperTicker = ticker.ToUpperInvariant();
+                holdings = allLatestHoldings
+                    .Where(h => h.Portfolio.AccountId == accountId && h.Instrument?.Ticker?.ToUpperInvariant() == upperTicker)
+                    .ToList();
+                logger.LogInformation("Retrieved {Count} latest holdings for account {AccountId} from date {LatestDate} for ticker {Ticker} (no tracking)",
+                    holdings.Count(), accountId, latestDate.Value, ticker);
+
+                if (eodMarketDataToolFactory != null)
+                {
+                    logger.LogInformation("Applying real-time pricing for ticker {Ticker} on date {Date}", ticker, valuationDate);
+                    holdings = await ApplyRealTimePricing(holdings.ToList(), valuationDate, cancellationToken);
+                }
+                else
+                {
+                    logger.LogWarning("EOD market data tool not available for real-time pricing, returning latest holdings with historical prices");
+                }
+            }
+            else
+            {
+                logger.LogWarning("No historical holdings found for account {AccountId}, returning empty holdings", accountId);
+                holdings = Enumerable.Empty<Holding>();
+            }
+
+            return holdings;
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Error retrieving holdings for account {AccountId} on date {ValuationDate} for ticker {Ticker}", accountId, valuationDate, ticker);
+            throw;
+        }
+    }
+
+    /// <summary>
     /// Adds a new holding to a portfolio for the latest valuation date
     /// </summary>
     public async Task<HoldingAddResult> AddHoldingAsync(
