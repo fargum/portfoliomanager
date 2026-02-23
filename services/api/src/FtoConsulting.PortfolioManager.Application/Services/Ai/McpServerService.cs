@@ -206,6 +206,7 @@ public class McpServerService(
             return toolName switch
             {
                 "GetPortfolioHoldings" => await ExecuteGetPortfolioHoldings(parameters, cancellationToken),
+                "GetHoldingByTicker" => await ExecuteGetPortfolioHoldings(parameters, cancellationToken),
                 "AnalyzePortfolioPerformance" => await ExecuteAnalyzePortfolioPerformance(parameters, cancellationToken),
                 "ComparePortfolioPerformance" => await ExecuteComparePortfolioPerformance(parameters, cancellationToken),
                 "GetMarketContext" => await ExecuteGetMarketContext(parameters, cancellationToken),

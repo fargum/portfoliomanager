@@ -79,6 +79,17 @@ public static class PortfolioToolRegistry
         ),
 
         new PortfolioToolDefinition(
+            Name: "GetHoldingByTicker",
+            Description: "Retrieve the user's current position in a specific stock by ticker symbol. Use this when the user asks about their position, holding, or exposure in a named company or stock — instead of fetching the entire portfolio.",
+            Parameters: new Dictionary<string, ToolParameterDefinition>
+            {
+                ["ticker"] = new ToolParameterDefinition("string", "Ticker symbol of the stock to look up (e.g. 'DIS', 'AAPL')", true),
+                ["date"] = new ToolParameterDefinition("string", "Date for the holding lookup. Use 'today' for current position, or a historical date in YYYY-MM-DD format.", true)
+            },
+            Category: "Portfolio Data"
+        ),
+
+        new PortfolioToolDefinition(
             Name: "SearchRecentNews",
             Description: "Search for recent news articles about specific stock tickers from the past week. Use this for up-to-date market news, company announcements, and market-moving events.",
             Parameters: new Dictionary<string, ToolParameterDefinition>
@@ -174,6 +185,11 @@ public static class PortfolioToolRegistry
                 method: (string[] tickers) => toolExecutor("GetRealTimePrices", new Dictionary<string, object> { ["tickers"] = tickers }),
                 name: "GetRealTimePrices",
                 description: "Get current real-time stock prices for specific tickers. Use this when the user asks for current price, live price, real-time price, or what a stock is trading at right now."),
+
+            AIFunctionFactory.Create(
+                method: (string ticker, string date) => toolExecutor("GetHoldingByTicker", new Dictionary<string, object> { ["accountId"] = authenticatedAccountId, ["ticker"] = ticker, ["date"] = date }),
+                name: "GetHoldingByTicker",
+                description: "Retrieve the user's current position in a specific stock by ticker symbol. Use this when the user asks about their position, holding, or exposure in a named company or stock — instead of fetching the entire portfolio."),
 
             AIFunctionFactory.Create(
                 method: (string[] tickers, string companyNames) => toolExecutor("SearchRecentNews", new Dictionary<string, object> { ["tickers"] = tickers, ["companyNames"] = companyNames }),
