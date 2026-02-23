@@ -241,8 +241,9 @@ For casual conversation, respond naturally without using tools.";
             .GetChatClient(effectiveModelId)
             .AsIChatClient()
             .AsBuilder()
-            .UseOpenTelemetry(sourceName: "PortfolioManager.AI", 
+            .UseOpenTelemetry(sourceName: "PortfolioManager.AI",
                              configure: cfg => cfg.EnableSensitiveData = true) // Enable sensitive data for token metrics
+            .UseFunctionInvocation(configure: c => c.AllowConcurrentInvocation = true)
             .Build();
         
         // Wrap with token tracking for detailed usage monitoring
@@ -268,6 +269,7 @@ For casual conversation, respond naturally without using tools.";
         var agent = chatClient.AsAIAgent(new ChatClientAgentOptions
         {
             ChatOptions = secureChatOptions,
+            UseProvidedChatClientAsIs = true, // We add our own FunctionInvokingChatClient with AllowConcurrentInvocation=true
             ChatHistoryProviderFactory = (ctx, ct) => new ValueTask<ChatHistoryProvider>(chatMessageStoreFactory(accountId, threadId, ctx.JsonSerializerOptions)),
             AIContextProviderFactory = (ctx, ct) => new ValueTask<AIContextProvider>(memoryContextProviderFactory(accountId, chatClient))
         });
