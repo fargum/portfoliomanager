@@ -45,13 +45,11 @@ public class MarketIntelligenceService : IMarketIntelligenceService
             var news = await GetNewsAsync(tickers, date);
             var sentiment = await GetSentimentAsync(date, tickers);
 
-            // Generate AI-powered market summary
-            var marketSummary = await GenerateMarketSummaryAsync(tickers, news, sentiment, Array.Empty<MarketIndexDto>(), cancellationToken);
-
+            // Return raw data — the outer chat agent synthesises the summary, no need for a nested LLM call here
             return new MarketContextDto(
                 Tickers: tickers,
                 Date: date,
-                MarketSummary: marketSummary,
+                MarketSummary: string.Empty,
                 RelevantNews: news,
                 Sentiment: sentiment,
                 Indices: Array.Empty<MarketIndexDto>()
