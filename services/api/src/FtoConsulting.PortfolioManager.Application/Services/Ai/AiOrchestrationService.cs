@@ -268,9 +268,9 @@ For casual conversation, respond naturally without using tools.";
         var agent = chatClient.AsAIAgent(new ChatClientAgentOptions
         {
             ChatOptions = secureChatOptions,
-            ChatHistoryProvider = chatMessageStoreFactory(accountId, threadId, null),
-            AIContextProviders = [memoryContextProviderFactory(accountId, chatClient)]
-        }, loggerFactory);
+            ChatHistoryProviderFactory = (ctx, ct) => new ValueTask<ChatHistoryProvider>(chatMessageStoreFactory(accountId, threadId, ctx.JsonSerializerOptions)),
+            AIContextProviderFactory = (ctx, ct) => new ValueTask<AIContextProvider>(memoryContextProviderFactory(accountId, chatClient))
+        });
 
         logger.LogInformation("Memory store and context provider configured for agent on thread {ThreadId}", threadId);
 

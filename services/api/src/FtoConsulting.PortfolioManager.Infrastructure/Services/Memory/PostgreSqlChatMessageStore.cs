@@ -40,6 +40,11 @@ public class PostgreSqlChatMessageStore : ChatHistoryProvider, ITokenAwareChatMe
         }
     }
 
+    public override JsonElement Serialize(JsonSerializerOptions? jsonSerializerOptions)
+    {
+        return JsonSerializer.SerializeToElement(_conversationThreadId);
+    }
+
     /// <summary>
     /// Called after agent invocation to persist new messages to the conversation thread
     /// </summary>
