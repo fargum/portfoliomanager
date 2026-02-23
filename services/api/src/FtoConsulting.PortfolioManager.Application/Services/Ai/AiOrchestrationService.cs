@@ -241,9 +241,9 @@ For casual conversation, respond naturally without using tools.";
             .GetChatClient(effectiveModelId)
             .AsIChatClient()
             .AsBuilder()
-            .UseOpenTelemetry(sourceName: "PortfolioManager.AI",
-                             configure: cfg => cfg.EnableSensitiveData = true) // Enable sensitive data for token metrics
             .UseFunctionInvocation(configure: c => c.AllowConcurrentInvocation = true)
+            .UseOpenTelemetry(sourceName: "PortfolioManager.AI",
+                             configure: cfg => cfg.EnableSensitiveData = true) // Outermost: spans are children of the HTTP request activity
             .Build();
         
         // Wrap with token tracking for detailed usage monitoring
