@@ -120,6 +120,16 @@ public static class PortfolioToolRegistry
                 ["companyName"] = new ToolParameterDefinition("string", "Company name (e.g. Apple Inc)", false)
             },
             Category: "Market Intelligence"
+        ),
+
+        new PortfolioToolDefinition(
+            Name: "GetMarketOverview",
+            Description: "Get a broad overview of current market conditions, major indices, and top financial news. Use this for general questions like 'how are markets doing today?', 'what's happening in the markets?', or 'any big stories today?' — no specific tickers needed. Optionally focus on a region or sector.",
+            Parameters: new Dictionary<string, ToolParameterDefinition>
+            {
+                ["focus"] = new ToolParameterDefinition("string", "Optional focus area, e.g. 'UK', 'US', 'tech', 'energy', 'bonds'. Leave empty for global overview.", false)
+            },
+            Category: "Market Intelligence"
         )
     };
 
@@ -204,7 +214,12 @@ public static class PortfolioToolRegistry
             AIFunctionFactory.Create(
                 method: (string ticker, string companyName) => toolExecutor("GetCompanyOverview", new Dictionary<string, object> { ["ticker"] = ticker, ["companyName"] = companyName }),
                 name: "GetCompanyOverview",
-                description: "Get a general overview of a company including its business model, competitive position, and recent strategic developments.")
+                description: "Get a general overview of a company including its business model, competitive position, and recent strategic developments."),
+
+            AIFunctionFactory.Create(
+                method: (string? focus) => toolExecutor("GetMarketOverview", new Dictionary<string, object> { ["focus"] = focus ?? string.Empty }),
+                name: "GetMarketOverview",
+                description: "Get a broad overview of current market conditions, major indices, and top financial news. Use this for general questions like 'how are markets doing today?', 'what's happening in the markets?', or 'any big stories today?' — no specific tickers needed. Optionally focus on a region or sector.")
         };
 
         return functions;

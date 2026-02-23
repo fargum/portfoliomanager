@@ -28,6 +28,18 @@ public class TavilySearchTool
         "finance.yahoo.com"
     ];
 
+    private static readonly string[] MarketNewsDomains =
+    [
+        "reuters.com",
+        "finance.yahoo.com",
+        "marketwatch.com",
+        "cnbc.com",
+        "ft.com",
+        "bloomberg.com",
+        "bbc.co.uk",
+        "investing.com"
+    ];
+
     public TavilySearchTool(
         ILogger<TavilySearchTool> logger,
         IOptions<TavilyOptions> tavilyOptions)
@@ -179,6 +191,59 @@ public class TavilySearchTool
         {
             _logger.LogError(ex, "Error getting company overview via Tavily for {Ticker}", ticker);
             return new { Error = "Failed to get company overview", Ticker = ticker };
+        }
+    }
+
+    [Description("Get a broad overview of current market conditions, major indices, and top financial news. Use this for general questions like 'how are markets doing today?', 'what's happening in the markets?', or 'any big stories today?' — no specific tickers needed. Optionally focus on a region or sector.")]
+    public async Task<object> GetMarketOverview(
+        [Description("Optional focus area to narrow the search, e.g. 'UK', 'US', 'tech', 'energy', 'bonds'. Leave empty for a global market overview.")] string? focus = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrEmpty(_tavilyOptions.ApiKey))
+        {
+            _logger.LogWarning("Tavily API key not configured — cannot fetch market overview");
+            return new { Error = "Tavily API key not configured" };
+        }
+
+        try
+        {
+            var focusPart = string.IsNullOrWhiteSpace(focus) ? string.Empty : $" {focus.Trim()}";
+            var query = $"stock market news today major indices{focusPart}";
+
+            _logger.LogInformation("Fetching market overview via Tavily. Query: {Query}", query);
+
+            var requestBody = new
+            {
+                query,
+                topic = "news",
+                time_range = "day",
+                search_depth = "advanced",
+                include_answer = "advanced",
+                max_results = 10,
+                include_domains = MarketNewsDomains
+            };
+
+            var response = await PostToTavilyAsync("/search", requestBody, cancellationToken);
+            if (response == null)
+                return new { Focus = focus, Summary = (string?)null, News = Array.Empty<NewsItemDto>() };
+
+            var summary = ExtractAnswer(response.Value);
+            var news = ParseNewsResults(response.Value);
+
+            _logger.LogInformation("Tavily market overview complete. Summary length: {Length}, News items: {Count}",
+                summary?.Length ?? 0, news.Count);
+
+            return new
+            {
+                Focus = string.IsNullOrWhiteSpace(focus) ? "Global" : focus,
+                Summary = summary,
+                News = news
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error fetching market overview via Tavily");
+            return new { Error = "Failed to retrieve market overview" };
         }
     }
 

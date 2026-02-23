@@ -7,7 +7,8 @@
         "Show me my portfolio\" or \"What do I own?",
         "How am I doing this month?\" or \"What's my performance?",
         "Any news on Microsoft stock?\" or \"What's happening with HSBC?",
-        "How's the market looking today?"
+        "How's the market looking today?\" or \"What's happening in the markets?\" or \"Any big stories today?\" → use GetMarketOverview (no tickers needed)",
+        "How are UK markets doing?\" or \"What's the mood in tech today?\" → use GetMarketOverview with a focus (e.g. 'UK', 'tech')"
       ],
       "WhenNotToUseTools": [
         "Greetings like \"Hi there!\" or \"How are you?",

@@ -215,6 +215,7 @@ public class McpServerService(
                 "SearchRecentNews" => await ExecuteSearchRecentNews(parameters, cancellationToken),
                 "ResearchCompanyFundamentals" => await ExecuteResearchCompanyFundamentals(parameters, cancellationToken),
                 "GetCompanyOverview" => await ExecuteGetCompanyOverview(parameters, cancellationToken),
+                "GetMarketOverview" => await ExecuteGetMarketOverview(parameters, cancellationToken),
                 _ => throw new ArgumentException($"Unknown tool: {toolName}")
             };
         }
@@ -329,6 +330,13 @@ public class McpServerService(
         var companyName = parameters.TryGetValue("companyName", out var cn) ? cn.ToString()! : ticker;
 
         return await tavilySearchTool.GetCompanyOverview(ticker, companyName, cancellationToken);
+    }
+
+    private async Task<object> ExecuteGetMarketOverview(Dictionary<string, object> parameters, CancellationToken cancellationToken)
+    {
+        var focus = parameters.TryGetValue("focus", out var f) ? f?.ToString() : null;
+
+        return await tavilySearchTool.GetMarketOverview(focus, cancellationToken);
     }
 
     /// <summary>
