@@ -178,15 +178,6 @@ public class PostgreSqlChatMessageStore : ChatHistoryProvider, ITokenAwareChatMe
     }
 
     /// <summary>
-    /// Serialize the store state for persistence
-    /// </summary>
-    public override JsonElement Serialize(JsonSerializerOptions jsonSerializerOptions)
-    {
-        // Serialize the conversation thread ID for restoration
-        return JsonSerializer.SerializeToElement(_conversationThreadId);
-    }
-
-    /// <summary>
     /// Ensure we have a conversation thread, creating one if necessary
     /// </summary>
     private async Task EnsureConversationThreadAsync(CancellationToken cancellationToken)

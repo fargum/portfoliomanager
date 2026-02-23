@@ -146,14 +146,6 @@ public class PortfolioMemoryContextProvider : AIContextProvider
     }
 
     /// <summary>
-    /// Serialize the memory state for persistence
-    /// </summary>
-    public override JsonElement Serialize(JsonSerializerOptions jsonSerializerOptions)
-    {
-        return JsonSerializer.SerializeToElement(_memoryState, jsonSerializerOptions);
-    }
-
-    /// <summary>
     /// Load recent conversation summaries using tiered memory approach with token budgeting
     /// </summary>
     private async Task LoadRecentSummariesAsync(StringBuilder instructions, CancellationToken cancellationToken)
