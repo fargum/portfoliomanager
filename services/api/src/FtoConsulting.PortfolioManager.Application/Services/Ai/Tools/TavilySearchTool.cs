@@ -21,10 +21,10 @@ public class TavilySearchTool
     [
         "stockanalysis.com",
         "macrotrends.net",
-        "simplywall.st",
+        "dividendmax.com",
+        "hl.co.uk",
         "marketwatch.com",
         "finviz.com",
-        "reuters.com",
         "finance.yahoo.com"
     ];
 
@@ -93,7 +93,7 @@ public class TavilySearchTool
         }
     }
 
-    [Description("Research company fundamentals including P/E ratio, earnings, EPS, analyst ratings, and price targets for a specific stock. Returns an AI-generated summary with sources.")]
+    [Description("Research company fundamentals including P/E ratio, dividend yield, earnings, EPS, analyst ratings, and price targets for a specific stock. Returns an AI-generated summary with sources.")]
     public async Task<object> ResearchCompanyFundamentals(
         [Description("Stock ticker symbol (e.g. AAPL)")] string ticker,
         [Description("Company name (e.g. Apple Inc)")] string companyName,
@@ -107,8 +107,7 @@ public class TavilySearchTool
 
         try
         {
-            var query = $"{companyName} {ticker} P/E ratio earnings EPS analyst rating price target valuation 2025";
-
+            var query = $"{companyName} {ticker} P/E ratio EPS earnings per share analyst price target dividend yield payout ratio ex-dividend date dividend cover 2026";
             _logger.LogInformation("Researching fundamentals via Tavily for {Ticker} ({CompanyName})", ticker, companyName);
 
             var requestBody = new
