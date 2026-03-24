@@ -37,12 +37,19 @@ public class PortfolioReportService : IPortfolioReportService
 
         // Build the prompt — the agent will call all the right tools itself
         var prompt = reportType == ReportType.Morning
-            ? "Generate a concise morning portfolio briefing for me. Check my current holdings with live prices, " +
-              "identify any significant movers, search for relevant news on those movers only, and give me a " +
-              "150-200 word summary I can read in under a minute. Focus on what matters for today's session."
-            : "Generate a concise end-of-day portfolio summary for me. Check my current holdings with live prices, " +
-              "identify today's significant movers, search for relevant news explaining what drove them, and give me a " +
-              "150-200 word summary. Highlight anything I should watch heading into tomorrow.";
+            ? "Generate a morning portfolio briefing. Follow this exact structure — do not deviate, do not add a closing question or offer further help:\n\n" +
+              "1. **Portfolio Snapshot** — total portfolio value in GBP, today's overall gain/loss in GBP and percent.\n\n" +
+              "2. **Top 5 Gainers** — format as an HTML table with columns: Holding | Price | Today (GBP) | Today (%)\n\n" +
+              "3. **Top 5 Losers** — same HTML table format.\n\n" +
+              "4. **Market & News Summary** — 3-4 sentences on what is driving markets today and any relevant news for the above movers. Include hyperlinks using HTML <a href='url'>text</a> format.\n\n" +
+              "Rules: output plain text and HTML only — no markdown, no asterisks, no hash headings, no bullet dashes. Use <strong> for bold. Do not end with a question or offer of further assistance."
+            : "Generate an end-of-day portfolio summary. Follow this exact structure — do not deviate, do not add a closing question or offer further help:\n\n" +
+              "1. **Portfolio Snapshot** — total portfolio value in GBP, today's overall gain/loss in GBP and percent, and overall gain/loss since cost.\n\n" +
+              "2. **Top 5 Gainers today** — format as an HTML table with columns: Holding | Price | Today (GBP) | Today (%)\n\n" +
+              "3. **Top 5 Losers today** — same HTML table format.\n\n" +
+              "4. **Market & News Summary** — 3-4 sentences on what drove markets today and any relevant news for the above movers. Include hyperlinks using HTML <a href='url'>text</a> format.\n\n" +
+              "5. **Watch list for tomorrow** — 2-3 bullet points on what to watch overnight or at open.\n\n" +
+              "Rules: output plain text and HTML only — no markdown, no asterisks, no hash headings, no bullet dashes. Use <strong> for bold. Do not end with a question or offer of further assistance.";
 
         // Stream the agent response into a StringBuilder — same pipeline as the chat UI
         var narrativeBuilder = new StringBuilder();
@@ -96,8 +103,8 @@ public class PortfolioReportService : IPortfolioReportService
             : "📊 Evening Portfolio Summary";
         var now = DateTime.UtcNow;
 
-        // Convert plain line breaks to <br/> and escape HTML entities in the narrative
-        var safeNarrative = HtmlEncode(narrative).Replace("\n", "<br/>");
+        // The AI is instructed to emit HTML directly — just sanitise stray markdown that may slip through
+        var safeNarrative = SanitiseNarrative(narrative);
 
         var sb = new StringBuilder();
         sb.Append("<!DOCTYPE html><html lang=\"en\"><head>");
@@ -110,6 +117,13 @@ public class PortfolioReportService : IPortfolioReportService
         sb.Append(".header h1{margin:0 0 4px;font-size:20px;font-weight:600}");
         sb.Append(".header p{margin:0;font-size:13px;opacity:.8}");
         sb.Append(".body{padding:28px 32px;font-size:15px;line-height:1.75;color:#444}");
+        sb.Append(".body h2{font-size:16px;font-weight:600;color:#1a2f5e;margin:20px 0 6px}");
+        sb.Append(".body table{width:100%;border-collapse:collapse;margin:8px 0 16px;font-size:14px}");
+        sb.Append(".body th{background:#1a2f5e;color:#fff;padding:7px 10px;text-align:left;font-weight:600}");
+        sb.Append(".body td{padding:6px 10px;border-bottom:1px solid #e5e8ef}");
+        sb.Append(".body tr:nth-child(even) td{background:#f8f9fb}");
+        sb.Append(".body a{color:#1a2f5e}");
+        sb.Append(".body ul{margin:6px 0 12px;padding-left:20px}");
         sb.Append(".footer{text-align:center;padding:16px;font-size:11px;color:#aaa;background:#f8f9fb;border-top:1px solid #e5e8ef}");
         sb.Append("</style></head><body><div class=\"wrapper\">");
         sb.Append($"<div class=\"header\"><h1>{title}</h1>");
@@ -174,10 +188,31 @@ public class PortfolioReportService : IPortfolioReportService
         }
     }
 
-    private static string HtmlEncode(string text)
-        => text
-            .Replace("&", "&amp;")
-            .Replace("<", "&lt;")
-            .Replace(">", "&gt;")
-            .Replace("\"", "&quot;");
+    // The AI is instructed to return HTML, but may still emit some stray markdown.
+    // Convert residual markdown to HTML rather than HTML-encoding the whole string.
+    private static string SanitiseNarrative(string text)
+    {
+        // Markdown links [text](url) → <a href="url">text</a>
+        text = System.Text.RegularExpressions.Regex.Replace(
+            text,
+            @"\[([^\]]+)\]\((https?://[^\)]+)\)",
+            "<a href=\"$2\">$1</a>");
+
+        // **bold** → <strong>bold</strong>
+        text = System.Text.RegularExpressions.Regex.Replace(
+            text, @"\*\*(.+?)\*\*", "<strong>$1</strong>");
+
+        // ## Heading → <h2>Heading</h2>  (strip leading #)
+        text = System.Text.RegularExpressions.Regex.Replace(
+            text, @"(?m)^#{1,3}\s+(.+)$", "<h2>$1</h2>");
+
+        // Bare newlines outside HTML tags → <br/>
+        // Only add <br/> for lines that aren't already HTML block elements
+        text = System.Text.RegularExpressions.Regex.Replace(
+            text,
+            @"\n(?!<(?:h[1-6]|p|ul|li|table|tr|th|td|div|br))",
+            "<br/>");
+
+        return text;
+    }
 }
