@@ -1,0 +1,34 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "outputs": {},
+  "actions": {
+    "HTTP_Evening_Report": {
+      "type": "Http",
+      "runAfter": {},
+      "inputs": {
+        "method": "POST",
+        "uri": "https://pm-api.thankfulbay-b96a666e.uksouth.azurecontainerapps.io/api/system/portfolio-report?reportType=evening&accountId=1",
+        "headers": {
+          "Content-Type": "application/json",
+          "X-System-Api-Key": "Rbdh0RguaFLlWgycmgkJ2LhBqQ3acZ1pEQPl2Tz9WjI="
+        }
+      }
+    }
+  },
+  "triggers": {
+    "Recurrence": {
+      "type": "Recurrence",
+      "recurrence": {
+        "frequency": "Week",
+        "interval": 1,
+        "timeZone": "UTC",
+        "schedule": {
+          "hours": [ "16" ],
+          "minutes": [ 30 ],
+          "weekDays": [ "Monday", "Tuesday", "Wednesday", "Thursday", "Friday" ]
+        }
+      }
+    }
+  }
+}
