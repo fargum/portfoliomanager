@@ -206,12 +206,22 @@ public class PortfolioReportService : IPortfolioReportService
         text = System.Text.RegularExpressions.Regex.Replace(
             text, @"(?m)^#{1,3}\s+(.+)$", "<h2>$1</h2>");
 
-        // Bare newlines outside HTML tags → <br/>
-        // Only add <br/> for lines that aren't already HTML block elements
+        // Strip newlines that are adjacent to block-level HTML elements —
+        // these produce unwanted whitespace gaps in email clients.
+        // Remove: newline immediately before a block-level opening or closing tag
         text = System.Text.RegularExpressions.Regex.Replace(
             text,
-            @"\n(?!<(?:h[1-6]|p|ul|li|table|tr|th|td|div|br))",
-            "<br/>");
+            @"\n+(?=<(?:/)?(?:h[1-6]|table|thead|tbody|tr|th|td|ul|ol|li|div|p|strong)\b)",
+            " ");
+
+        // Remove: newline immediately after a block-level closing tag
+        text = System.Text.RegularExpressions.Regex.Replace(
+            text,
+            @"(</(?:h[1-6]|table|thead|tbody|tr|th|td|ul|ol|li|div|p)>)\n+",
+            "$1");
+
+        // Remaining bare newlines (prose paragraphs) → <br/>
+        text = text.Replace("\n", "<br/>");
 
         return text;
     }
