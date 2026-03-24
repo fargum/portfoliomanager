@@ -2,6 +2,7 @@ using FtoConsulting.PortfolioManager.Application.Utilities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
+using FtoConsulting.PortfolioManager.Application.DTOs;
 using FtoConsulting.PortfolioManager.Api.Authentication;
 using System.Diagnostics;
 
@@ -18,6 +19,7 @@ namespace FtoConsulting.PortfolioManager.Api.Controllers;
 [ApiExplorerSettings(IgnoreApi = true)] // Hide from Swagger - internal endpoints
 public class SystemController(
     IHoldingRevaluationService holdingRevaluationService,
+    IPortfolioReportService portfolioReportService,
     ILogger<SystemController> logger) : ControllerBase
 {
     private static readonly ActivitySource s_activitySource = new("PortfolioManager.System");
@@ -94,6 +96,64 @@ public class SystemController(
             logger.LogError(ex, "Error during system automated revaluation");
             return StatusCode(StatusCodes.Status500InternalServerError, 
                 "An error occurred during the automated revaluation process.");
+        }
+    }
+
+    /// <summary>
+    /// System endpoint for scheduled jobs to trigger AI portfolio report generation and email delivery.
+    /// Generates a morning or evening report for the specified account and sends it via email.
+    /// </summary>
+    /// <param name="reportType">Report type: "morning" or "evening"</param>
+    /// <param name="accountId">Account ID to generate the report for (defaults to 1)</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <returns>Report result including AI narrative, HTML content, and email send status</returns>
+    /// <response code="200">Report generated (and email attempted)</response>
+    /// <response code="400">Invalid report type</response>
+    /// <response code="401">Invalid or missing API key</response>
+    /// <response code="500">Internal server error during report generation</response>
+    [HttpPost("portfolio-report")]
+    [ProducesResponseType(typeof(PortfolioReportDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status500InternalServerError)]
+    public async Task<ActionResult<PortfolioReportDto>> PortfolioReport(
+        [FromQuery] string reportType = "morning",
+        [FromQuery] int accountId = 1,
+        CancellationToken cancellationToken = default)
+    {
+        using var activity = s_activitySource.StartActivity("SystemPortfolioReport");
+        activity?.SetTag("report.type", reportType);
+        activity?.SetTag("account.id", accountId.ToString());
+
+        if (!Enum.TryParse<ReportType>(reportType, ignoreCase: true, out var parsedReportType))
+        {
+            return BadRequest($"Invalid reportType '{reportType}'. Valid values are 'morning' or 'evening'.");
+        }
+
+        try
+        {
+            logger.LogInformation("System portfolio report triggered: type={ReportType}, accountId={AccountId}",
+                reportType, accountId);
+
+            var result = await portfolioReportService.GenerateAndSendReportAsync(
+                parsedReportType, accountId, cancellationToken);
+
+            activity?.SetTag("report.email_sent", result.EmailSent.ToString());
+            activity?.SetStatus(ActivityStatusCode.Ok);
+
+            logger.LogInformation(
+                "Portfolio report completed: type={ReportType}, accountId={AccountId}, emailSent={EmailSent}",
+                reportType, accountId, result.EmailSent);
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            logger.LogError(ex, "Error generating portfolio report: type={ReportType}, accountId={AccountId}",
+                reportType, accountId);
+            return StatusCode(StatusCodes.Status500InternalServerError,
+                "An error occurred during portfolio report generation.");
         }
     }
 

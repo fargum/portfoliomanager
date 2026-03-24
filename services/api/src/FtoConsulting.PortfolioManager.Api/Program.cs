@@ -135,6 +135,10 @@ builder.Services.Configure<TavilyOptions>(
 builder.Services.Configure<AzureFoundryOptions>(
     builder.Configuration.GetSection(AzureFoundryOptions.SectionName));
 
+// Configure Portfolio Report options
+builder.Services.Configure<PortfolioReportOptions>(
+    builder.Configuration.GetSection(PortfolioReportOptions.SectionName));
+
 // Register API services
 builder.Services.AddScoped<IPortfolioMappingService, PortfolioMappingService>();
 

@@ -158,8 +158,32 @@ public static class ServiceCollectionExtensions
         });
         
         services.AddScoped<IMcpServerService, McpServerService>();
-        
-        // Register MediatR for CQRS
+
+        // Register PortfolioReportService — delegates to the existing AI orchestration agent
+        services.AddScoped<IPortfolioReportService>(serviceProvider =>
+        {
+            var logger = serviceProvider.GetRequiredService<ILogger<PortfolioReportService>>();
+            var options = serviceProvider.GetRequiredService<IOptions<PortfolioReportOptions>>();
+            var aiOrchestrationService = serviceProvider.GetRequiredService<IAiOrchestrationService>();
+            return new PortfolioReportService(logger, options, aiOrchestrationService);
+        });
+
+        // Register RealTimePortfolioService
+        services.AddScoped<IRealTimePortfolioService>(serviceProvider =>
+        {
+            var logger = serviceProvider.GetRequiredService<ILogger<RealTimePortfolioService>>();
+            var holdingRepository = serviceProvider.GetRequiredService<IHoldingRepository>();
+            var mcpServerService = serviceProvider.GetService<IMcpServerService>();
+
+            Func<EodMarketDataTool>? eodMarketDataToolFactory = null;
+            try
+            {
+                eodMarketDataToolFactory = () => serviceProvider.GetRequiredService<EodMarketDataTool>();
+            }
+            catch { }
+
+            return new RealTimePortfolioService(logger, holdingRepository, mcpServerService, eodMarketDataToolFactory);
+        });        // Register MediatR for CQRS
         services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(ServiceCollectionExtensions).Assembly));
         
         // Register automated background services

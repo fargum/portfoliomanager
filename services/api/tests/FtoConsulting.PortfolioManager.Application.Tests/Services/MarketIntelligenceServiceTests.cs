@@ -148,17 +148,18 @@ public class MarketIntelligenceServiceTests
     }
 
     [Fact]
-    public async Task GetMarketContextAsync_WithoutEodService_ThrowsInvalidOperationException()
+    public async Task GetMarketContextAsync_WithoutEodService_ReturnsEmptyContext()
     {
         // Arrange
         var tickers = new[] { "AAPL", "MSFT" };
         var date = DateTime.Now;
 
-        // Act & Assert
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => _service.GetMarketContextAsync(tickers, date));
-        
-        Assert.Contains("Failed to generate market summary", exception.Message);
+        // Act
+        var result = await _service.GetMarketContextAsync(tickers, date);
+
+        // Assert - service should return empty context rather than throw when EOD is not configured
+        Assert.NotNull(result);
+        Assert.Empty(result.RelevantNews);
     }
 
     [Fact]
