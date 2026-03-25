@@ -517,10 +517,20 @@ public class HoldingService(
 
         if (!pricingResult.Success)
         {
-            logger.LogError("Pricing calculation failed: {ErrorMessage}", pricingResult.ErrorMessage);
-            result.Errors.Add(pricingResult.ErrorMessage ?? "Failed to calculate current value");
-            result.Message = "Pricing calculation failed";
-            return null;
+            logger.LogWarning("No DB price for {Ticker}, attempting live EOD price fallback for new instrument", instrument.Ticker);
+            pricingResult = await TryFetchLivePriceForNewInstrumentAsync(instrument, request.Units, latestValuationDate, cancellationToken);
+        }
+
+        if (!pricingResult.Success)
+        {
+            logger.LogWarning("No live price available for {Ticker}, falling back to bought value as current value", instrument.Ticker);
+            // Fallback: use bought value so the holding can be created; nightly batch will price it correctly
+            pricingResult = new HoldingPriceResult
+            {
+                Success = true,
+                CurrentPrice = request.Units > 0 ? request.BoughtValue / request.Units : 0m,
+                CurrentValue = request.BoughtValue
+            };
         }
 
         logger.LogInformation("Pricing calculation successful: CurrentPrice={CurrentPrice}, CurrentValue={CurrentValue}",
@@ -644,6 +654,52 @@ public class HoldingService(
         
         var holdings = await holdingRepository.GetByValuationDateAsync(targetDate);
         return holdings.FirstOrDefault(h => h.PortfolioId == portfolioId && h.InstrumentId == instrumentId);
+    }
+
+    private async Task<HoldingPriceResult> TryFetchLivePriceForNewInstrumentAsync(
+        Instrument instrument,
+        decimal units,
+        DateOnly valuationDate,
+        CancellationToken cancellationToken)
+    {
+        if (eodMarketDataToolFactory == null)
+            return new HoldingPriceResult { Success = false, ErrorMessage = "EOD market data not configured" };
+
+        try
+        {
+            var eodTool = eodMarketDataToolFactory();
+            var prices = await eodTool.GetRealTimePricesAsync(null, new List<string> { instrument.Ticker }, cancellationToken);
+
+            if (prices.TryGetValue(instrument.Ticker, out var livePrice) && livePrice > 0)
+            {
+                var currentValue = await pricingCalculationService.CalculateCurrentValueAsync(
+                    units,
+                    livePrice,
+                    instrument.QuoteUnit,
+                    instrument.CurrencyCode ?? CurrencyConstants.GBP,
+                    valuationDate);
+
+                var scaledPrice = pricingCalculationService.ApplyScalingFactor(livePrice, instrument.Ticker);
+
+                logger.LogInformation("EOD live price fallback successful for {Ticker}: Price={Price}, Value={Value}",
+                    instrument.Ticker, livePrice, currentValue);
+
+                return new HoldingPriceResult
+                {
+                    Success = true,
+                    CurrentPrice = scaledPrice,
+                    CurrentValue = currentValue
+                };
+            }
+
+            logger.LogWarning("EOD returned no price for {Ticker}", instrument.Ticker);
+            return new HoldingPriceResult { Success = false, ErrorMessage = $"EOD returned no price for {instrument.Ticker}" };
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "EOD live price fallback failed for {Ticker}: {Message}", instrument.Ticker, ex.Message);
+            return new HoldingPriceResult { Success = false, ErrorMessage = ex.Message };
+        }
     }
 
     private static List<string> ValidateAddHoldingRequest(AddHoldingRequest request)
