@@ -135,8 +135,11 @@ public class SystemController(
             logger.LogInformation("System portfolio report triggered: type={ReportType}, accountId={AccountId}",
                 reportType, accountId);
 
+            // Use CancellationToken.None so the report completes even if the caller (e.g. Logic App)
+            // drops the HTTP connection after its own timeout. The HTTP request token must not
+            // cancel a long-running background operation like AI report generation + email send.
             var result = await portfolioReportService.GenerateAndSendReportAsync(
-                parsedReportType, accountId, cancellationToken);
+                parsedReportType, accountId, CancellationToken.None);
 
             activity?.SetTag("report.email_sent", result.EmailSent.ToString());
             activity?.SetStatus(ActivityStatusCode.Ok);

@@ -192,6 +192,10 @@ public class PortfolioReportService : IPortfolioReportService
     // Convert residual markdown to HTML rather than HTML-encoding the whole string.
     private static string SanitiseNarrative(string text)
     {
+        // Normalise line endings — LLMs often return \r\n (CRLF) which breaks
+        // the newline-stripping regexes below that only match \n.
+        text = text.Replace("\r\n", "\n").Replace("\r", "\n");
+
         // Markdown links [text](url) → <a href="url">text</a>
         text = System.Text.RegularExpressions.Regex.Replace(
             text,
@@ -222,6 +226,20 @@ public class PortfolioReportService : IPortfolioReportService
 
         // Remaining bare newlines (prose paragraphs) → <br/>
         text = text.Replace("\n", "<br/>");
+
+        // Remove <br/> tags immediately before block-level elements.
+        // LLMs often emit literal <br/> tags (not just \n) between headings and
+        // tables, which the newline-stripping passes above don't catch.
+        text = System.Text.RegularExpressions.Regex.Replace(
+            text,
+            @"(<br\s*/?>\s*)+(?=<(?:table|thead|tbody|tr|th|td|ul|ol|li|div|p|h[1-6])\b)",
+            "");
+
+        // Remove <br/> tags immediately after block-level closing tags.
+        text = System.Text.RegularExpressions.Regex.Replace(
+            text,
+            @"(?<=</(?:table|thead|tbody|tr|th|td|ul|ol|li|div|p|h[1-6])>)(\s*<br\s*/?>\s*)+",
+            "");
 
         return text;
     }
