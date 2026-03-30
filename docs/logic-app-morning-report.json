@@ -22,7 +22,7 @@
       "recurrence": {
         "frequency": "Week",
         "interval": 1,
-        "timeZone": "UTC",
+        "timeZone": "GMT Standard Time",
         "schedule": {
           "hours": [ "8" ],
           "minutes": [ 30 ],
