@@ -98,6 +98,7 @@ public class ChatController(
                 },
                 request.ThreadId,
                 request.ModelId,
+                storeInHistory: true,
                 cancellationToken);
 
             // Send completion message

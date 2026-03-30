@@ -44,23 +44,36 @@ public class AiOrchestrationService(
         Func<string, Task> onTokenReceived,
         int? threadId = null,
         string? modelId = null,
+        bool storeInHistory = true,
         CancellationToken cancellationToken = default)
     {
-        // SECURITY: Validate threadId belongs to authenticated account if provided
-        ConversationThread? thread = null;
-        if (threadId.HasValue)
+        // When storeInHistory=false (e.g. automated reports) we never touch the user's conversation thread
+        int resolvedThreadId;
+        if (storeInHistory)
         {
-            thread = await conversationThreadService.GetThreadByIdAsync(threadId.Value, accountId, cancellationToken);
-            if (thread == null)
+            // SECURITY: Validate threadId belongs to authenticated account if provided
+            ConversationThread? thread = null;
+            if (threadId.HasValue)
             {
-                logger.LogWarning("ThreadId {ThreadId} not found or does not belong to account {AccountId}, creating new thread", 
-                    threadId.Value, accountId);
+                thread = await conversationThreadService.GetThreadByIdAsync(threadId.Value, accountId, cancellationToken);
+                if (thread == null)
+                {
+                    logger.LogWarning("ThreadId {ThreadId} not found or does not belong to account {AccountId}, creating new thread",
+                        threadId.Value, accountId);
+                }
             }
+
+            // Get or create conversation thread if not already retrieved
+            thread ??= await conversationThreadService.GetOrCreateActiveThreadAsync(accountId, cancellationToken);
+            resolvedThreadId = thread.Id;
         }
-        
-        // Get or create conversation thread if not already retrieved
-        thread ??= await conversationThreadService.GetOrCreateActiveThreadAsync(accountId, cancellationToken);
-        
+        else
+        {
+            // Use a sentinel value — history will not be loaded or persisted
+            resolvedThreadId = -1;
+            logger.LogInformation("Report query for account {AccountId} running in ephemeral mode (no history storage)", accountId);
+        }
+
         // GUARDRAILS: Validate input
         var inputValidation = await guardrails.ValidateInputAsync(query, accountId);
         
@@ -78,8 +91,9 @@ public class AiOrchestrationService(
             await ProcessWithStreamingComponents(
                 query, 
                 accountId, 
-                thread.Id,
+                resolvedThreadId,
                 modelId,
+                storeInHistory,
                 onStatusUpdate, 
                 onTokenReceived, 
                 cancellationToken
@@ -87,7 +101,7 @@ public class AiOrchestrationService(
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Error processing portfolio query for account {AccountId}, thread {ThreadId}", accountId, thread.Id);
+            logger.LogError(ex, "Error processing portfolio query for account {AccountId}, thread {ThreadId}", accountId, resolvedThreadId);
             
             var errorResponse = "I apologize, but I encountered an error while processing your request. Please try again.";
             await onTokenReceived(errorResponse);
@@ -224,7 +238,7 @@ For casual conversation, respond naturally without using tools.";
     /// <summary>
     /// Setup memory-aware AI agent with optimized conversation history
     /// </summary>
-    private async Task<(AIAgent agent, List<Microsoft.Extensions.AI.ChatMessage> messagesToSend)> SetupMemoryAwareAgent(string query, int accountId, int threadId, string? modelId, CancellationToken cancellationToken)
+    private async Task<(AIAgent agent, List<Microsoft.Extensions.AI.ChatMessage> messagesToSend)> SetupMemoryAwareAgent(string query, int accountId, int threadId, string? modelId, bool storeInHistory, CancellationToken cancellationToken)
     {
         // Validate Azure Foundry configuration
         if (string.IsNullOrEmpty(azureFoundryOptions.Value.FoundryProjectEndpoint) || string.IsNullOrEmpty(azureFoundryOptions.Value.ApiKey))
@@ -270,29 +284,36 @@ For casual conversation, respond naturally without using tools.";
         {
             ChatOptions = secureChatOptions,
             UseProvidedChatClientAsIs = true, // We add our own FunctionInvokingChatClient with AllowConcurrentInvocation=true
-            ChatHistoryProviderFactory = (ctx, ct) => new ValueTask<ChatHistoryProvider>(chatMessageStoreFactory(accountId, threadId, ctx.JsonSerializerOptions)),
+            ChatHistoryProviderFactory = storeInHistory
+                ? (ctx, ct) => new ValueTask<ChatHistoryProvider>(chatMessageStoreFactory(accountId, threadId, ctx.JsonSerializerOptions))
+                : (ctx, ct) => new ValueTask<ChatHistoryProvider>(new EphemeralChatHistoryProvider()),
             AIContextProviderFactory = (ctx, ct) => new ValueTask<AIContextProvider>(memoryContextProviderFactory(accountId, chatClient))
         });
 
-        logger.LogInformation("Memory store and context provider configured for agent on thread {ThreadId}", threadId);
+        logger.LogInformation("Memory store and context provider configured for agent on thread {ThreadId} (storeInHistory={StoreInHistory})", threadId, storeInHistory);
 
         // OPTIMIZATION: Load existing conversation history with reduced token budget for faster processing
-        var messageStore = chatMessageStoreFactory(accountId, threadId, null);
-        
-        // Use a smaller token budget for faster initial loading - prioritize recent context
         List<Microsoft.Extensions.AI.ChatMessage> recentMessages;
-        
-        if (messageStore is ITokenAwareChatMessageStore tokenAwareStore)
+
+        if (storeInHistory)
         {
-            // OPTIMIZATION: Reduced from 2000 to 1000 tokens for 50% faster loading
-            var tokenBudgetedMessages = await tokenAwareStore.GetMessagesWithinTokenBudgetAsync(
-                tokenBudget: 1000, // Reduced for faster performance
-                cancellationToken);
-            recentMessages = tokenBudgetedMessages.ToList();
+            var messageStore = chatMessageStoreFactory(accountId, threadId, null);
+            if (messageStore is ITokenAwareChatMessageStore tokenAwareStore)
+            {
+                // OPTIMIZATION: Reduced from 2000 to 1000 tokens for 50% faster loading
+                var tokenBudgetedMessages = await tokenAwareStore.GetMessagesWithinTokenBudgetAsync(
+                    tokenBudget: 1000, // Reduced for faster performance
+                    cancellationToken);
+                recentMessages = tokenBudgetedMessages.ToList();
+            }
+            else
+            {
+                recentMessages = new List<Microsoft.Extensions.AI.ChatMessage>();
+            }
         }
         else
         {
-            // Fallback: use empty message history when store doesn't support token-aware loading
+            // Ephemeral mode — no history loaded or persisted
             recentMessages = new List<Microsoft.Extensions.AI.ChatMessage>();
         }
 
@@ -319,7 +340,7 @@ For casual conversation, respond naturally without using tools.";
     /// <summary>
     /// Process portfolio query with streaming components
     /// </summary>
-    private async Task ProcessWithStreamingComponents(string query, int accountId, int threadId, string? modelId, Func<StatusUpdateDto, Task>? onStatusUpdate, Func<string, Task> onTokenReceived, CancellationToken cancellationToken)
+    private async Task ProcessWithStreamingComponents(string query, int accountId, int threadId, string? modelId, bool storeInHistory, Func<StatusUpdateDto, Task>? onStatusUpdate, Func<string, Task> onTokenReceived, CancellationToken cancellationToken)
     {
         try
         {
@@ -328,7 +349,7 @@ For casual conversation, respond naturally without using tools.";
                 await onStatusUpdate(new StatusUpdateDto(StatusUpdateType.ToolPlanning, "Setting up AI agent..."));
             }
             
-            var (agent, messagesToSend) = await SetupMemoryAwareAgent(query, accountId, threadId, modelId, cancellationToken);
+            var (agent, messagesToSend) = await SetupMemoryAwareAgent(query, accountId, threadId, modelId, storeInHistory, cancellationToken);
             
             logger.LogInformation("Processing with streaming agent for thread {ThreadId}", threadId);
             
@@ -461,4 +482,21 @@ For casual conversation, respond naturally without using tools.";
     }
 
 
+}
+
+/// <summary>
+/// A no-op ChatHistoryProvider used for automated reports and other ephemeral AI calls
+/// that must not pollute the user's active conversation history.
+/// </summary>
+file sealed class EphemeralChatHistoryProvider : ChatHistoryProvider
+{
+    protected override ValueTask InvokedCoreAsync(InvokedContext context, CancellationToken cancellationToken = default)
+        => ValueTask.CompletedTask;
+
+    protected override ValueTask<IEnumerable<Microsoft.Extensions.AI.ChatMessage>> InvokingCoreAsync(
+        InvokingContext context, CancellationToken cancellationToken = default)
+        => new(Enumerable.Empty<Microsoft.Extensions.AI.ChatMessage>());
+
+    public override System.Text.Json.JsonElement Serialize(System.Text.Json.JsonSerializerOptions? jsonSerializerOptions = null)
+        => System.Text.Json.JsonSerializer.SerializeToElement<object?>(null, jsonSerializerOptions);
 }

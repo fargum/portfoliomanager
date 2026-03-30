@@ -51,7 +51,10 @@ public class PortfolioReportService : IPortfolioReportService
               "5. **Watch list for tomorrow** — 2-3 bullet points on what to watch overnight or at open.\n\n" +
               "Rules: output plain text and HTML only — no markdown, no asterisks, no hash headings, no bullet dashes. Use <strong> for bold. Do not end with a question or offer of further assistance.";
 
-        // Stream the agent response into a StringBuilder — same pipeline as the chat UI
+        // Stream the agent response into a StringBuilder — same pipeline as the chat UI,
+        // but with storeInHistory:false so the HTML-format prompt/response never enters
+        // the user's active conversation history (which would cause the chat UI to start
+        // rendering raw HTML).
         var narrativeBuilder = new StringBuilder();
         await _aiOrchestrationService.ProcessPortfolioQueryAsync(
             query: prompt,
@@ -64,6 +67,7 @@ public class PortfolioReportService : IPortfolioReportService
             },
             threadId: null,
             modelId: null,
+            storeInHistory: false,
             cancellationToken: cancellationToken);
 
         var narrative = narrativeBuilder.ToString().Trim();

@@ -15,6 +15,8 @@ public interface IAiOrchestrationService
     /// <param name="onStatusUpdate">Optional callback for status updates during processing</param>
     /// <param name="onTokenReceived">Callback for streaming tokens</param>
     /// <param name="threadId">Optional conversation thread ID for memory continuity</param>
+    /// <param name="modelId">Optional model override</param>
+    /// <param name="storeInHistory">When false, the interaction is not persisted to conversation history (use for automated reports)</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Task that completes when streaming finishes</returns>
     Task ProcessPortfolioQueryAsync(
@@ -24,6 +26,7 @@ public interface IAiOrchestrationService
         Func<string, Task> onTokenReceived,
         int? threadId = null,
         string? modelId = null,
+        bool storeInHistory = true,
         CancellationToken cancellationToken = default);
     
     /// <summary>
