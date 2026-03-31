@@ -12,6 +12,9 @@
         "headers": {
           "Content-Type": "application/json",
           "X-System-Api-Key": "Rbdh0RguaFLlWgycmgkJ2LhBqQ3acZ1pEQPl2Tz9WjI="
+        },
+        "retryPolicy": {
+          "type": "none"
         }
       }
     }

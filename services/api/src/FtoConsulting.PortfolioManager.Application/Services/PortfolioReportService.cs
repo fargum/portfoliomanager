@@ -14,6 +14,14 @@ namespace FtoConsulting.PortfolioManager.Application.Services;
 /// </summary>
 public class PortfolioReportService : IPortfolioReportService
 {
+    // Per-type semaphore: prevents a second report being generated while the first
+    // is still in-flight (e.g. Logic App retry fired before prior request completed).
+    private static readonly Dictionary<ReportType, SemaphoreSlim> s_reportLocks = new()
+    {
+        [ReportType.Morning] = new SemaphoreSlim(1, 1),
+        [ReportType.Evening] = new SemaphoreSlim(1, 1),
+    };
+
     private readonly ILogger<PortfolioReportService> _logger;
     private readonly PortfolioReportOptions _options;
     private readonly IAiOrchestrationService _aiOrchestrationService;
@@ -33,6 +41,17 @@ public class PortfolioReportService : IPortfolioReportService
         int accountId,
         CancellationToken cancellationToken = default)
     {
+        var semaphore = s_reportLocks[reportType];
+        if (!await semaphore.WaitAsync(0, cancellationToken))
+        {
+            _logger.LogWarning(
+                "{ReportType} report request rejected — a report generation is already in progress for account {AccountId}",
+                reportType, accountId);
+            throw new ReportAlreadyInProgressException(reportType);
+        }
+
+        try
+        {
         _logger.LogInformation("Generating {ReportType} portfolio report for account {AccountId}", reportType, accountId);
 
         // Build the prompt — the agent will call all the right tools itself
@@ -94,6 +113,11 @@ public class PortfolioReportService : IPortfolioReportService
             EmailSent: emailSent,
             EmailError: emailError
         );
+        }
+        finally
+        {
+            semaphore.Release();
+        }
     }
 
     // -------------------------------------------------------------------------

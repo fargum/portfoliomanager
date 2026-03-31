@@ -1,6 +1,7 @@
 using FtoConsulting.PortfolioManager.Application.Utilities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using FtoConsulting.PortfolioManager.Application.Services;
 using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 using FtoConsulting.PortfolioManager.Application.DTOs;
 using FtoConsulting.PortfolioManager.Api.Authentication;
@@ -110,11 +111,13 @@ public class SystemController(
     /// <response code="200">Report generated (and email attempted)</response>
     /// <response code="400">Invalid report type</response>
     /// <response code="401">Invalid or missing API key</response>
+    /// <response code="409">A report of this type is already being generated</response>
     /// <response code="500">Internal server error during report generation</response>
     [HttpPost("portfolio-report")]
     [ProducesResponseType(typeof(PortfolioReportDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     [ProducesResponseType(StatusCodes.Status500InternalServerError)]
     public async Task<ActionResult<PortfolioReportDto>> PortfolioReport(
         [FromQuery] string reportType = "morning",
@@ -149,6 +152,13 @@ public class SystemController(
                 reportType, accountId, result.EmailSent);
 
             return Ok(result);
+        }
+        catch (ReportAlreadyInProgressException ex)
+        {
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            logger.LogWarning("Portfolio report request rejected (already in progress): type={ReportType}, accountId={AccountId}",
+                reportType, accountId);
+            return Conflict(ex.Message);
         }
         catch (Exception ex)
         {
