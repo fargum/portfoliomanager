@@ -55,9 +55,11 @@ public class PortfolioMemoryContextProvider : AIContextProvider
     }
 
     /// <summary>
-    /// Called before each AI agent invocation to provide memory context
+    /// Called before each AI agent invocation to provide memory context.
+    /// Returns only the ADDITIONAL context (instructions) — the base class merges this
+    /// with the existing AIContext (preserving Messages and Tools from prior stages).
     /// </summary>
-    protected override async ValueTask<AIContext> InvokingCoreAsync(
+    protected override async ValueTask<AIContext> ProvideAIContextAsync(
         InvokingContext context,
         CancellationToken cancellationToken = default)
     {
