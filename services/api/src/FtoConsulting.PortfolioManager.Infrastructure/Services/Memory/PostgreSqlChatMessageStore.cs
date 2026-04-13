@@ -114,16 +114,13 @@ public class PostgreSqlChatMessageStore : ChatHistoryProvider
             // Only load messages from the current day to prevent stale context from old sessions.
             // Long-term memory is handled separately by PortfolioMemoryContextProvider,
             // so chat history should only provide current-session context.
-            // Limit to the most recent 10 messages to keep the context window lean —
-            // the old code used a 1000-token budget which yielded roughly this many messages.
-            // Loading too many (especially old tool-result blobs stored as plain text) bloats
-            // the payload and causes the LLM call to exceed the HTTP timeout.
+            // The CompactionProvider (SlidingWindow) further trims within this window.
             var cutoff = DateTime.UtcNow.Date; // Start of today (UTC)
             var dbMessages = await _dbContext.ChatMessages
                 .Where(cm => cm.ConversationThreadId == _conversationThreadId.Value
                              && cm.MessageTimestamp >= cutoff)
                 .OrderByDescending(cm => cm.MessageTimestamp)
-                .Take(10)
+                .Take(50)
                 .OrderBy(cm => cm.MessageTimestamp)
                 .ToListAsync(cancellationToken);
 
