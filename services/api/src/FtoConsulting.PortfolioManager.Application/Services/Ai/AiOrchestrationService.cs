@@ -4,6 +4,7 @@ using FtoConsulting.PortfolioManager.Application.Configuration;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.AI;
 using Microsoft.Agents.AI;
+using Microsoft.Agents.AI.Compaction;
 using OpenAI;
 using System.ClientModel;
 using Microsoft.Extensions.Logging;
@@ -25,7 +26,7 @@ public class AiOrchestrationService(
     IConversationThreadService conversationThreadService,
     IAgentPromptService agentPromptService,
     AgentFrameworkGuardrails guardrails,
-    Func<int, int?, System.Text.Json.JsonSerializerOptions?, ChatHistoryProvider> chatMessageStoreFactory,
+    Func<int, int?, ChatHistoryProvider> chatMessageStoreFactory,
     Func<int, IChatClient, AIContextProvider> memoryContextProviderFactory,
     ILoggerFactory loggerFactory) : IAiOrchestrationService
 {
@@ -172,69 +173,6 @@ For casual conversation, respond naturally without using tools.";
         }
     }
 
-
-
-
-    /// <summary>
-    /// Measure the estimated token count for context analysis
-    /// </summary>
-    private int MeasureContextSize(object content)
-    {
-        if (content == null) return 0;
-        
-        string text = content switch
-        {
-            string str => str,
-            IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages => string.Join(" ", messages.Select(m => m.Text ?? "")),
-            _ => content.ToString() ?? ""
-        };
-        
-        // Rough estimation: ~4 characters per token
-        return Math.Max(1, text.Length / 4);
-    }
-
-    /// <summary>
-    /// Clean up markdown formatting issues in AI responses
-    /// </summary>
-    private string CleanupMarkdownFormatting(string response)
-    {
-        if (string.IsNullOrEmpty(response))
-            return response;
-
-        // Replace bullet symbols with dashes consistently
-        var cleaned = response
-            .Replace("• ", "- ")
-            .Replace("◦ ", "- ")
-            .Replace("▪ ", "- ");
-
-        // Fix the specific issue: bullet point on separate line from content
-        // Pattern: "•\nArticle:" becomes "- Article:"
-        cleaned = System.Text.RegularExpressions.Regex.Replace(
-            cleaned,
-            @"^[•\-]\s*\n([A-Za-z][^:\n]*:)",
-            "- $1",
-            System.Text.RegularExpressions.RegexOptions.Multiline
-        );
-
-        // Fix standalone bullet points that are followed by content on next line
-        cleaned = System.Text.RegularExpressions.Regex.Replace(
-            cleaned,
-            @"^[•\-]\s*$\n([A-Za-z][^:\n]*:)",
-            "- $1",
-            System.Text.RegularExpressions.RegexOptions.Multiline
-        );
-
-        // Clean up extra newlines that might be left behind
-        cleaned = System.Text.RegularExpressions.Regex.Replace(
-            cleaned,
-            @"\n\n\n+",
-            "\n\n",
-            System.Text.RegularExpressions.RegexOptions.Multiline
-        );
-
-        return cleaned;
-    }
-
     /// <summary>
     /// Setup memory-aware AI agent with optimized conversation history
     /// </summary>
@@ -280,59 +218,37 @@ For casual conversation, respond naturally without using tools.";
         var currentDate = DateTime.UtcNow.ToString("yyyy-MM-dd");
         secureChatOptions.Instructions = secureInstructions + $"\n\nCurrent Date: {currentDate}";
         
+        // Build a compaction pipeline to manage context window efficiently:
+        // 1. ToolResultCompactionStrategy — compacts verbose MCP tool result payloads (holdings JSON, market data) into YAML summaries
+        // 2. SummarizationCompactionStrategy — when conversation exceeds 10 turns, older turns are summarised by the LLM
+        //    instead of being silently dropped (preserves context that a sliding window would lose)
+        var compactionProvider = new CompactionProvider(
+            new PipelineCompactionStrategy([
+                new ToolResultCompactionStrategy(CompactionTriggers.HasToolCalls()),
+                new SummarizationCompactionStrategy(chatClient, CompactionTriggers.TurnsExceed(10), minimumPreservedGroups: 5)
+            ]),
+            stateKey: "portfolio-compaction",
+            loggerFactory: loggerFactory);
+
         var agent = chatClient.AsAIAgent(new ChatClientAgentOptions
         {
             ChatOptions = secureChatOptions,
             UseProvidedChatClientAsIs = true, // We add our own FunctionInvokingChatClient with AllowConcurrentInvocation=true
-            ChatHistoryProviderFactory = storeInHistory
-                ? (ctx, ct) => new ValueTask<ChatHistoryProvider>(chatMessageStoreFactory(accountId, threadId, ctx.JsonSerializerOptions))
-                : (ctx, ct) => new ValueTask<ChatHistoryProvider>(new EphemeralChatHistoryProvider()),
-            AIContextProviderFactory = (ctx, ct) => new ValueTask<AIContextProvider>(memoryContextProviderFactory(accountId, chatClient))
+            ChatHistoryProvider = storeInHistory
+                ? chatMessageStoreFactory(accountId, threadId)
+                : new EphemeralChatHistoryProvider(),
+            AIContextProviders = [
+                memoryContextProviderFactory(accountId, chatClient),
+                compactionProvider
+            ]
         });
 
-        logger.LogInformation("Memory store and context provider configured for agent on thread {ThreadId} (storeInHistory={StoreInHistory})", threadId, storeInHistory);
+        logger.LogInformation("Memory store and compaction provider configured for agent on thread {ThreadId} (storeInHistory={StoreInHistory})", threadId, storeInHistory);
 
-        // OPTIMIZATION: Load existing conversation history with reduced token budget for faster processing
-        List<Microsoft.Extensions.AI.ChatMessage> recentMessages;
-
-        if (storeInHistory)
-        {
-            var messageStore = chatMessageStoreFactory(accountId, threadId, null);
-            if (messageStore is ITokenAwareChatMessageStore tokenAwareStore)
-            {
-                // OPTIMIZATION: Reduced from 2000 to 1000 tokens for 50% faster loading
-                var tokenBudgetedMessages = await tokenAwareStore.GetMessagesWithinTokenBudgetAsync(
-                    tokenBudget: 1000, // Reduced for faster performance
-                    cancellationToken);
-                recentMessages = tokenBudgetedMessages.ToList();
-            }
-            else
-            {
-                recentMessages = new List<Microsoft.Extensions.AI.ChatMessage>();
-            }
-        }
-        else
-        {
-            // Ephemeral mode — no history loaded or persisted
-            recentMessages = new List<Microsoft.Extensions.AI.ChatMessage>();
-        }
-
-        // CONTEXT SIZE ANALYSIS: Measure each component for visibility
-        var contextAnalysis = new
-        {
-            ConversationHistory = MeasureContextSize(recentMessages),
-            AgentInstructions = MeasureContextSize(secureInstructions),
-            ToolDescriptions = MeasureContextSize(secureChatOptions?.Tools?.Count.ToString() ?? "0 tools")
-        };
-
-        logger.LogInformation("Context Window Analysis for thread {ThreadId}: Conversation={ConversationTokens} tokens, Instructions={InstructionTokens} tokens, Tools={ToolTokens} tokens",
-            threadId, 
-            contextAnalysis.ConversationHistory, 
-            contextAnalysis.AgentInstructions,
-            contextAnalysis.ToolDescriptions);
-
-        // Combine recent messages with new message using secure preparation
-        var messagesToSend = await guardrails.PrepareSecureMessagesAsync(recentMessages, query, accountId, threadId);
+        // Prepare the user query — conversation history is injected by ChatHistoryProvider.InvokingCoreAsync,
+        // memory context by PortfolioMemoryContextProvider, and compaction by CompactionProvider.
+        // We only send the new user message here to avoid double-loading history.
+        var messagesToSend = await guardrails.PrepareSecureMessagesAsync([], query, accountId, threadId);
         
         return (agent, messagesToSend);
     }
@@ -359,8 +275,8 @@ For casual conversation, respond naturally without using tools.";
                 await onStatusUpdate(new StatusUpdateDto(StatusUpdateType.Thinking, "Understanding your request..."));
             }
             
-            var inToolCall = false;
             var contentStarted = false;
+            ChatFinishReason? lastFinishReason = null;
             var lastStatusUpdate = DateTime.UtcNow;
             var processingStartTime = DateTime.UtcNow;
             
@@ -379,6 +295,9 @@ For casual conversation, respond naturally without using tools.";
             {
                 if (cancellationToken.IsCancellationRequested)
                     break;
+
+                if (streamingUpdate.FinishReason is { } reason)
+                    lastFinishReason = reason;
 
                 var now = DateTime.UtcNow;
                 
@@ -401,64 +320,23 @@ For casual conversation, respond naturally without using tools.";
                     lastStatusUpdate = now;
                 }
 
-                // Detect specific tool usage patterns for more specific updates
-                if (onStatusUpdate != null && !contentStarted)
+                // Track whether the model is invoking tools — FunctionCallContent appears in
+                // the streaming update's Contents collection when the framework is executing tools.
+                if (!contentStarted && streamingUpdate.Contents.OfType<FunctionCallContent>().Any())
                 {
-                    if (streamingUpdate.Text?.Contains("get_portfolio_holdings") == true && !inToolCall)
+                    if (onStatusUpdate != null)
                     {
-                        await onStatusUpdate(new StatusUpdateDto(StatusUpdateType.FetchingPortfolioData, "Retrieving your portfolio holdings..."));
-                        inToolCall = true;
-                        lastStatusUpdate = now;
-                    }
-                    else if (streamingUpdate.Text?.Contains("get_market_sentiment") == true && !inToolCall)
-                    {
-                        await onStatusUpdate(new StatusUpdateDto(StatusUpdateType.FetchingMarketData, "Fetching market sentiment and news..."));
-                        inToolCall = true;
-                        lastStatusUpdate = now;
-                    }
-                    else if (streamingUpdate.Text?.Contains("analyze_performance") == true && !inToolCall)
-                    {
-                        await onStatusUpdate(new StatusUpdateDto(StatusUpdateType.AnalyzingPerformance, "Analyzing portfolio performance..."));
-                        inToolCall = true;
-                        lastStatusUpdate = now;
-                    }
-                    else if (streamingUpdate.Text?.Contains("calculate_risk") == true && !inToolCall)
-                    {
-                        await onStatusUpdate(new StatusUpdateDto(StatusUpdateType.AnalyzingRisk, "Calculating risk metrics..."));
-                        inToolCall = true;
-                        lastStatusUpdate = now;
-                    }
-                    
-                    // Reset tool call flag when we get actual content
-                    if (!string.IsNullOrWhiteSpace(streamingUpdate.Text) && 
-                        !streamingUpdate.Text.Contains("get_") && 
-                        !streamingUpdate.Text.Contains("analyze_") && 
-                        !streamingUpdate.Text.Contains("calculate_") &&
-                        inToolCall)
-                    {
-                        await onStatusUpdate(new StatusUpdateDto(StatusUpdateType.GeneratingInsights, "Finalizing analysis..."));
-                        inToolCall = false;
+                        await onStatusUpdate(new StatusUpdateDto(StatusUpdateType.FetchingPortfolioData, "Retrieving data from your portfolio..."));
                         lastStatusUpdate = now;
                     }
                 }
 
                 if (!string.IsNullOrEmpty(streamingUpdate.Text))
                 {
-                    var cleanedText = CleanupMarkdownFormatting(streamingUpdate.Text);
-                    
-                    // Check if this looks like actual response content (not tool calls)
-                    if (!contentStarted && 
-                        !cleanedText.Contains("get_") && 
-                        !cleanedText.Contains("analyze_") && 
-                        !cleanedText.Contains("calculate_") &&
-                        cleanedText.Trim().Length > 0 &&
-                        !cleanedText.Contains("thinking") &&
-                        !cleanedText.Contains("processing"))
-                    {
+                    if (!contentStarted)
                         contentStarted = true;
-                    }
-                    
-                    await onTokenReceived(cleanedText);
+
+                    await onTokenReceived(streamingUpdate.Text);
                 }
             }
 
@@ -466,6 +344,18 @@ For casual conversation, respond naturally without using tools.";
             if (onStatusUpdate != null && !contentStarted)
             {
                 await onStatusUpdate(new StatusUpdateDto(StatusUpdateType.Completed, "Analysis complete!"));
+            }
+
+            // Check the last streaming update's FinishReason to detect truncated or filtered responses
+            if (lastFinishReason == ChatFinishReason.Length)
+            {
+                logger.LogWarning("Response was truncated (FinishReason=Length) for thread {ThreadId}", threadId);
+                await onTokenReceived("\n\n⚠️ *My response was cut short because it hit the model's output limit. Ask me to continue if you need more detail.*");
+            }
+            else if (lastFinishReason == ChatFinishReason.ContentFilter)
+            {
+                logger.LogWarning("Response was filtered (FinishReason=ContentFilter) for thread {ThreadId}", threadId);
+                await onTokenReceived("\n\n⚠️ *Part of my response was filtered by the content safety system. Please rephrase your question if needed.*");
             }
             
             logger.LogInformation("Successfully completed streaming for thread {ThreadId}", threadId);
@@ -496,7 +386,4 @@ file sealed class EphemeralChatHistoryProvider : ChatHistoryProvider
     protected override ValueTask<IEnumerable<Microsoft.Extensions.AI.ChatMessage>> InvokingCoreAsync(
         InvokingContext context, CancellationToken cancellationToken = default)
         => new(Enumerable.Empty<Microsoft.Extensions.AI.ChatMessage>());
-
-    public override System.Text.Json.JsonElement Serialize(System.Text.Json.JsonSerializerOptions? jsonSerializerOptions = null)
-        => System.Text.Json.JsonSerializer.SerializeToElement<object?>(null, jsonSerializerOptions);
 }

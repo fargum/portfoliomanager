@@ -4,12 +4,10 @@ using FtoConsulting.PortfolioManager.Infrastructure.Repositories;
 using FtoConsulting.PortfolioManager.Infrastructure.Repositories.Memory;
 using FtoConsulting.PortfolioManager.Infrastructure.Services;
 using FtoConsulting.PortfolioManager.Infrastructure.Services.Memory;
-using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.AI;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.Logging;
-using System.Text.Json;
 
 namespace FtoConsulting.PortfolioManager.Infrastructure.Repositories;
 
@@ -30,15 +28,12 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IConversationThreadRepository, ConversationThreadRepository>();
         services.AddScoped<IChatMessageRepository, ChatMessageRepository>();
         services.AddScoped<IMemorySummaryRepository, MemorySummaryRepository>();
-        services.AddTransient<Func<int, int?, System.Text.Json.JsonSerializerOptions?, ChatHistoryProvider>>(serviceProvider =>
-            (accountId, threadId, jsonOptions) =>
+        services.AddTransient<Func<int, int?, ChatHistoryProvider>>(serviceProvider =>
+            (accountId, threadId) =>
             {
                 var dbContext = serviceProvider.GetRequiredService<PortfolioManagerDbContext>();
                 var logger = serviceProvider.GetRequiredService<ILogger<PostgreSqlChatMessageStore>>();
-                var serializedState = threadId.HasValue 
-                    ? JsonSerializer.SerializeToElement(threadId.Value)
-                    : JsonSerializer.SerializeToElement((object?)null);
-                return new PostgreSqlChatMessageStore(dbContext, logger, accountId, serializedState, jsonOptions);
+                return new PostgreSqlChatMessageStore(dbContext, logger, accountId, threadId);
             });
             
         services.AddTransient<Func<int, IChatClient, AIContextProvider>>(serviceProvider =>
