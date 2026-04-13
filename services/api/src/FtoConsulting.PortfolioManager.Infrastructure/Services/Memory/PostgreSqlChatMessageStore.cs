@@ -95,9 +95,11 @@ public class PostgreSqlChatMessageStore : ChatHistoryProvider
     }
 
     /// <summary>
-    /// Called before agent invocation to provide conversation history
+    /// Called before agent invocation to provide conversation history.
+    /// Returns only the history messages — the base class merges these with the caller's
+    /// request messages (context.RequestMessages) via Concat.
     /// </summary>
-    protected override async ValueTask<IEnumerable<AIChatMessage>> InvokingCoreAsync(
+    protected override async ValueTask<IEnumerable<AIChatMessage>> ProvideChatHistoryAsync(
         InvokingContext context,
         CancellationToken cancellationToken = default)
     {
@@ -109,13 +111,21 @@ public class PostgreSqlChatMessageStore : ChatHistoryProvider
                 return [];
             }
 
-            // Get recent messages (last 50 to respect context window)
+            // Only load messages from the current day to prevent stale context from old sessions.
+            // Long-term memory is handled separately by PortfolioMemoryContextProvider,
+            // so chat history should only provide current-session context.
+            // The CompactionProvider (SlidingWindow) further trims within this window.
+            var cutoff = DateTime.UtcNow.Date; // Start of today (UTC)
             var dbMessages = await _dbContext.ChatMessages
-                .Where(cm => cm.ConversationThreadId == _conversationThreadId.Value)
+                .Where(cm => cm.ConversationThreadId == _conversationThreadId.Value
+                             && cm.MessageTimestamp >= cutoff)
                 .OrderByDescending(cm => cm.MessageTimestamp)
                 .Take(50)
                 .OrderBy(cm => cm.MessageTimestamp)
                 .ToListAsync(cancellationToken);
+
+            _logger.LogDebug("Loaded {Count} messages from thread {ThreadId} since {Cutoff} for account {AccountId}",
+                dbMessages.Count, _conversationThreadId, cutoff, _accountId);
 
             var chatMessages = new List<AIChatMessage>();
 

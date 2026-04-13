@@ -378,13 +378,14 @@ For casual conversation, respond naturally without using tools.";
 /// <summary>
 /// A no-op ChatHistoryProvider used for automated reports and other ephemeral AI calls
 /// that must not pollute the user's active conversation history.
+/// Returns no history — the base class merges with context.RequestMessages automatically.
 /// </summary>
 file sealed class EphemeralChatHistoryProvider : ChatHistoryProvider
 {
     protected override ValueTask InvokedCoreAsync(InvokedContext context, CancellationToken cancellationToken = default)
         => ValueTask.CompletedTask;
 
-    protected override ValueTask<IEnumerable<Microsoft.Extensions.AI.ChatMessage>> InvokingCoreAsync(
+    protected override ValueTask<IEnumerable<Microsoft.Extensions.AI.ChatMessage>> ProvideChatHistoryAsync(
         InvokingContext context, CancellationToken cancellationToken = default)
         => new(Enumerable.Empty<Microsoft.Extensions.AI.ChatMessage>());
 }
