@@ -36,7 +36,11 @@ public class AiOrchestrationService(
     private readonly Lazy<OpenAIClient> _openAiClient = new Lazy<OpenAIClient>(() =>
         new OpenAIClient(
             new ApiKeyCredential(azureFoundryOptions.Value.ApiKey),
-            new OpenAIClientOptions { Endpoint = new Uri(azureFoundryOptions.Value.FoundryProjectEndpoint) }));
+            new OpenAIClientOptions
+            {
+                Endpoint = new Uri(azureFoundryOptions.Value.FoundryProjectEndpoint),
+                NetworkTimeout = TimeSpan.FromSeconds(azureFoundryOptions.Value.TimeoutSeconds)
+            }));
 
     public async Task ProcessPortfolioQueryAsync(
         string query, 
