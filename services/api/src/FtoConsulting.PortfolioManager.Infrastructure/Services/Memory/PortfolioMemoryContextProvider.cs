@@ -17,20 +17,18 @@ namespace FtoConsulting.PortfolioManager.Infrastructure.Services.Memory;
 public class PortfolioMemoryContextProvider : AIContextProvider
 {
     private readonly PortfolioManagerDbContext _dbContext;
-    private readonly IChatClient _chatClient;
     private readonly ILogger<PortfolioMemoryContextProvider> _logger;
     private readonly int _accountId;
     private PortfolioMemoryState _memoryState;
 
     public PortfolioMemoryContextProvider(
         PortfolioManagerDbContext dbContext,
-        IChatClient chatClient,
+        IChatClient chatClient, // kept for DI compatibility; no longer used internally
         ILogger<PortfolioMemoryContextProvider> logger,
         int accountId,
         PortfolioMemoryState? memoryState = null)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
-        _chatClient = chatClient ?? throw new ArgumentNullException(nameof(chatClient));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _accountId = accountId;
         _memoryState = memoryState ?? new PortfolioMemoryState();
@@ -38,14 +36,13 @@ public class PortfolioMemoryContextProvider : AIContextProvider
 
     public PortfolioMemoryContextProvider(
         PortfolioManagerDbContext dbContext,
-        IChatClient chatClient,
+        IChatClient chatClient, // kept for DI compatibility; no longer used internally
         ILogger<PortfolioMemoryContextProvider> logger,
         int accountId,
         JsonElement serializedState,
         JsonSerializerOptions? jsonSerializerOptions = null)
     {
         _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
-        _chatClient = chatClient ?? throw new ArgumentNullException(nameof(chatClient));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _accountId = accountId;
         
@@ -106,46 +103,12 @@ public class PortfolioMemoryContextProvider : AIContextProvider
         }
     }
 
-    /// <summary>
-    /// Called after each AI agent invocation to update memory
-    /// </summary>
-    protected override async ValueTask InvokedCoreAsync(
-        InvokedContext context,
-        CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            // Start background memory processing without blocking the response
-            // Use Task.Run to execute on thread pool to avoid blocking the HTTP response
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    // Extract insights from the conversation
-                    await ExtractConversationInsightsAsync(context, CancellationToken.None);
-                    
-                    // Update user preferences if patterns are detected
-                    await UpdateUserPreferencesAsync(context, CancellationToken.None);
-
-                    _logger.LogDebug("Completed background memory processing for account {AccountId}", _accountId);
-                }
-                catch (Exception backgroundEx)
-                {
-                    _logger.LogWarning(backgroundEx, "Background memory processing failed for account {AccountId}", _accountId);
-                    // Don't throw - background failure shouldn't impact user experience
-                }
-            });
-
-            _logger.LogDebug("Started background memory processing for account {AccountId}", _accountId);
-            
-            // Satisfy async requirement since this is an override method
-            await Task.CompletedTask;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error updating memory after invocation for account {AccountId}", _accountId);
-        }
-    }
+    // NOTE: InvokedCoreAsync removed — it previously fired ExtractConversationInsightsAsync
+    // and UpdateUserPreferencesAsync in a fire-and-forget Task.Run, but both only updated
+    // the in-memory _memoryState field which is never persisted to the DB.
+    // This wasted an entire LLM call (5-45s) per request for insights that were immediately
+    // garbage collected. The fire-and-forget also leaked Activity context, causing spurious
+    // telemetry spans to appear in the next request's trace.
 
     /// <summary>
     /// Load recent conversation summaries using tiered memory approach with token budgeting
@@ -476,116 +439,6 @@ public class PortfolioMemoryContextProvider : AIContextProvider
         instructions.AppendLine("- Reference previous conversations when relevant");
         instructions.AppendLine();
     }
-
-    /// <summary>
-    /// Extract insights from the conversation for future reference
-    /// </summary>
-    private async Task ExtractConversationInsightsAsync(InvokedContext context, CancellationToken cancellationToken)
-    {
-        try
-        {
-            var userMessages = context.RequestMessages
-                .Where(m => m.Role == ChatRole.User)
-                .Select(m => m.Text ?? string.Empty)
-                .Where(text => !string.IsNullOrWhiteSpace(text))
-                .ToList();
-
-            if (!userMessages.Any()) return;
-
-            var conversationText = string.Join(" ", userMessages);
-            
-            // Use AI to extract insights
-            var extractionPrompt = $@"
-Analyze this portfolio-related conversation and extract:
-1. User investment preferences or goals
-2. Areas of concern or interest
-3. Specific financial instruments mentioned
-4. Risk tolerance indicators
-
-Conversation: {conversationText}
-
-Respond in JSON format:
-{{
-    ""preferences"": {{""key"": ""value""}},
-    ""concerns"": [""concern1"", ""concern2""],
-    ""instruments"": [""AAPL"", ""MSFT""],
-    ""riskTolerance"": ""conservative|moderate|aggressive""
-}}";
-
-            try
-            {
-            var response = await _chatClient.GetResponseAsync(
-                [new AIChatMessage(ChatRole.User, extractionPrompt)],
-                new ChatOptions(), // Remove temperature - use model default
-                cancellationToken);                if (!string.IsNullOrEmpty(response.Text))
-                {
-                    var insights = JsonSerializer.Deserialize<ConversationInsights>(response.Text);
-                    if (insights != null)
-                    {
-                        // Update memory state with extracted insights
-                        foreach (var preference in insights.Preferences ?? new Dictionary<string, string>())
-                        {
-                            _memoryState.UserPreferences[preference.Key] = preference.Value;
-                        }
-
-                        if (!string.IsNullOrEmpty(insights.RiskTolerance))
-                        {
-                            _memoryState.UserPreferences["RiskTolerance"] = insights.RiskTolerance;
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to extract conversation insights for account {AccountId}", _accountId);
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error in ExtractConversationInsightsAsync for account {AccountId}", _accountId);
-        }
-    }
-
-    /// <summary>
-    /// Update user preferences based on conversation patterns
-    /// </summary>
-    private async Task UpdateUserPreferencesAsync(InvokedContext context, CancellationToken cancellationToken)
-    {
-        // Simple preference learning based on question patterns
-        var userMessages = context.RequestMessages
-            .Where(m => m.Role == ChatRole.User)
-            .Select(m => m.Text?.ToLowerInvariant() ?? string.Empty)
-            .ToList();
-
-        foreach (var message in userMessages)
-        {
-            // Detect communication preferences
-            if (message.Contains("detailed") || message.Contains("comprehensive"))
-            {
-                _memoryState.UserPreferences["CommunicationStyle"] = "Detailed";
-            }
-            else if (message.Contains("brief") || message.Contains("summary"))
-            {
-                _memoryState.UserPreferences["CommunicationStyle"] = "Brief";
-            }
-
-            // Detect analysis preferences
-            if (message.Contains("risk") || message.Contains("safe"))
-            {
-                _memoryState.UserPreferences["FocusArea"] = "Risk Analysis";
-            }
-            else if (message.Contains("performance") || message.Contains("return"))
-            {
-                _memoryState.UserPreferences["FocusArea"] = "Performance Analysis";
-            }
-            else if (message.Contains("news") || message.Contains("market"))
-            {
-                _memoryState.UserPreferences["FocusArea"] = "Market Intelligence";
-            }
-        }
-
-        await Task.CompletedTask;
-    }
 }
 
 /// <summary>
@@ -595,15 +448,4 @@ public class PortfolioMemoryState
 {
     public Dictionary<string, string> UserPreferences { get; set; } = new();
     public Dictionary<string, object> ConversationMetrics { get; set; } = new();
-}
-
-/// <summary>
-/// Structure for AI-extracted conversation insights
-/// </summary>
-public class ConversationInsights
-{
-    public Dictionary<string, string>? Preferences { get; set; }
-    public string[]? Concerns { get; set; }
-    public string[]? Instruments { get; set; }
-    public string? RiskTolerance { get; set; }
 }
