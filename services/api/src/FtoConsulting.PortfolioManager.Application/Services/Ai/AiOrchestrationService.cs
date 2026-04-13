@@ -220,12 +220,13 @@ For casual conversation, respond naturally without using tools.";
         
         // Build a compaction pipeline to manage context window efficiently:
         // 1. ToolResultCompactionStrategy — compacts verbose MCP tool result payloads (holdings JSON, market data) into YAML summaries
-        // 2. SummarizationCompactionStrategy — when conversation exceeds 10 turns, older turns are summarised by the LLM
-        //    instead of being silently dropped (preserves context that a sliding window would lose)
+        // 2. SlidingWindowCompactionStrategy — when conversation exceeds 10 turns, oldest turns are dropped.
+        //    This is a lightweight, zero-latency approach that avoids the extra LLM call that
+        //    SummarizationCompactionStrategy requires (which adds ~60s and leaks stale context).
         var compactionProvider = new CompactionProvider(
             new PipelineCompactionStrategy([
                 new ToolResultCompactionStrategy(CompactionTriggers.HasToolCalls()),
-                new SummarizationCompactionStrategy(chatClient, CompactionTriggers.TurnsExceed(10), minimumPreservedGroups: 5)
+                new SlidingWindowCompactionStrategy(CompactionTriggers.TurnsExceed(10), minimumPreservedTurns: 5)
             ]),
             stateKey: "portfolio-compaction",
             loggerFactory: loggerFactory);
