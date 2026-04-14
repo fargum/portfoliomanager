@@ -85,7 +85,7 @@ public class PortfolioReportService : IPortfolioReportService
                 return Task.CompletedTask;
             },
             threadId: null,
-            modelId: null,
+            modelId: "grok-4-fast-reasoning",
             storeInHistory: false,
             cancellationToken: cancellationToken);
 
