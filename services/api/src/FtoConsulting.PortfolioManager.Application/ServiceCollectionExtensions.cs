@@ -90,8 +90,7 @@ public static class ServiceCollectionExtensions
             }
             
             var logger = serviceProvider.GetRequiredService<ILogger<AzureOpenAiChatService>>();
-            var azureFoundryOptions = serviceProvider.GetRequiredService<IOptions<AzureFoundryOptions>>();
-            return new AzureOpenAiChatService(openAiClient, azureFoundryOptions, logger);
+            return new AzureOpenAiChatService(openAiClient, logger);
         });
         
         // Register AI services (now in correct Application layer)

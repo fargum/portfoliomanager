@@ -1,9 +1,7 @@
 using OpenAI;
 using OpenAI.Chat;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Microsoft.Extensions.AI;
-using FtoConsulting.PortfolioManager.Application.Configuration;
 using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 
 
@@ -14,7 +12,6 @@ namespace FtoConsulting.PortfolioManager.Application.Services.Ai;
 /// </summary>
 public class AzureOpenAiChatService(
     OpenAIClient openAiClient,
-    IOptions<AzureFoundryOptions> azureFoundryOptions,
     ILogger<AzureOpenAiChatService> logger) : IAiChatService
 {
 
@@ -44,9 +41,10 @@ public class AzureOpenAiChatService(
                 return new Microsoft.Extensions.AI.ChatMessage(role, content);
             });
 
-            // Use instrumented chat client for telemetry (uses default model for memory/intelligence tasks)
+            // Use a fast, cheap model for background tasks (memory extraction, market intelligence).
+            // These are simple JSON-extraction calls that don't need a powerful model.
             var instrumentedChatClient = openAiClient
-                .GetChatClient(azureFoundryOptions.Value.ModelName)
+                .GetChatClient("gpt-4o-mini")
                 .AsIChatClient()
                 .AsBuilder()
                 .UseOpenTelemetry(sourceName: "PortfolioManager.AI.DirectChat", 
