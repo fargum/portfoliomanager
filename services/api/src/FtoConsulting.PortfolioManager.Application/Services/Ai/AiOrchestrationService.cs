@@ -8,6 +8,7 @@ using Microsoft.Agents.AI.Compaction;
 using OpenAI;
 using System.ClientModel;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 using FtoConsulting.PortfolioManager.Application.Services.Ai.Guardrails;
 using FtoConsulting.PortfolioManager.Domain.Entities;
@@ -22,13 +23,13 @@ namespace FtoConsulting.PortfolioManager.Application.Services.Ai;
 public class AiOrchestrationService(
     ILogger<AiOrchestrationService> logger,
     IOptions<AzureFoundryOptions> azureFoundryOptions,
-    IMcpServerService mcpServerService,
     IConversationThreadService conversationThreadService,
     IAgentPromptService agentPromptService,
     AgentFrameworkGuardrails guardrails,
     Func<int, int?, ChatHistoryProvider> chatMessageStoreFactory,
     Func<int, IChatClient, AIContextProvider> memoryContextProviderFactory,
-    ILoggerFactory loggerFactory) : IAiOrchestrationService
+    ILoggerFactory loggerFactory,
+    IServiceScopeFactory serviceScopeFactory) : IAiOrchestrationService
 {
     private static readonly ActivitySource s_activitySource = new("PortfolioManager.AI");
 
@@ -156,17 +157,23 @@ For casual conversation, respond naturally without using tools.";
     }
 
     /// <summary>
-    /// Call an MCP tool through our local MCP server
+    /// Call an MCP tool through our local MCP server.
+    /// Each call gets its own DI scope so concurrent invocations have isolated DbContext
+    /// instances and do not race on the same EF Core context.
     /// </summary>
     private async Task<object> CallMcpTool(string toolName, Dictionary<string, object> parameters)
     {
+        // Create a dedicated scope for this tool call so that the DbContext it resolves
+        // is never shared with a concurrently-running tool call on another thread.
+        await using var scope = serviceScopeFactory.CreateAsyncScope();
+        var scopedMcpService = scope.ServiceProvider.GetRequiredService<IMcpServerService>();
+
         try
         {
             logger.LogInformation("Calling MCP tool: {ToolName} with parameters: {@Parameters}", toolName, parameters);
-            
-            // Call our MCP server service directly (more efficient than HTTP calls)
-            var result = await mcpServerService.ExecuteToolAsync(toolName, parameters);
-            
+
+            var result = await scopedMcpService.ExecuteToolAsync(toolName, parameters);
+
             logger.LogInformation("Successfully executed MCP tool: {ToolName}", toolName);
             return result;
         }
