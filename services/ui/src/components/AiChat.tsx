@@ -47,7 +47,7 @@ I can analyze your holdings, market conditions, and provide insights to help you
 
   useEffect(() => {
     scrollToBottom();
-  }, [chatState.messages]);
+  }, [chatState.messages.length]);
 
   // Scroll to bottom when component becomes visible
   useEffect(() => {

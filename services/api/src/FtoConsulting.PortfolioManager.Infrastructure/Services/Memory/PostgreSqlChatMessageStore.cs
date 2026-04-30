@@ -111,9 +111,6 @@ public class PostgreSqlChatMessageStore : ChatHistoryProvider
                 return [];
             }
 
-            // Only load messages from the current day to prevent stale context from old sessions.
-            // Long-term memory is handled separately by PortfolioMemoryContextProvider,
-            // so chat history should only provide current-session context.
             // The CompactionProvider (SlidingWindow) further trims within this window.
             var cutoff = DateTime.UtcNow.Date; // Start of today (UTC)
             var dbMessages = await _dbContext.ChatMessages
@@ -123,6 +120,9 @@ public class PostgreSqlChatMessageStore : ChatHistoryProvider
                 .Take(50)
                 .OrderBy(cm => cm.MessageTimestamp)
                 .ToListAsync(cancellationToken);
+            // Only load messages from the current day to prevent stale context from old sessions.
+            // Long-term memory is handled separately by PortfolioMemoryContextProvider,
+            // so chat history should only provide current-session context.
 
             _logger.LogDebug("Loaded {Count} messages from thread {ThreadId} since {Cutoff} for account {AccountId}",
                 dbMessages.Count, _conversationThreadId, cutoff, _accountId);
