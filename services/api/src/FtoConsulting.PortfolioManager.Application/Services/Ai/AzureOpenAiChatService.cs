@@ -44,7 +44,7 @@ public class AzureOpenAiChatService(
             // Use a fast, cheap model for background tasks (memory extraction, market intelligence).
             // These are simple JSON-extraction calls that don't need a powerful model.
             var instrumentedChatClient = openAiClient
-                .GetChatClient("gpt-4o-mini")
+                .GetChatClient("gpt-5.4-mini")
                 .AsIChatClient()
                 .AsBuilder()
                 .UseOpenTelemetry(sourceName: "PortfolioManager.AI.DirectChat", 

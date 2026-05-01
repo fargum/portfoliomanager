@@ -30,7 +30,7 @@ public class AzureFoundryOptions
     /// <summary>
     /// Default model deployment name used when the caller does not specify one.
     /// </summary>
-    public string ModelName { get; set; } = "gpt-5-mini";
+    public string ModelName { get; set; } = "gpt-5.4-mini";
 
     /// <summary>
     /// Timeout for API requests in seconds
