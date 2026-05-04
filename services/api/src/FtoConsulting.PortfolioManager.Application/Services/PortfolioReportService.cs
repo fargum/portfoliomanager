@@ -85,7 +85,7 @@ public class PortfolioReportService : IPortfolioReportService
                 return Task.CompletedTask;
             },
             threadId: null,
-            modelId: "grok-4-20-non-reasoning",
+            modelId: "gpt-5.4-mini",
             storeInHistory: false,
             cancellationToken: cancellationToken);
 
