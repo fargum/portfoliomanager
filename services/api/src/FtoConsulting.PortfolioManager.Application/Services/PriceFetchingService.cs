@@ -291,10 +291,13 @@ public class PriceFetchingService(
                 throw new InvalidOperationException("EOD API token is not configured.");
             }
             
-            // Use direct HTTP call to EOD API endpoint for historical data on specific date
+            // Use direct HTTP call to EOD API endpoint for historical data on specific date.
+            // Fetch a 7-day window ending on the valuation date so that instruments with a
+            // publication lag (e.g. ETFs) can still return the most recent available close.
             var symbol = ticker.Contains('.') ? ticker : $"{ticker}.{DEFAULT_EXCHANGE}"; // Default to LSE if no exchange specified
-            var dateString = valuationDate.ToString("yyyy-MM-dd");
-            var url = $"{_eodApiOptions.BaseUrl}/eod/{symbol}?api_token={_eodApiOptions.Token}&fmt=json&from={dateString}&to={dateString}";
+            var fromDate = valuationDate.AddDays(-7).ToString("yyyy-MM-dd");
+            var toDate = valuationDate.ToString("yyyy-MM-dd");
+            var url = $"{_eodApiOptions.BaseUrl}/eod/{symbol}?api_token={_eodApiOptions.Token}&fmt=json&from={fromDate}&to={toDate}";
             
             using var httpClient = new HttpClient();
             
@@ -327,16 +330,25 @@ httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
                     return null;
                 }
                 
-                // Get the price data for the requested date (should be only one record when using from/to date range)
-                var requestedDatePrice = priceData.FirstOrDefault(p => 
-                    DateTime.Parse(p.Date).Date == valuationDate.ToDateTime(TimeOnly.MinValue).Date);
-                
-                
+                // Get the price data for the requested date, falling back to the most recent available date
+                // (some instruments like ETFs may have a publication lag on EOD's historical endpoint)
+                var requestedDatePrice = priceData
+                    .Where(p => DateTime.Parse(p.Date).Date <= valuationDate.ToDateTime(TimeOnly.MinValue).Date)
+                    .OrderByDescending(p => p.Date)
+                    .FirstOrDefault();
+
                 if (requestedDatePrice == null)
                 {
-                    logger.LogWarning("No price data available for the specific date {ValuationDate} for {Ticker}. Available dates: {AvailableDates}",
+                    logger.LogWarning("No price data available on or before {ValuationDate} for {Ticker}. Available dates: {AvailableDates}",
                         valuationDate, ticker, string.Join(", ", priceData.Select(p => p.Date)));
                     return null;
+                }
+
+                var priceDate = DateTime.Parse(requestedDatePrice.Date).Date;
+                if (priceDate != valuationDate.ToDateTime(TimeOnly.MinValue).Date)
+                {
+                    logger.LogInformation("Using price from {PriceDate} for {Ticker} (requested {ValuationDate}) — exact date not available in EOD historical data",
+                        priceDate.ToString("yyyy-MM-dd"), ticker, valuationDate);
                 }
                 
                 // Map the EOD data to our InstrumentPriceData
