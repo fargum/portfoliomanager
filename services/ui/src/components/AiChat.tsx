@@ -335,7 +335,7 @@ I can analyze your holdings, market conditions, and provide insights to help you
         <div className={`flex items-start space-x-2 sm:space-x-3 max-w-[95%] ${isUser ? 'flex-row-reverse space-x-reverse' : ''}`}>
           {/* Avatar - smaller on mobile */}
           <div className={`flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center shadow-lg ${
-            isUser ? 'bg-gradient-to-br from-financial-blue-500 to-financial-indigo-600 text-white' : 
+            isUser ? 'bg-gradient-to-br from-financial-blue-500 to-financial-indigo-600 dark:from-financial-slate-700 dark:to-financial-indigo-900 text-white' : 
             isSystem ? 'bg-gradient-to-br from-financial-slate-500 to-financial-slate-600 text-white' : 
             'bg-gradient-to-br from-financial-emerald-500 to-financial-emerald-600 text-white'
           }`}>
@@ -344,7 +344,7 @@ I can analyze your holdings, market conditions, and provide insights to help you
           
           {/* Message Content - responsive padding */}
           <div className={`rounded-xl sm:rounded-2xl px-3 py-2.5 sm:px-5 sm:py-4 shadow-lg border backdrop-blur-sm ${
-            isUser ? 'bg-gradient-to-br from-financial-blue-600 to-financial-indigo-600 text-white border-financial-blue-200' : 
+            isUser ? 'bg-gradient-to-br from-financial-blue-600 to-financial-indigo-600 dark:from-financial-slate-800 dark:to-financial-indigo-900 text-white border-financial-blue-200 dark:border-financial-indigo-700/50' : 
             isSystem ? 'bg-gradient-to-br from-financial-slate-50 to-white dark:from-financial-slate-900 dark:to-financial-slate-900 text-financial-slate-800 dark:text-financial-slate-100 border-financial-slate-200 dark:border-financial-slate-700' :
             message.error ? 'bg-gradient-to-br from-financial-rose-50 to-white dark:from-financial-rose-950/30 dark:to-financial-slate-900 text-financial-rose-800 dark:text-financial-rose-200 border-financial-rose-200 dark:border-financial-rose-900' :
             'bg-gradient-to-br from-white to-financial-slate-50/30 dark:from-financial-slate-900 dark:to-financial-slate-800 text-financial-slate-800 dark:text-financial-slate-100 border-financial-slate-200 dark:border-financial-slate-700'
@@ -491,7 +491,7 @@ I can analyze your holdings, market conditions, and provide insights to help you
                 )}
                 
                 <div className={`text-xs mt-2 flex items-center ${
-                  isUser ? 'text-blue-200' : 'text-gray-500 dark:text-financial-slate-400'
+                  isUser ? 'text-blue-200 dark:text-financial-slate-300' : 'text-gray-500 dark:text-financial-slate-400'
                 }`}>
                   <Clock className="h-3 w-3 mr-1" />
                   {message.timestamp.toLocaleTimeString()}
