@@ -261,12 +261,12 @@ I can analyze your holdings, market conditions, and provide insights to help you
   };
 
   const renderInsight = (insight: InsightDto, index: number) => (
-    <div key={index} className="bg-blue-50 border border-blue-200 rounded-lg p-2.5 sm:p-3 mt-1.5 sm:mt-2">
+    <div key={index} className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 rounded-lg p-2.5 sm:p-3 mt-1.5 sm:mt-2">
       <div className="flex items-start space-x-1.5 sm:space-x-2">
         <Lightbulb className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600 mt-0.5 flex-shrink-0" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center space-x-1.5 sm:space-x-2 flex-wrap">
-            <h4 className="font-medium text-blue-900 text-xs sm:text-sm">{insight.title}</h4>
+            <h4 className="font-medium text-blue-900 dark:text-blue-200 text-xs sm:text-sm">{insight.title}</h4>
             <span className={`px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium ${
               insight.impact === 'High' ? 'bg-red-100 text-red-800' :
               insight.impact === 'Medium' ? 'bg-yellow-100 text-yellow-800' :
@@ -275,26 +275,26 @@ I can analyze your holdings, market conditions, and provide insights to help you
               {insight.impact}
             </span>
           </div>
-          <p className="text-blue-800 text-xs sm:text-sm mt-1">{insight.description}</p>
-          <span className="text-blue-600 text-[10px] sm:text-xs mt-1 block">{insight.category}</span>
+          <p className="text-blue-800 dark:text-blue-300 text-xs sm:text-sm mt-1">{insight.description}</p>
+          <span className="text-blue-600 dark:text-blue-400 text-[10px] sm:text-xs mt-1 block">{insight.category}</span>
         </div>
       </div>
     </div>
   );
 
   const renderPortfolioSummary = (summary: any) => (
-    <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 sm:p-4 mt-2 sm:mt-3">
-      <h4 className="font-semibold text-gray-900 text-sm sm:text-base mb-2 sm:mb-3 flex items-center">
+    <div className="bg-gray-50 dark:bg-financial-slate-900 border border-gray-200 dark:border-financial-slate-700 rounded-lg p-3 sm:p-4 mt-2 sm:mt-3">
+      <h4 className="font-semibold text-gray-900 dark:text-financial-slate-100 text-sm sm:text-base mb-2 sm:mb-3 flex items-center">
         <Activity className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
         Portfolio Summary
       </h4>
       <div className="grid grid-cols-2 gap-2 sm:gap-4">
         <div>
-          <p className="text-xs sm:text-sm text-gray-600">Total Value</p>
-          <p className="font-bold text-base sm:text-lg">{formatCurrency(summary.totalValue)}</p>
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-financial-slate-400">Total Value</p>
+          <p className="font-bold text-base sm:text-lg text-gray-900 dark:text-financial-slate-100">{formatCurrency(summary.totalValue)}</p>
         </div>
         <div>
-          <p className="text-xs sm:text-sm text-gray-600">Day Change</p>
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-financial-slate-400">Day Change</p>
           <p className={`font-bold text-base sm:text-lg flex items-center ${
             summary.dayChange >= 0 ? 'text-green-600' : 'text-red-600'
           }`}>
@@ -303,20 +303,20 @@ I can analyze your holdings, market conditions, and provide insights to help you
           </p>
         </div>
         <div>
-          <p className="text-xs sm:text-sm text-gray-600">Holdings Count</p>
-          <p className="font-bold text-sm sm:text-base">{summary.holdingsCount}</p>
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-financial-slate-400">Holdings Count</p>
+          <p className="font-bold text-sm sm:text-base text-gray-900 dark:text-financial-slate-100">{summary.holdingsCount}</p>
         </div>
         <div>
-          <p className="text-xs sm:text-sm text-gray-600">Date</p>
-          <p className="font-bold text-sm sm:text-base">{new Date(summary.date).toLocaleDateString()}</p>
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-financial-slate-400">Date</p>
+          <p className="font-bold text-sm sm:text-base text-gray-900 dark:text-financial-slate-100">{new Date(summary.date).toLocaleDateString()}</p>
         </div>
       </div>
       {summary.topHoldings && summary.topHoldings.length > 0 && (
         <div className="mt-2 sm:mt-3">
-          <p className="text-xs sm:text-sm text-gray-600 mb-1.5 sm:mb-2">Top Holdings</p>
+          <p className="text-xs sm:text-sm text-gray-600 dark:text-financial-slate-400 mb-1.5 sm:mb-2">Top Holdings</p>
           <div className="flex flex-wrap gap-1.5 sm:gap-2">
             {summary.topHoldings.map((holding: string, index: number) => (
-              <span key={index} className="bg-blue-100 text-blue-800 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium">
+              <span key={index} className="bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200 px-1.5 py-0.5 sm:px-2 sm:py-1 rounded-full text-[10px] sm:text-xs font-medium">
                 {holding}
               </span>
             ))}
@@ -345,9 +345,9 @@ I can analyze your holdings, market conditions, and provide insights to help you
           {/* Message Content - responsive padding */}
           <div className={`rounded-xl sm:rounded-2xl px-3 py-2.5 sm:px-5 sm:py-4 shadow-lg border backdrop-blur-sm ${
             isUser ? 'bg-gradient-to-br from-financial-blue-600 to-financial-indigo-600 text-white border-financial-blue-200' : 
-            isSystem ? 'bg-gradient-to-br from-financial-slate-50 to-white text-financial-slate-800 border-financial-slate-200' :
-            message.error ? 'bg-gradient-to-br from-financial-rose-50 to-white text-financial-rose-800 border-financial-rose-200' :
-            'bg-gradient-to-br from-white to-financial-slate-50/30 text-financial-slate-800 border-financial-slate-200'
+            isSystem ? 'bg-gradient-to-br from-financial-slate-50 to-white dark:from-financial-slate-900 dark:to-financial-slate-900 text-financial-slate-800 dark:text-financial-slate-100 border-financial-slate-200 dark:border-financial-slate-700' :
+            message.error ? 'bg-gradient-to-br from-financial-rose-50 to-white dark:from-financial-rose-950/30 dark:to-financial-slate-900 text-financial-rose-800 dark:text-financial-rose-200 border-financial-rose-200 dark:border-financial-rose-900' :
+            'bg-gradient-to-br from-white to-financial-slate-50/30 dark:from-financial-slate-900 dark:to-financial-slate-800 text-financial-slate-800 dark:text-financial-slate-100 border-financial-slate-200 dark:border-financial-slate-700'
           }`}>
             {message.isLoading ? (
               <div className="flex items-center space-x-2">
@@ -404,27 +404,27 @@ I can analyze your holdings, market conditions, and provide insights to help you
                           </td>
                         ),
                         h1: ({ children }) => (
-                          <h1 className="text-lg sm:text-xl font-bold text-gray-900 mb-2 sm:mb-3">
+                          <h1 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-financial-slate-100 mb-2 sm:mb-3">
                             {children}
                           </h1>
                         ),
                         h2: ({ children }) => (
-                          <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-1.5 sm:mb-2">
+                          <h2 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-financial-slate-100 mb-1.5 sm:mb-2">
                             {children}
                           </h2>
                         ),
                         h3: ({ children }) => (
-                          <h3 className="text-md font-medium text-gray-900 mb-2">
+                          <h3 className="text-md font-medium text-gray-900 dark:text-financial-slate-100 mb-2">
                             {children}
                           </h3>
                         ),
                         p: ({ children }) => (
-                          <p className="mb-2 text-gray-800">
+                          <p className="mb-2 text-gray-800 dark:text-financial-slate-200">
                             {children}
                           </p>
                         ),
                         strong: ({ children }) => (
-                          <strong className="font-semibold text-gray-900">
+                          <strong className="font-semibold text-gray-900 dark:text-financial-slate-100">
                             {children}
                           </strong>
                         ),
@@ -439,17 +439,17 @@ I can analyze your holdings, market conditions, and provide insights to help you
                           </ol>
                         ),
                         li: ({ children }) => (
-                          <li className="text-gray-800 mb-1">
+                          <li className="text-gray-800 dark:text-financial-slate-200 mb-1">
                             {children}
                           </li>
                         ),
                         code: ({ children, ...props }) => (
                           props.className?.includes('inline') || !props.className ? (
-                            <code className="bg-gray-100 text-gray-800 px-1 py-0.5 rounded text-sm font-mono">
+                            <code className="bg-gray-100 dark:bg-financial-slate-800 text-gray-800 dark:text-financial-slate-100 px-1 py-0.5 rounded text-sm font-mono">
                               {children}
                             </code>
                           ) : (
-                            <pre className="bg-gray-100 text-gray-800 p-3 rounded-lg overflow-x-auto">
+                            <pre className="bg-gray-100 dark:bg-financial-slate-800 text-gray-800 dark:text-financial-slate-100 p-3 rounded-lg overflow-x-auto">
                               <code className="text-sm font-mono">
                                 {children}
                               </code>
@@ -457,7 +457,7 @@ I can analyze your holdings, market conditions, and provide insights to help you
                           )
                         ),
                         blockquote: ({ children }) => (
-                          <blockquote className="border-l-4 border-blue-500 pl-4 italic text-gray-700 my-2">
+                          <blockquote className="border-l-4 border-blue-500 pl-4 italic text-gray-700 dark:text-financial-slate-300 my-2">
                             {children}
                           </blockquote>
                         ),
@@ -482,7 +482,7 @@ I can analyze your holdings, market conditions, and provide insights to help you
                 
                 {message.insights && message.insights.length > 0 && (
                   <div className="mt-3">
-                    <h4 className="font-medium text-gray-900 mb-2 flex items-center">
+                    <h4 className="font-medium text-gray-900 dark:text-financial-slate-100 mb-2 flex items-center">
                       <Lightbulb className="h-4 w-4 mr-2" />
                       Insights
                     </h4>
@@ -491,12 +491,12 @@ I can analyze your holdings, market conditions, and provide insights to help you
                 )}
                 
                 <div className={`text-xs mt-2 flex items-center ${
-                  isUser ? 'text-blue-200' : 'text-gray-500'
+                  isUser ? 'text-blue-200' : 'text-gray-500 dark:text-financial-slate-400'
                 }`}>
                   <Clock className="h-3 w-3 mr-1" />
                   {message.timestamp.toLocaleTimeString()}
                   {message.queryType && (
-                    <span className="ml-2 bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full">
+                    <span className="ml-2 bg-gray-200 dark:bg-financial-slate-700 text-gray-700 dark:text-financial-slate-200 px-2 py-0.5 rounded-full">
                       {message.queryType}
                     </span>
                   )}
@@ -510,18 +510,18 @@ I can analyze your holdings, market conditions, and provide insights to help you
   };
 
   return (
-    <div className={`flex flex-col h-full bg-white ${className}`}>
+    <div className={`flex flex-col h-full bg-white dark:bg-financial-slate-900 ${className}`}>
       {!isAuthenticated ? (
         // Authentication required state
         <div className="flex-1 flex items-center justify-center p-8">
           <div className="text-center max-w-md">
-            <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <div className="w-20 h-20 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
               <Bot className="h-10 w-10 text-blue-600" />
             </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-3">
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-financial-slate-100 mb-3">
               AI Assistant Ready
             </h3>
-            <p className="text-gray-600 mb-6">
+            <p className="text-gray-600 dark:text-financial-slate-300 mb-6">
               Sign in to access your AI portfolio assistant and get personalized insights about your investments.
             </p>
             <button
@@ -531,7 +531,7 @@ I can analyze your holdings, market conditions, and provide insights to help you
               <LogIn className="h-5 w-5" />
               <span>Sign In to Start</span>
             </button>
-            <p className="text-sm text-gray-500 mt-4">
+            <p className="text-sm text-gray-500 dark:text-financial-slate-400 mt-4">
               Once authenticated, you can ask questions about your portfolio performance, holdings, and get market insights.
             </p>
           </div>
@@ -540,22 +540,22 @@ I can analyze your holdings, market conditions, and provide insights to help you
         // Authenticated chat interface
         <>
           {/* Messages - reduced padding on mobile */}
-          <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-4 sm:space-y-6 bg-gradient-to-br from-white to-financial-slate-50/30">
+          <div className="flex-1 overflow-y-auto p-3 sm:p-6 space-y-4 sm:space-y-6 bg-gradient-to-br from-white to-financial-slate-50/30 dark:from-financial-slate-900 dark:to-financial-slate-900">
             {chatState.messages.map(renderMessage)}
             <div ref={messagesEndRef} />
           </div>
 
           {/* Input - compact on mobile */}
-          <div className="border-t border-financial-slate-200 p-2 sm:p-4 bg-white/95 backdrop-blur-sm">
+          <div className="border-t border-financial-slate-200 dark:border-financial-slate-700 p-2 sm:p-4 bg-white/95 dark:bg-financial-slate-900/95 backdrop-blur-sm">
           {/* Model selector — shown above input when multiple models are available */}
           {availableModels.length > 1 && (
             <div className="flex items-center space-x-2 mb-2 px-1">
-              <span className="text-xs text-financial-slate-500 font-medium whitespace-nowrap">Model:</span>
+              <span className="text-xs text-financial-slate-500 dark:text-financial-slate-400 font-medium whitespace-nowrap">Model:</span>
               <select
                 value={selectedModelId ?? ''}
                 onChange={(e) => setSelectedModelId(e.target.value)}
                 disabled={chatState.isLoading}
-                className="text-xs border border-financial-slate-200 rounded-lg px-2 py-1.5 text-financial-slate-700 bg-white focus:outline-none focus:ring-1 focus:ring-financial-blue-500 disabled:opacity-50 cursor-pointer"
+                className="text-xs border border-financial-slate-200 dark:border-financial-slate-700 rounded-lg px-2 py-1.5 text-financial-slate-700 dark:text-financial-slate-200 bg-white dark:bg-financial-slate-900 focus:outline-none focus:ring-1 focus:ring-financial-blue-500 disabled:opacity-50 cursor-pointer"
               >
                 {availableModels.map(m => (
                   <option key={m.id} value={m.id}>{m.displayName}</option>
@@ -571,7 +571,7 @@ I can analyze your holdings, market conditions, and provide insights to help you
                 onChange={(e) => setInputValue(e.target.value)}
                 placeholder="Ask me about your portfolio..."
                 disabled={chatState.isLoading}
-                className="flex-1 border border-financial-slate-300 rounded-lg sm:rounded-xl px-3 py-2 sm:px-4 sm:py-3 focus:outline-none focus:ring-2 focus:ring-financial-blue-500 focus:border-transparent disabled:bg-financial-slate-100 disabled:cursor-not-allowed text-sm sm:text-base text-financial-slate-800 placeholder-financial-slate-500 shadow-sm"
+                className="flex-1 border border-financial-slate-300 dark:border-financial-slate-700 rounded-lg sm:rounded-xl px-3 py-2 sm:px-4 sm:py-3 focus:outline-none focus:ring-2 focus:ring-financial-blue-500 focus:border-transparent disabled:bg-financial-slate-100 dark:disabled:bg-financial-slate-800 disabled:cursor-not-allowed text-sm sm:text-base text-financial-slate-800 dark:text-financial-slate-100 placeholder-financial-slate-500 dark:placeholder-financial-slate-400 shadow-sm"
               />
               <button
                 type="submit"
@@ -583,7 +583,7 @@ I can analyze your holdings, market conditions, and provide insights to help you
             </form>
             
             {chatState.error && (
-              <div className="mt-3 text-sm text-red-600 flex items-center justify-between bg-red-50 p-3 rounded-lg border border-red-200">
+              <div className="mt-3 text-sm text-red-600 dark:text-red-300 flex items-center justify-between bg-red-50 dark:bg-red-950/30 p-3 rounded-lg border border-red-200 dark:border-red-900">
                 <div className="flex items-center">
                   <AlertCircle className="h-4 w-4 mr-2 flex-shrink-0" />
                   <span>{chatState.error}</span>

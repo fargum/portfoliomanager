@@ -6,6 +6,7 @@ import { HoldingResponse } from '@/types/api';
 import { apiClient } from '@/lib/api-client';
 import { useAuth } from '@/contexts/AuthContext';
 import { getHoldingsColumnDefs, getGridOptions, calculateTotalValue, calculateTotalBoughtValue, calculateTotalGainLoss, calculateTotalGainLossPercentage, calculateTotalDailyPnL, calculateAverageDailyPnLPercentage, formatCurrency } from '@/lib/grid-utils';
+import { useTheme } from '@/contexts/ThemeContext';
 import { Calendar, Search, TrendingUp, PoundSterling, PieChart, RefreshCw, Trash2, Plus, X, DollarSign, TrendingDown, Activity, Zap, Target, BarChart4, Wallet, CreditCard } from 'lucide-react';
 
 // AG Grid CSS imports (we'll handle these in the layout)
@@ -27,6 +28,7 @@ interface HoldingsGridProps {
 
 export const HoldingsGrid: React.FC<HoldingsGridProps> = () => {
   const { userInfo } = useAuth();
+  const { resolvedTheme } = useTheme();
   const [holdings, setHoldings] = useState<HoldingResponse[]>([]);
   const holdingsRef = useRef<HoldingResponse[]>([]);
   const [loading, setLoading] = useState(false);
@@ -308,7 +310,7 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = () => {
     } finally {
       setIsAdding(false);
     }
-  }, [holdings, fetchHoldings]);
+  }, [fetchHoldings]);
 
   useEffect(() => {
     fetchHoldings();
@@ -331,7 +333,7 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = () => {
   return (
     <div className="w-full h-full bg-transparent flex flex-col">
       {/* Mobile Summary Card - Only visible on mobile */}
-      <div className="md:hidden bg-gradient-to-r from-financial-blue-600 to-financial-indigo-600 p-3 text-white">
+      <div className="md:hidden bg-gradient-to-r from-financial-blue-600 to-financial-indigo-600 dark:from-financial-slate-800 dark:via-financial-indigo-900 dark:to-financial-slate-800 p-3 text-white">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-2">
             <PieChart className="h-4 w-4" />
@@ -340,7 +342,7 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = () => {
           <button
             onClick={fetchHoldings}
             disabled={loading}
-            className="bg-white/20 hover:bg-white/30 p-1.5 rounded-md"
+            className="bg-white/20 hover:bg-white/30 dark:bg-financial-slate-700/60 dark:hover:bg-financial-slate-600/70 p-1.5 rounded-md"
           >
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
           </button>
@@ -348,24 +350,24 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = () => {
         
         {/* Compact Stats Grid */}
         <div className="grid grid-cols-2 gap-2 mb-2">
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-2">
+          <div className="bg-white/10 dark:bg-financial-slate-800/45 backdrop-blur-sm rounded-lg p-2 border border-transparent dark:border-financial-slate-600/40">
             <div className="flex items-center space-x-1 mb-1">
-              <Wallet className="h-3 w-3 text-blue-200" />
-              <p className="text-[10px] text-blue-100 uppercase tracking-wide">Value</p>
+              <Wallet className="h-3 w-3 text-blue-200 dark:text-financial-slate-400" />
+              <p className="text-[10px] text-blue-100 dark:text-financial-slate-300 uppercase tracking-wide">Value</p>
             </div>
             <p className="text-base font-bold">
               {formatCurrency(filteredTotalValue > 0 ? filteredTotalValue : totalValue)}
             </p>
           </div>
           
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-2">
+          <div className="bg-white/10 dark:bg-financial-slate-800/45 backdrop-blur-sm rounded-lg p-2 border border-transparent dark:border-financial-slate-600/40">
             <div className="flex items-center space-x-1 mb-1">
               {totalGainLoss >= 0 ? (
                 <TrendingUp className="h-3 w-3 text-green-200" />
               ) : (
                 <TrendingDown className="h-3 w-3 text-red-200" />
               )}
-              <p className="text-[10px] text-blue-100 uppercase tracking-wide">Total P&L</p>
+              <p className="text-[10px] text-blue-100 dark:text-financial-slate-300 uppercase tracking-wide">Total P&L</p>
             </div>
             <p className={`text-sm font-bold ${
               totalGainLoss >= 0 ? 'text-green-200' : 'text-red-200'
@@ -379,10 +381,10 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = () => {
             </p>
           </div>
           
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-2">
+          <div className="bg-white/10 dark:bg-financial-slate-800/45 backdrop-blur-sm rounded-lg p-2 border border-transparent dark:border-financial-slate-600/40">
             <div className="flex items-center space-x-1 mb-1">
               <Activity className="h-3 w-3 text-yellow-200" />
-              <p className="text-[10px] text-blue-100 uppercase tracking-wide">Daily P&L</p>
+              <p className="text-[10px] text-blue-100 dark:text-financial-slate-300 uppercase tracking-wide">Daily P&L</p>
             </div>
             <p className={`text-sm font-bold ${
               totalDailyPnL >= 0 ? 'text-green-200' : 'text-red-200'
@@ -396,10 +398,10 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = () => {
             </p>
           </div>
           
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg p-2">
+          <div className="bg-white/10 dark:bg-financial-slate-800/45 backdrop-blur-sm rounded-lg p-2 border border-transparent dark:border-financial-slate-600/40">
             <div className="flex items-center space-x-1 mb-1">
-              <Calendar className="h-3 w-3 text-blue-200" />
-              <p className="text-[10px] text-blue-100 uppercase tracking-wide">Date</p>
+              <Calendar className="h-3 w-3 text-blue-200 dark:text-financial-slate-400" />
+              <p className="text-[10px] text-blue-100 dark:text-financial-slate-300 uppercase tracking-wide">Date</p>
             </div>
             <input
               type="date"
@@ -410,14 +412,14 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = () => {
           </div>
         </div>
         
-        <p className="text-[10px] text-blue-200 text-center">
+        <p className="text-[10px] text-blue-200 dark:text-financial-slate-400 text-center">
           {holdings.length} holdings • Swipe table horizontally to see all columns
         </p>
       </div>
 
       {/* Desktop Header Section - Hidden on mobile */}
-      <div className="hidden md:block bg-gradient-to-r from-financial-blue-600 via-financial-indigo-600 to-financial-purple-600 px-4 py-3 text-white relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent transform -skew-x-12 translate-x-full animate-pulse"></div>
+      <div className="hidden md:block bg-gradient-to-r from-financial-blue-600 via-financial-indigo-600 to-financial-purple-600 dark:from-financial-slate-800 dark:via-financial-indigo-900 dark:to-financial-slate-800 px-4 py-3 text-white relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 dark:via-white/5 to-transparent transform -skew-x-12 translate-x-full animate-pulse"></div>
         <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full transform translate-x-16 -translate-y-16"></div>
         <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/5 rounded-full transform -translate-x-12 translate-y-12"></div>
         
@@ -429,29 +431,29 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = () => {
             </div>
             <div>
               <h2 className="text-lg font-bold tracking-wide">Portfolio Holdings</h2>
-              <p className="text-blue-100 text-sm font-medium">{getHeaderText()}</p>
+              <p className="text-blue-100 dark:text-financial-slate-300 text-sm font-medium">{getHeaderText()}</p>
             </div>
           </div>
           
           <div className="flex items-center space-x-3">
             {/* Date Input with enhanced styling */}
-            <div className="flex items-center space-x-2 bg-white/20 backdrop-blur-sm rounded-lg px-3 py-2 border border-white/30">
-              <Calendar className="h-4 w-4 text-blue-200" />
+            <div className="flex items-center space-x-2 bg-white/20 dark:bg-financial-slate-700/55 backdrop-blur-sm rounded-lg px-3 py-2 border border-white/30 dark:border-financial-slate-600/60">
+              <Calendar className="h-4 w-4 text-blue-200 dark:text-financial-slate-400" />
               <input
                 type="date"
                 value={valuationDate}
                 onChange={(e) => setValuationDate(e.target.value)}
-                className="bg-transparent border-0 text-white text-sm focus:outline-none placeholder-blue-200 font-medium"
+                className="bg-transparent border-0 text-white text-sm focus:outline-none placeholder-blue-200 dark:placeholder-financial-slate-400 font-medium"
               />
             </div>
             
             {/* Enhanced Stats Display */}
             <div className="text-right">
               <div className="flex items-baseline space-x-6">
-                <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2 border border-white/20">
+                <div className="bg-white/10 dark:bg-financial-slate-700/45 backdrop-blur-sm rounded-lg px-3 py-2 border border-white/20 dark:border-financial-slate-600/55">
                   <div className="flex items-center space-x-2 mb-1">
-                    <Wallet className="h-3 w-3 text-blue-200" />
-                    <p className="text-xs text-blue-100 font-medium uppercase tracking-wide">
+                    <Wallet className="h-3 w-3 text-blue-200 dark:text-financial-slate-400" />
+                    <p className="text-xs text-blue-100 dark:text-financial-slate-300 font-medium uppercase tracking-wide">
                       {filteredCount !== holdings.length ? 'Filtered' : 'Total'} Value
                     </p>
                   </div>
@@ -459,19 +461,19 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = () => {
                     {formatCurrency(filteredTotalValue > 0 ? filteredTotalValue : totalValue)}
                   </p>
                   {filteredCount !== holdings.length && (
-                    <p className="text-xs text-blue-200 font-medium">
+                    <p className="text-xs text-blue-200 dark:text-financial-slate-400 font-medium">
                       Total: {formatCurrency(totalValue)}
                     </p>
                   )}
                 </div>
-                <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2 border border-white/20">
+                <div className="bg-white/10 dark:bg-financial-slate-700/45 backdrop-blur-sm rounded-lg px-3 py-2 border border-white/20 dark:border-financial-slate-600/55">
                   <div className="flex items-center space-x-2 mb-1">
                     {totalGainLoss >= 0 ? (
                       <TrendingUp className="h-3 w-3 text-green-200" />
                     ) : (
                       <TrendingDown className="h-3 w-3 text-red-200" />
                     )}
-                    <p className="text-xs text-blue-100 font-medium uppercase tracking-wide">Total P&L</p>
+                    <p className="text-xs text-blue-100 dark:text-financial-slate-300 font-medium uppercase tracking-wide">Total P&L</p>
                   </div>
                   <p className={`text-sm font-bold ${
                     totalGainLoss >= 0 ? 'text-green-200' : 'text-red-200'
@@ -484,10 +486,10 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = () => {
                     ({totalGainLossPercentage >= 0 ? '+' : ''}{totalGainLossPercentage.toFixed(2)}%)
                   </p>
                 </div>
-                <div className="bg-white/10 backdrop-blur-sm rounded-lg px-3 py-2 border border-white/20">
+                <div className="bg-white/10 dark:bg-financial-slate-700/45 backdrop-blur-sm rounded-lg px-3 py-2 border border-white/20 dark:border-financial-slate-600/55">
                   <div className="flex items-center space-x-2 mb-1">
                     <Activity className="h-3 w-3 text-yellow-200" />
-                    <p className="text-xs text-blue-100 font-medium uppercase tracking-wide">Daily P&L</p>
+                    <p className="text-xs text-blue-100 dark:text-financial-slate-300 font-medium uppercase tracking-wide">Daily P&L</p>
                   </div>
                   <p className={`text-sm font-bold ${
                     totalDailyPnL >= 0 ? 'text-green-200' : 'text-red-200'
@@ -506,7 +508,7 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = () => {
             <button
               onClick={fetchHoldings}
               disabled={loading}
-              className="group flex items-center space-x-2 bg-white/20 hover:bg-white/30 backdrop-blur-sm px-3 py-2 rounded-lg border border-white/30 transition-all duration-300 transform hover:scale-105 shadow-lg"
+              className="group flex items-center space-x-2 bg-white/20 hover:bg-white/30 dark:bg-financial-slate-700/55 dark:hover:bg-financial-slate-600/70 backdrop-blur-sm px-3 py-2 rounded-lg border border-white/30 dark:border-financial-slate-600/60 transition-all duration-300 transform hover:scale-105 shadow-lg"
             >
               <RefreshCw className={`h-4 w-4 transition-transform duration-300 ${
                 loading ? 'animate-spin' : 'group-hover:rotate-180'
@@ -559,8 +561,8 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = () => {
       {/* Content Section */}
       <div className="flex-1 flex flex-col min-h-0">
         {error && (
-          <div className="mx-4 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-            <div className="flex items-center space-x-2 text-red-700">
+          <div className="mx-4 mt-4 p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-lg">
+            <div className="flex items-center space-x-2 text-red-700 dark:text-red-300">
               <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
               </svg>
@@ -571,7 +573,7 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = () => {
 
         {/* Grid Container - Full width with proper scrolling and space for row group panel */}
         <div className="flex-1 w-full px-4 pb-4">
-          <div className="ag-theme-alpine w-full h-full">
+          <div className={`${resolvedTheme === 'dark' ? 'ag-theme-alpine-dark' : 'ag-theme-alpine'} w-full h-full`}>
             <AgGridReact
               rowData={holdings}
               columnDefs={getHoldingsColumnDefs(handleCellValueChanged)}
@@ -623,19 +625,19 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = () => {
         {/* Footer Summary - Fixed height at bottom */}
         {holdings.length > 0 && (
           <div className="px-4 pb-4 flex-shrink-0">
-            <div className="bg-gray-50 rounded-lg p-3">
-              <div className="flex justify-between items-center text-sm text-gray-600">
+            <div className="bg-gray-50 dark:bg-financial-slate-900 rounded-lg p-3 border border-transparent dark:border-financial-slate-800">
+              <div className="flex justify-between items-center text-sm text-gray-600 dark:text-financial-slate-300">
                 <div className="flex items-center space-x-4">
                   <span>
                     Showing {filteredCount} of {holdings.length} holdings
                     {filteredCount !== holdings.length && (
-                      <span className="text-blue-600 font-medium"> (filtered)</span>
+                      <span className="text-blue-600 dark:text-blue-400 font-medium"> (filtered)</span>
                     )}
                   </span>
                 </div>
                 <div className="flex items-center space-x-6">
                   {filteredCount !== holdings.length && (
-                    <span className="text-xs text-gray-500">
+                    <span className="text-xs text-gray-500 dark:text-financial-slate-400">
                       Total Portfolio: {formatCurrency(totalValue)}
                     </span>
                   )}
@@ -837,15 +839,15 @@ const AddHoldingModal: React.FC<AddHoldingModalProps> = ({ isOpen, onClose, onSu
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+    <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-black/70 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-financial-slate-900 rounded-lg shadow-xl max-w-md w-full border border-transparent dark:border-financial-slate-700">
         <div className="p-6">
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold text-gray-900">Add New Holding</h2>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-financial-slate-100">Add New Holding</h2>
             <button
               onClick={handleClose}
               disabled={isSubmitting}
-              className="text-gray-400 hover:text-gray-600 disabled:cursor-not-allowed"
+              className="text-gray-400 dark:text-financial-slate-500 hover:text-gray-600 dark:hover:text-financial-slate-200 disabled:cursor-not-allowed"
             >
               <X className="h-6 w-6" />
             </button>
@@ -855,7 +857,7 @@ const AddHoldingModal: React.FC<AddHoldingModalProps> = ({ isOpen, onClose, onSu
             {step === 'ticker' && (
               <>
                 <div>
-                  <label htmlFor="ticker" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="ticker" className="block text-sm font-medium text-gray-700 dark:text-financial-slate-300 mb-1">
                     Ticker Symbol *
                   </label>
                   <input
@@ -863,13 +865,13 @@ const AddHoldingModal: React.FC<AddHoldingModalProps> = ({ isOpen, onClose, onSu
                     id="ticker"
                     value={ticker}
                     onChange={(e) => setTicker(e.target.value)}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.ticker ? 'border-red-500' : 'border-gray-300'}`}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-financial-slate-800 dark:text-financial-slate-100 ${errors.ticker ? 'border-red-500' : 'border-gray-300 dark:border-financial-slate-700'}`}
                     placeholder="e.g., AAPL, MSFT, TSLA"
                     disabled={isChecking}
                     maxLength={20}
                   />
                   {errors.ticker && <p className="text-red-500 text-xs mt-1">{errors.ticker}</p>}
-                  <p className="text-gray-500 text-xs mt-1">
+                  <p className="text-gray-500 dark:text-financial-slate-400 text-xs mt-1">
                     Enter the ticker symbol to check if the instrument exists in our system
                   </p>
                 </div>
@@ -879,7 +881,7 @@ const AddHoldingModal: React.FC<AddHoldingModalProps> = ({ isOpen, onClose, onSu
                     type="button"
                     onClick={handleClose}
                     disabled={isChecking}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100"
+                    className="flex-1 px-4 py-2 border border-gray-300 dark:border-financial-slate-700 rounded-md text-gray-700 dark:text-financial-slate-200 hover:bg-gray-50 dark:hover:bg-financial-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100 dark:disabled:bg-financial-slate-800"
                   >
                     Cancel
                   </button>
@@ -903,9 +905,9 @@ const AddHoldingModal: React.FC<AddHoldingModalProps> = ({ isOpen, onClose, onSu
             
             {step === 'details' && (
               <>
-                <div className="bg-gray-50 p-3 rounded-md">
-                  <h4 className="font-medium text-gray-900">{ticker}</h4>
-                  <p className="text-sm text-gray-600">
+                <div className="bg-gray-50 dark:bg-financial-slate-800 p-3 rounded-md">
+                  <h4 className="font-medium text-gray-900 dark:text-financial-slate-100">{ticker}</h4>
+                  <p className="text-sm text-gray-600 dark:text-financial-slate-300">
                     {instrumentExists ? (
                       <>✅ Instrument exists in our system</>
                     ) : (
@@ -915,7 +917,7 @@ const AddHoldingModal: React.FC<AddHoldingModalProps> = ({ isOpen, onClose, onSu
                 </div>
                 
                 <div>
-                  <label htmlFor="units" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="units" className="block text-sm font-medium text-gray-700 dark:text-financial-slate-300 mb-1">
                     Number of Units *
                   </label>
                   <input
@@ -923,7 +925,7 @@ const AddHoldingModal: React.FC<AddHoldingModalProps> = ({ isOpen, onClose, onSu
                     id="units"
                     value={formData.units}
                     onChange={(e) => setFormData({ ...formData, units: e.target.value })}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.units ? 'border-red-500' : 'border-gray-300'}`}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-financial-slate-800 dark:text-financial-slate-100 ${errors.units ? 'border-red-500' : 'border-gray-300 dark:border-financial-slate-700'}`}
                     placeholder="0.0000"
                     disabled={isSubmitting}
                     min="0.0001"
@@ -935,14 +937,14 @@ const AddHoldingModal: React.FC<AddHoldingModalProps> = ({ isOpen, onClose, onSu
                 </div>
                 
                 <div>
-                  <label htmlFor="platformId" className="block text-sm font-medium text-gray-700 mb-1">
+                  <label htmlFor="platformId" className="block text-sm font-medium text-gray-700 dark:text-financial-slate-300 mb-1">
                     Platform *
                   </label>
                   <select
                     id="platformId"
                     value={formData.platformId}
                     onChange={(e) => setFormData({ ...formData, platformId: e.target.value })}
-                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.platformId ? 'border-red-500' : 'border-gray-300'}`}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-financial-slate-800 dark:text-financial-slate-100 ${errors.platformId ? 'border-red-500' : 'border-gray-300 dark:border-financial-slate-700'}`}
                     disabled={isSubmitting}
                   >
                     {availablePlatforms.length === 0 ? (
@@ -956,7 +958,7 @@ const AddHoldingModal: React.FC<AddHoldingModalProps> = ({ isOpen, onClose, onSu
                     )}
                   </select>
                   {errors.platformId && <p className="text-red-500 text-xs mt-1">{errors.platformId}</p>}
-                  <p className="text-gray-500 text-xs mt-1">
+                  <p className="text-gray-500 dark:text-financial-slate-400 text-xs mt-1">
                     Choose from platforms where you already have holdings
                   </p>
                 </div>
@@ -964,14 +966,14 @@ const AddHoldingModal: React.FC<AddHoldingModalProps> = ({ isOpen, onClose, onSu
                 {!instrumentExists && (
                   <>
                     <div>
-                      <label htmlFor="currencyCode" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="currencyCode" className="block text-sm font-medium text-gray-700 dark:text-financial-slate-300 mb-1">
                         Currency *
                       </label>
                       <select
                         id="currencyCode"
                         value={formData.currencyCode}
                         onChange={(e) => setFormData({ ...formData, currencyCode: e.target.value })}
-                        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.currencyCode ? 'border-red-500' : 'border-gray-300'}`}
+                        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-financial-slate-800 dark:text-financial-slate-100 ${errors.currencyCode ? 'border-red-500' : 'border-gray-300 dark:border-financial-slate-700'}`}
                         disabled={isSubmitting}
                       >
                         <option value="GBP">GBP (British Pound)</option>
@@ -985,14 +987,14 @@ const AddHoldingModal: React.FC<AddHoldingModalProps> = ({ isOpen, onClose, onSu
                     </div>
                     
                     <div>
-                      <label htmlFor="quoteUnit" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="quoteUnit" className="block text-sm font-medium text-gray-700 dark:text-financial-slate-300 mb-1">
                         Quote Unit *
                       </label>
                       <select
                         id="quoteUnit"
                         value={formData.quoteUnit}
                         onChange={(e) => setFormData({ ...formData, quoteUnit: e.target.value })}
-                        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.quoteUnit ? 'border-red-500' : 'border-gray-300'}`}
+                        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-financial-slate-800 dark:text-financial-slate-100 ${errors.quoteUnit ? 'border-red-500' : 'border-gray-300 dark:border-financial-slate-700'}`}
                         disabled={isSubmitting}
                       >
                         <option value="GBP">GBP (British Pound)</option>
@@ -1006,7 +1008,7 @@ const AddHoldingModal: React.FC<AddHoldingModalProps> = ({ isOpen, onClose, onSu
                     </div>
                     
                     <div>
-                      <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
+                      <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-financial-slate-300 mb-1">
                         Description
                       </label>
                       <input
@@ -1014,7 +1016,7 @@ const AddHoldingModal: React.FC<AddHoldingModalProps> = ({ isOpen, onClose, onSu
                         id="description"
                         value={formData.description}
                         onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="w-full px-3 py-2 border border-gray-300 dark:border-financial-slate-700 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-financial-slate-800 dark:text-financial-slate-100"
                         placeholder="Optional description for this instrument"
                         disabled={isSubmitting}
                         maxLength={255}
@@ -1028,7 +1030,7 @@ const AddHoldingModal: React.FC<AddHoldingModalProps> = ({ isOpen, onClose, onSu
                     type="button"
                     onClick={goBackToTicker}
                     disabled={isSubmitting}
-                    className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100"
+                    className="px-4 py-2 border border-gray-300 dark:border-financial-slate-700 rounded-md text-gray-700 dark:text-financial-slate-200 hover:bg-gray-50 dark:hover:bg-financial-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100 dark:disabled:bg-financial-slate-800"
                   >
                     Back
                   </button>
@@ -1036,7 +1038,7 @@ const AddHoldingModal: React.FC<AddHoldingModalProps> = ({ isOpen, onClose, onSu
                     type="button"
                     onClick={handleClose}
                     disabled={isSubmitting}
-                    className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100"
+                    className="px-4 py-2 border border-gray-300 dark:border-financial-slate-700 rounded-md text-gray-700 dark:text-financial-slate-200 hover:bg-gray-50 dark:hover:bg-financial-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-100 dark:disabled:bg-financial-slate-800"
                   >
                     Cancel
                   </button>

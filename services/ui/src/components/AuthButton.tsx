@@ -10,7 +10,7 @@ export function AuthButton() {
 
   if (inProgress === 'login') {
     return (
-      <div className="flex items-center space-x-2 text-blue-600">
+      <div className="flex items-center space-x-2 text-blue-600 dark:text-blue-400">
         <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
         <span className="text-sm">Signing in...</span>
       </div>
@@ -19,7 +19,7 @@ export function AuthButton() {
 
   if (isAcquiringToken) {
     return (
-      <div className="flex items-center space-x-2 text-blue-600">
+      <div className="flex items-center space-x-2 text-blue-600 dark:text-blue-400">
         <div className="animate-spin h-4 w-4 border-2 border-blue-600 border-t-transparent rounded-full"></div>
         <span className="text-sm">Getting access token...</span>
       </div>
@@ -30,7 +30,7 @@ export function AuthButton() {
     return (
       <button
         onClick={login}
-        className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
       >
         <LogIn className="h-4 w-4" />
         <span className="text-sm font-medium">Sign In</span>
@@ -43,12 +43,12 @@ export function AuthButton() {
       {/* Authentication Status */}
       <div className="flex items-center space-x-2">
         {accessToken ? (
-          <div className="flex items-center space-x-2 text-green-600">
+          <div className="flex items-center space-x-2 text-green-600 dark:text-green-400">
             <Shield className="h-4 w-4" />
             <span className="text-sm font-medium">Authenticated</span>
           </div>
         ) : (
-          <div className="flex items-center space-x-2 text-yellow-600">
+          <div className="flex items-center space-x-2 text-yellow-600 dark:text-yellow-400">
             <AlertCircle className="h-4 w-4" />
             <span className="text-sm font-medium">Getting token...</span>
           </div>
@@ -57,7 +57,7 @@ export function AuthButton() {
 
       {/* User Info */}
       {userInfo && (
-        <div className="flex items-center space-x-2 text-gray-700">
+        <div className="flex items-center space-x-2 text-gray-700 dark:text-financial-slate-200">
           <User className="h-4 w-4" />
           <span className="text-sm">{userInfo.name || userInfo.email}</span>
         </div>
@@ -66,7 +66,7 @@ export function AuthButton() {
       {/* Logout Button */}
       <button
         onClick={logout}
-        className="flex items-center space-x-2 px-3 py-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+        className="flex items-center space-x-2 px-3 py-2 text-gray-600 dark:text-financial-slate-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-financial-slate-800 rounded-lg transition-colors"
       >
         <LogOut className="h-4 w-4" />
         <span className="text-sm">Sign Out</span>
