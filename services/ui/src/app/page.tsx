@@ -126,11 +126,11 @@ export default function HomePage() {
             <div className="flex items-center space-x-6">
               <div className="flex items-center space-x-3">
                 <div className="relative">
-                  <Building2 className="h-6 w-6 text-financial-blue-600 relative z-10" />
+                  <Building2 className="h-6 w-6 text-financial-blue-600 dark:text-financial-blue-400 relative z-10" />
                   <div className="absolute inset-0 bg-financial-blue-400/20 rounded-lg scale-150 animate-pulse-slow"></div>
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold bg-gradient-to-r from-financial-slate-800 to-financial-blue-600 bg-clip-text text-transparent">
+                  <h1 className="text-xl font-bold bg-gradient-to-r from-financial-slate-800 to-financial-blue-600 dark:from-financial-slate-100 dark:to-financial-blue-300 bg-clip-text text-transparent">
                     Portfolio Manager
                   </h1>
                   <p className="text-xs text-financial-slate-500 dark:text-financial-slate-400 font-medium">AI-Powered Investment Management</p>

@@ -1,6 +1,13 @@
 import { ColDef } from 'ag-grid-community';
 import { HoldingResponse } from '@/types/api';
 
+const isDarkThemeActive = (): boolean => {
+  if (typeof document === 'undefined') {
+    return false;
+  }
+  return document.documentElement.classList.contains('dark');
+};
+
 // Utility functions for formatting
 export const formatCurrency = (value: number): string => {
   return new Intl.NumberFormat('en-GB', {
@@ -51,9 +58,12 @@ export const getHoldingsColumnDefs = (onCellValueChanged?: (params: any) => void
     filter: true,
     pinned: 'left',
     tooltipField: 'instrumentName',
-    cellStyle: {
-      backgroundColor: '#fafafa',
-      borderRight: '2px solid #f1f5f9'
+    cellStyle: () => {
+      const isDark = isDarkThemeActive();
+      return {
+        backgroundColor: isDark ? '#0b1220' : '#fafafa',
+        borderRight: isDark ? '2px solid #1f2937' : '2px solid #f1f5f9',
+      };
     },
   },
   // Platform column
@@ -99,8 +109,8 @@ export const getHoldingsColumnDefs = (onCellValueChanged?: (params: any) => void
     cellStyle: (params: any) => ({
       textAlign: 'right',
       fontFamily: 'monospace',
-      backgroundColor: params.node?.isRowPinned() ? 'transparent' : '#f8fafc',
-      border: '1px solid #e2e8f0',
+      backgroundColor: params.node?.isRowPinned() ? 'transparent' : isDarkThemeActive() ? '#0f172a' : '#f8fafc',
+      border: isDarkThemeActive() ? '1px solid #334155' : '1px solid #e2e8f0',
       cursor: 'pointer'
     }),
     onCellValueChanged: onCellValueChanged,
@@ -174,7 +184,9 @@ export const getHoldingsColumnDefs = (onCellValueChanged?: (params: any) => void
       fontFamily: 'monospace',
       fontWeight: 'bold',
       color: params.value >= 0 ? '#10b981' : '#ef4444',
-      backgroundColor: params.value >= 0 ? '#f0f9ff' : '#fef2f2',
+      backgroundColor: params.value >= 0
+        ? (isDarkThemeActive() ? '#06261f' : '#f0f9ff')
+        : (isDarkThemeActive() ? '#2b1010' : '#fef2f2'),
     }),
   },
   {
@@ -190,7 +202,9 @@ export const getHoldingsColumnDefs = (onCellValueChanged?: (params: any) => void
       fontFamily: 'monospace',
       fontWeight: 'bold',
       color: params.value >= 0 ? '#10b981' : '#ef4444',
-      backgroundColor: params.value >= 0 ? '#f0f9ff' : '#fef2f2',
+      backgroundColor: params.value >= 0
+        ? (isDarkThemeActive() ? '#06261f' : '#f0f9ff')
+        : (isDarkThemeActive() ? '#2b1010' : '#fef2f2'),
     }),
   },
   {

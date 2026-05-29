@@ -571,7 +571,7 @@ I can analyze your holdings, market conditions, and provide insights to help you
                 onChange={(e) => setInputValue(e.target.value)}
                 placeholder="Ask me about your portfolio..."
                 disabled={chatState.isLoading}
-                className="flex-1 border border-financial-slate-300 dark:border-financial-slate-700 rounded-lg sm:rounded-xl px-3 py-2 sm:px-4 sm:py-3 focus:outline-none focus:ring-2 focus:ring-financial-blue-500 focus:border-transparent disabled:bg-financial-slate-100 dark:disabled:bg-financial-slate-800 disabled:cursor-not-allowed text-sm sm:text-base text-financial-slate-800 dark:text-financial-slate-100 placeholder-financial-slate-500 dark:placeholder-financial-slate-400 shadow-sm"
+                className="flex-1 border border-financial-slate-300 dark:border-financial-slate-600 bg-white dark:bg-financial-slate-800/95 rounded-lg sm:rounded-xl px-3 py-2 sm:px-4 sm:py-3 focus:outline-none focus:ring-2 focus:ring-financial-blue-500 dark:focus:ring-financial-indigo-500 focus:border-transparent disabled:bg-financial-slate-100 dark:disabled:bg-financial-slate-800 disabled:cursor-not-allowed text-sm sm:text-base text-financial-slate-800 dark:text-financial-slate-100 placeholder-financial-slate-500 dark:placeholder-financial-slate-400 shadow-sm"
               />
               <button
                 type="submit"
