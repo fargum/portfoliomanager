@@ -87,8 +87,13 @@ I can analyze your holdings, market conditions, and provide insights to help you
     if (!isAuthenticated) return;
     apiClient.getModels().then(models => {
       setAvailableModels(models);
-      // Pre-select the first model if none chosen yet
-      if (models.length > 0 && !selectedModelId) {
+      // Use first returned model (API sorts default first) when selection is missing/invalid.
+      if (models.length === 0) {
+        setSelectedModelId(undefined);
+        return;
+      }
+
+      if (!selectedModelId || !models.some(m => m.id === selectedModelId)) {
         setSelectedModelId(models[0].id);
       }
     });

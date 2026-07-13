@@ -141,7 +141,10 @@ public class ChatController(
     [ProducesResponseType(typeof(IEnumerable<AiModelDto>), 200)]
     public IActionResult GetAvailableModels()
     {
+        var defaultModelId = azureFoundryOptions.Value.ModelName;
+
         var models = azureFoundryOptions.Value.AvailableModels
+            .OrderByDescending(m => string.Equals(m.Id, defaultModelId, StringComparison.OrdinalIgnoreCase))
             .Select(m => new AiModelDto(m.Id, m.DisplayName))
             .ToList();
 
