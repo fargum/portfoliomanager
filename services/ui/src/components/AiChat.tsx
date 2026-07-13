@@ -471,7 +471,7 @@ I can analyze your holdings, market conditions, and provide insights to help you
                             href={href}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-blue-600 hover:text-blue-800 underline font-medium"
+                            className="text-blue-600 hover:text-blue-800 dark:text-blue-300 dark:hover:text-blue-200 underline font-medium"
                           >
                             {children}
                           </a>
