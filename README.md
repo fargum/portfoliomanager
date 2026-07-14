@@ -12,6 +12,14 @@ Finally, I followed a DDD approach with this repo, which closely represents the 
 
 More detailed documentation can be found in the docs folder. I probably need a bit of cleanup of it - particularly the memory section which i went back and forth with many times. I think its a fascinating and very powerful feature of these systems.
 
+addendum july 2026
+
+Since I built the bulk of this around October 2025, much has happened in the AI space.
+Microsoft has finally released Microsoft Agent Framework 1.0 which has been incorporated here.
+Azure Foundry capabilities have advanced significantly - with better support for evals, guardrails and
+model fine tuning.  Coding tools have been revolutionized. I use both GitHub copilot and Claude code on this and other repos and have experimented in building custom coding agents and skills for both.
+I use both the sonnet and opus models for claude, but with price rises, I am trying new ways to optimize their use.  
+
 ## Quick Start
 
 ```bash
@@ -34,7 +42,7 @@ Microservices platform with DDD principles:
 
 ```
 services/
-├── api/                # .NET 9 REST API
+├── api/                # .NET 10 REST API
 │   ├── Domain         # Core business logic
 │   ├── Application    # CQRS, AI agents, market intelligence
 │   ├── Infrastructure # EF Core, PostgreSQL, EOD integration
@@ -60,23 +68,25 @@ services/
 
 ### AI Intelligence
 - **Conversational Interface**: Natural language portfolio queries
-- **Market Context**: Real-time news and sentiment analysis via EOD API
-- **Agent Tools**: GetMarketContext, AnalyzePortfolio, ComparePerformance, GetMarketSentiment
-- **Memory System**: Persistent conversation context with Redis
+- **Agent Orchestration**: Powered by Microsoft Agent Framework for multi-tool AI workflows
+- **Market Context**: Real-time news and sentiment analysis via EOD API and Tavily Search API
+- **Agent Tools**: GetMarketContext, AnalyzePortfolio, ComparePerformance, GetMarketSentiment, TavilySearchTool
+- **Memory System**: Persistent conversation context stored in PostgreSQL with account-scoped memory summaries and sliding window chat history
 - **Evaluation Framework**: Python-based testing with quality metrics
 
 ### Integration & Security
 - **Azure AD B2C**: OAuth 2.0 authentication with JWT tokens
-- **Azure OpenAI**: GPT-4 powered chat with function calling
+- **Azure AI Foundry**: Hosted AI inference models with function calling and agent capabilities
+- **Tavily Search API**: Real-time web search integration
 - **OpenTelemetry**: Distributed tracing and monitoring
 - **EOD Historical Data**: Real-time pricing and sentiment data
 
 ## Tech Stack
 
-**Backend**: .NET 9, EF Core, PostgreSQL, MediatR (CQRS)  
+**Backend**: .NET 10, EF Core, PostgreSQL, MediatR (CQRS)  
 **Frontend**: Next.js 15, React, TailwindCSS, Azure AD auth  
-**AI**: Azure OpenAI (GPT-4), Microsoft Agent Framework  
-**Infrastructure**: Docker, Azure Container Apps, Azure Cache for Redis  
+**AI**: Azure AI Foundry (GPT-5.6 Terra / Reasoning Models), Microsoft Agent Framework, Tavily Search API  
+**Infrastructure**: Docker, Azure Container Apps  
 **Observability**: OpenTelemetry, Azure Monitor, Application Insights
 
 ## Configuration
@@ -92,16 +102,16 @@ AzureAdB2C__Instance="https://login.microsoftonline.com/"
 AzureAdB2C__ClientId="<client-id>"
 AzureAdB2C__TenantId="<tenant-id>"
 
-# Azure OpenAI
-AzureOpenAI__Endpoint="https://<resource>.openai.azure.com/"
-AzureOpenAI__Key="<api-key>"
-AzureOpenAI__DeploymentName="gpt-4"
+# Azure AI Foundry
+AzureFoundry__Endpoint="https://<resource>.openai.azure.com/"
+AzureFoundry__ApiKey="<api-key>"
+AzureFoundry__ModelName="gpt-5.6-terra"
 
 # EOD Historical Data
 EodApi__Token="<eod-token>"
 
-# Redis (for memory)
-Redis__ConnectionString="<redis-connection>"
+# Tavily Search API
+Tavily__ApiKey="<tavily-api-key>"
 ```
 
 Use **Azure Key Vault** for production, **User Secrets** for local development.
