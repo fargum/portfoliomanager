@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using FtoConsulting.PortfolioManager.Domain.Repositories;
 using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 using FtoConsulting.PortfolioManager.Api.Models.Responses;
@@ -14,6 +15,7 @@ namespace FtoConsulting.PortfolioManager.Api.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Authorize] 
+[EnableRateLimiting("standard-api")]
 public class InstrumentsController(
     IInstrumentRepository instrumentRepository,
     ICurrentUserService currentUserService,

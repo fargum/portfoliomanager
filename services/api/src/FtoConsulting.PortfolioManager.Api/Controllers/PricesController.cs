@@ -2,6 +2,7 @@ using FtoConsulting.PortfolioManager.Api.Models.Responses;
 using FtoConsulting.PortfolioManager.Api.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Net;
 using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 using System.Diagnostics;
@@ -15,6 +16,7 @@ namespace FtoConsulting.PortfolioManager.Api.Controllers;
 [Route("api/[controller]")]
 [Produces("application/json")]
 [Authorize(Policy = "RequirePortfolioScope")]
+[EnableRateLimiting("standard-api")]
 public class PricesController(
     IPriceFetching priceFetching,
     ILogger<PricesController> logger) : ControllerBase

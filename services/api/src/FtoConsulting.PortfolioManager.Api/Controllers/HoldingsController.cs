@@ -5,6 +5,7 @@ using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 using FtoConsulting.PortfolioManager.Application.DTOs;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Net;
 using System.Diagnostics;
 
@@ -17,6 +18,7 @@ namespace FtoConsulting.PortfolioManager.Api.Controllers;
 [Route("api/[controller]")]
 [Produces("application/json")]
 [Authorize(Policy = "RequirePortfolioScope")]
+[EnableRateLimiting("standard-api")]
 public class HoldingsController(
     IHoldingService holdingService,
     IPortfolioMappingService mappingService,

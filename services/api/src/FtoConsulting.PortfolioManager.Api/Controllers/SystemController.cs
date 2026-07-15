@@ -1,6 +1,7 @@
 using FtoConsulting.PortfolioManager.Application.Utilities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using FtoConsulting.PortfolioManager.Application.Services;
 using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 using FtoConsulting.PortfolioManager.Application.DTOs;
@@ -18,6 +19,7 @@ namespace FtoConsulting.PortfolioManager.Api.Controllers;
 [Produces("application/json")]
 [Authorize(AuthenticationSchemes = SystemApiKeyAuthenticationHandler.SchemeName)]
 [ApiExplorerSettings(IgnoreApi = true)] // Hide from Swagger - internal endpoints
+[DisableRateLimiting] // Scheduled jobs must never be blocked by rate limits
 public class SystemController(
     IHoldingRevaluationService holdingRevaluationService,
     IPortfolioReportService portfolioReportService,

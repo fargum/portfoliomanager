@@ -1,3 +1,4 @@
+using System.Threading.RateLimiting;
 using FtoConsulting.PortfolioManager.Api.Services;
 using FtoConsulting.PortfolioManager.Application;
 using FtoConsulting.PortfolioManager.Application.Configuration;
@@ -234,6 +235,70 @@ builder.Services.AddCors(options =>
 // Add health checks
 builder.Services.AddHealthChecks();
 
+// Configure rate limiting
+var rateLimitingOptions = builder.Configuration
+    .GetSection(RateLimitingOptions.SectionName)
+    .Get<RateLimitingOptions>() ?? new RateLimitingOptions();
+
+builder.Services.AddRateLimiter(limiterOptions =>
+{
+    // Resolve partition key from the authenticated user's object ID claim, falling back to IP.
+    static string GetPartitionKey(HttpContext context)
+    {
+        var oid = context.User.FindFirst("oid")?.Value
+               ?? context.User.FindFirst("http://schemas.microsoft.com/identity/claims/objectidentifier")?.Value;
+        return !string.IsNullOrEmpty(oid)
+            ? oid
+            : context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+    }
+
+    // Sliding window policy for AI chat — partitioned per user, protects expensive Azure OpenAI calls.
+    limiterOptions.AddPolicy("ai-chat", context =>
+        RateLimitPartition.GetSlidingWindowLimiter(
+            partitionKey: GetPartitionKey(context),
+            factory: _ => new SlidingWindowRateLimiterOptions
+            {
+                Window = TimeSpan.FromSeconds(rateLimitingOptions.AiChatWindowSeconds),
+                PermitLimit = rateLimitingOptions.AiChatPermitLimit,
+                SegmentsPerWindow = 6,
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+
+    // Fixed window policy for standard API endpoints — partitioned per user.
+    limiterOptions.AddPolicy("standard-api", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: GetPartitionKey(context),
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                Window = TimeSpan.FromSeconds(rateLimitingOptions.StandardApiWindowSeconds),
+                PermitLimit = rateLimitingOptions.StandardApiPermitLimit,
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+
+    limiterOptions.OnRejected = async (context, cancellationToken) =>
+    {
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+        {
+            context.HttpContext.Response.Headers.RetryAfter =
+                ((int)retryAfter.TotalSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        var logger = context.HttpContext.RequestServices
+            .GetRequiredService<ILogger<Program>>();
+        logger.LogWarning(
+            "Rate limit exceeded for {Method} {Path} by partition {Key}",
+            context.HttpContext.Request.Method,
+            context.HttpContext.Request.Path,
+            GetPartitionKey(context.HttpContext));
+
+        await context.HttpContext.Response.WriteAsync("Too many requests. Please slow down.", cancellationToken);
+    };
+});
+
 // Configure OpenTelemetry following Microsoft Agent Framework patterns
 var resourceBuilder = ResourceBuilder.CreateDefault()
     .AddService("PortfolioManager.API", "1.0.0")
@@ -400,6 +465,7 @@ app.UseCors("AllowUI");
 app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseRateLimiter();
 
 // Map health checks endpoint
 // Add health checks endpoint with logging

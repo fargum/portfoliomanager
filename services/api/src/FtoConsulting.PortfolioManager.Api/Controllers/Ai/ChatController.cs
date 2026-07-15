@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
@@ -17,6 +18,7 @@ namespace FtoConsulting.PortfolioManager.Api.Controllers.Ai;
 [Route("api/ai/chat")]
 [Produces("application/json")]
 [Authorize(Policy = "RequirePortfolioScope")]
+[EnableRateLimiting("ai-chat")]
 public class ChatController(
     IAiOrchestrationService aiOrchestrationService,
     ICurrentUserService currentUserService,
