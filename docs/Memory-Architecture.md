@@ -28,12 +28,12 @@ The memory system uses three primary entities in PostgreSQL:
   - Automatic timestamping
 
 #### MemorySummary
-- **Purpose**: AI-generated conversation summaries for long-term context
+- **Purpose**: AI-generated conversation summary, one row per conversation thread once it is closed
 - **Features**:
-  - Intelligent conversation summarization using dedicated AI agent
-  - Key insights and decision extraction
-  - Performance optimization for large conversation histories
-  - Automatic trigger when conversation exceeds length thresholds
+  - Intelligent conversation summarization using a dedicated AI agent (`MemoryExtractionService`)
+  - Extracts `Summary`, `KeyTopics` (JSON, includes `importantFacts`), and `UserPreferences` (JSON)
+  - One summary is created when a thread closes — **not** continuously during the conversation
+  - Only recently-created summaries are ever read back into context (see "Known Limitation" below) — there is no separate long-term/permanent fact store
 
 ### 2. Microsoft Agent Framework Integration
 
@@ -46,14 +46,19 @@ The memory system uses three primary entities in PostgreSQL:
   - Thread-scoped message retrieval
   - Automatic conversation thread creation
 
+#### CompactionProvider pipeline (in-session, per-request)
+- Configured in `AiOrchestrationService.SetupMemoryAwareAgent` as a `PipelineCompactionStrategy` with two stages, run on the messages loaded from `PostgreSqlChatMessageStore` before every model call:
+  1. **ToolResultCompactionStrategy** — compacts verbose MCP tool result payloads (holdings JSON, market data) into YAML summaries whenever the conversation contains tool calls
+  2. **SlidingWindowCompactionStrategy** — once a thread exceeds **10 turns**, drops the oldest turns down to the last **5** (`minimumPreservedTurns: 5`)
+  - This replaced the earlier `SummarizationCompactionStrategy` (see commit `dc2c20d`) because summarization added an extra ~60s LLM call per request and could leak stale context. The trade-off is that anything stated only in the dropped early turns (e.g. a name mentioned once at the start of a long session) is no longer sent to the model for the rest of that session, unless it was also captured in `MemorySummary`.
+
 #### PortfolioMemoryContextProvider  
 - **Inherits**: `Microsoft.Agents.AI.AIContextProvider`
-- **Responsibility**: Provides contextual information to AI agents
-- **Features**:
-  - Conversation insights extraction
-  - Memory state serialization
-  - Context enhancement before AI invocation
-  - Integration with memory summarization agent
+- **Responsibility**: Injects `Instructions` (not `Messages`) into the agent before each invocation, built from `MemorySummary` rows using a tiered, token-budgeted approach (~2000 token budget total):
+  - **Tier 1 — Essential facts** (`LoadEssentialFactsAsync`): looks only at the **3 most recent** `MemorySummary` rows for the account, takes at most **2** `importantFacts` per summary that match identity/goal keywords (`name`, `called`, `i'm`, `i am`, `investment goal`, `risk tolerance`, ...), merges them into a set, then displays only the **top 3** (alphabetically). Core preferences (`RiskTolerance`, `CommunicationStyle`, `InvestmentGoal`) are surfaced the same way.
+  - **Tier 2 — Hot memory**: full-detail summaries from the last 7 days (up to 3), included while the token budget allows
+  - **Tier 3 — Warm memory**: compressed summaries from 7–30 days ago (up to 3), included with any remaining budget
+  - **Note**: `InvokedCoreAsync` (which previously ran `ExtractConversationInsightsAsync`/`UpdateUserPreferencesAsync` in a fire-and-forget `Task.Run` after each response) was removed — it only updated an in-memory field that was never persisted, wasting an LLM call per request and leaking Activity/telemetry spans into the next request's trace. All persistence now happens via `MemorySummary` on thread close, not per-message.
 
 ### 3. Memory Summarization Agent
 
@@ -66,10 +71,10 @@ The memory system uses three primary entities in PostgreSQL:
   - Integration with Azure OpenAI for high-quality summaries
 
 #### Memory Summarization Flow
-- **Trigger**: Automatic when conversation exceeds configured message threshold
-- **Processing**: Dedicated AI agent analyzes conversation history
-- **Output**: Structured memory summary with key insights
-- **Storage**: Persisted to MemorySummary table for future context
+- **Trigger**: A conversation thread is closed — either because it has been inactive for **30 minutes** (`ConversationThreadService.InactivityThreshold`) or a new session is explicitly started (`CreateNewSessionAsync`)
+- **Processing**: `MemoryExtractionService` sends the thread's user messages (all of them) plus the last 5 assistant messages (truncated to 200 chars each) to a dedicated AI agent (`MemoryExtractionAgent` prompt) for analysis
+- **Output**: Structured `MemoryExtractionResult` (`ImportantFacts`, `UserPreferences`, `KeyTopics`, `Summary`)
+- **Storage**: Persisted as one `MemorySummary` row per closed thread — **not** triggered by message count/threshold despite the name; there is currently no `MessageThreshold`-based mid-conversation summarization
 
 ### 4. Application Layer
 
@@ -107,83 +112,69 @@ sequenceDiagram
     participant API
     participant Agent
     participant ChatStore
-    participant MemoryService
+    participant Compaction
+    participant ThreadService
     participant SummaryAgent
     participant Database
 
     User->>API: Send chat message
-    API->>Agent: Create memory-aware agent
+    API->>ThreadService: GetOrCreateActiveThreadAsync
+    alt Active thread inactive > 30 min
+        ThreadService->>SummaryAgent: Extract memories from closed thread
+        SummaryAgent->>Database: Store MemorySummary
+        ThreadService->>Database: Deactivate old thread, create new one
+    end
+    API->>Agent: Create memory-aware agent (loads ChatStore + memory context)
     Agent->>ChatStore: Store user message
     ChatStore->>Database: INSERT user message
-    Agent->>AI: Process with context
-    AI-->>Agent: Generate response
+    Agent->>Compaction: Compact tool results + apply sliding window (>10 turns)
+    Agent->>AI: Process with compacted history + memory instructions
+    AI-->>Agent: Generate response (streamed)
     Agent->>ChatStore: Store AI response
     ChatStore->>Database: INSERT AI response
-    
-    Note over ChatStore,MemoryService: Check if summarization needed
-    ChatStore->>MemoryService: Trigger summarization check
-    MemoryService->>Database: Count messages in thread
-    alt Message count exceeds threshold
-        MemoryService->>SummaryAgent: Extract conversation memories
-        SummaryAgent->>Database: Fetch conversation history
-        SummaryAgent->>AI: Generate structured summary
-        AI-->>SummaryAgent: Return memory insights
-        SummaryAgent->>Database: Store MemorySummary
-    end
-    
-    Agent-->>API: Return response
-    API-->>User: Send response
+    Agent-->>API: Stream response tokens
+    API-->>User: Stream response
 ```
 
 ### 2. Context Retrieval and Memory Integration
 
 When processing a new message:
-1. **Thread Resolution**: Get or create conversation thread for account
-2. **Message History**: Load last 50 messages from thread
-3. **Memory Summary**: Retrieve existing memory summaries for long-term context
-4. **Context Enhancement**: Extract conversation insights and combine with summaries
-5. **AI Processing**: Provide enriched context to AI agent
-6. **Response Generation**: AI responds with full conversation context
-7. **Summarization Check**: Trigger memory summarization if message threshold exceeded
+1. **Thread Resolution**: Get or create active thread for account; closes and summarizes the previous thread if it's been inactive for 30+ minutes
+2. **Message History**: Load last 50 messages from the thread via `PostgreSqlChatMessageStore`
+3. **In-Session Compaction**: `CompactionProvider` compacts tool-call results, then applies a sliding window once the thread exceeds 10 turns (keeps the most recent 5)
+4. **Memory Instructions**: `PortfolioMemoryContextProvider` injects tiered instructions built from the 3 most recent `MemorySummary` rows (essential facts) plus hot/warm summaries — see "Known Limitation" below
+5. **AI Processing**: Agent streams tokens back through the compacted history + injected instructions
+6. **Response Generation**: AI response is persisted to `PostgreSqlChatMessageStore` as it completes
 
 ### 3. Automatic Thread Management and Summarization
 
 - **New Conversations**: Automatically create threads with descriptive titles
-- **Thread Continuity**: Maintain context across multiple interactions
+- **Thread Continuity**: Maintain context within a thread via the message store + compaction pipeline
 - **Activity Tracking**: Update `last_activity` timestamp on each message
 - **Account Isolation**: Each account has separate conversation spaces
-- **Automatic Summarization**: Trigger memory extraction when conversations exceed configured length
-- **Memory Integration**: Incorporate previous summaries into new conversation context
+- **Automatic Summarization**: Triggered by 30 minutes of inactivity (or explicit new session), not by message count
+- **Memory Integration**: Only the 3 most recent `MemorySummary` rows are read back into context — older summaries (and any facts only recorded in them) are not resurfaced
+
+### 4. Known Limitation — No Durable "Core Facts" Store
+
+Because essential facts are re-derived every request from whichever 3 `MemorySummary` rows are most recent (`PortfolioMemoryContextProvider.LoadEssentialFactsAsync`), a fact such as the user's name only stays in context for as long as it keeps appearing in one of those 3 latest summaries. Once enough sessions pass without it being restated (or without that session's AI extraction re-flagging it), it silently drops out of context — there is currently no accumulating/deduplicating profile table for identity-level facts. **This needs revisiting** — candidate fix is a dedicated `UserProfile`/`CoreFact` store that accumulates identity facts (name, goals, risk tolerance) across all sessions and is always loaded regardless of summary recency.
 
 ## API Integration
 
-### Memory-Enabled Endpoints
-
-#### `/api/ai/chat/query`
-- **Method**: POST
-- **Features**: Synchronous chat with memory
-- **Request**: 
-  ```json
-  {
-    "query": "What's my portfolio performance?",
-    "accountId": 1,
-    "threadId": 123  // Optional - auto-creates if omitted
-  }
-  ```
-- **Response**:
-  ```json
-  {
-    "response": "Based on our previous discussion...",
-    "queryType": "PortfolioAnalysis",
-    "threadId": 123,
-    "threadTitle": "Portfolio Performance Analysis"
-  }
-  ```
+### Memory-Enabled Endpoint
 
 #### `/api/ai/chat/stream`
 - **Method**: POST
-- **Features**: Streaming responses with memory
-- **Same request/response pattern with real-time streaming**
+- **Features**: Streaming responses with memory (this is the only chat endpoint — there is no non-streaming `/query` endpoint)
+- **Request**:
+  ```json
+  {
+    "query": "What's my portfolio performance?",
+    "threadId": 123,   // Optional - auto-creates/resumes the active thread if omitted
+    "modelId": "gpt-5.6-terra"  // Optional - falls back to AzureFoundry:ModelName
+  }
+  ```
+- **Response**: newline-delimited JSON messages (`status`, `content`, `completion`) streamed as `text/plain`; `accountId` is always taken from the authenticated user, never from the request body
 
 ### Graceful Degradation
 
@@ -199,57 +190,60 @@ If memory components fail:
 
 ```csharp
 // Infrastructure Layer - Factory Registration
-services.AddTransient<Func<int, int?, JsonSerializerOptions?, ChatMessageStore>>(
-    serviceProvider => (accountId, threadId, jsonOptions) => 
+services.AddTransient<Func<int, int?, ChatHistoryProvider>>(
+    serviceProvider => (accountId, threadId) =>
         new PostgreSqlChatMessageStore(/* ... */));
 
 services.AddTransient<Func<int, IChatClient, AIContextProvider>>(
-    serviceProvider => (accountId, chatClient) => 
+    serviceProvider => (accountId, chatClient) =>
         new PortfolioMemoryContextProvider(/* ... */));
 
 // Memory Summarization Service
-services.AddScoped<MemoryExtractionService>();
-services.AddScoped<IAiChatService, AzureOpenAiChatService>();
+services.AddScoped<IMemoryExtractionService, MemoryExtractionService>();
+services.AddScoped<IConversationThreadService, ConversationThreadService>();
 ```
 
-### Agent Creation with Memory
+### Agent Creation with Memory (as built in `AiOrchestrationService.SetupMemoryAwareAgent`)
 
 ```csharp
-var agent = chatClient.CreateAIAgent(new ChatClientAgentOptions
+var agent = chatClient.AsAIAgent(new ChatClientAgentOptions
 {
-    Instructions = "You are a portfolio assistant with access to conversation history...",
-    ChatOptions = new ChatOptions { Tools = portfolioTools },
-    ChatMessageStoreFactory = ctx => chatMessageStoreFactory(accountId, threadId, ctx.JsonSerializerOptions),
-    AIContextProviderFactory = ctx => memoryContextProviderFactory(accountId, chatClient)
+    ChatOptions = secureChatOptions, // Instructions set here, refreshed with current date each call
+    UseProvidedChatClientAsIs = true,
+    ChatHistoryProvider = storeInHistory
+        ? chatMessageStoreFactory(accountId, threadId)
+        : new EphemeralChatHistoryProvider(),
+    AIContextProviders = [
+        memoryContextProviderFactory(accountId, chatClient), // PortfolioMemoryContextProvider (tiered summaries)
+        compactionProvider                                   // ToolResultCompaction + SlidingWindowCompaction pipeline
+    ]
 });
 ```
 
-### Memory Summarization Configuration
+### Memory Summarization Trigger
+
+There is no configurable message-count threshold. Summarization is triggered purely by thread closure:
 
 ```csharp
-// Memory extraction configuration
-services.Configure<MemoryExtractionOptions>(options =>
-{
-    options.MessageThreshold = 50; // Trigger summarization after 50 messages
-    options.SummaryPrompt = "Analyze this conversation and extract key portfolio insights...";
-    options.MaxTokens = 2000;
-});
+// ConversationThreadService
+private static readonly TimeSpan InactivityThreshold = TimeSpan.FromMinutes(30);
 ```
+
+When `GetOrCreateActiveThreadAsync` finds an active thread whose `LastActivity` is older than this threshold, it calls `MemoryExtractionService` to summarize the closed thread before creating a new one.
 
 ## Performance Considerations
 
 ### Context Window Management
 - **Message Limit**: Only loads last 50 messages per thread for immediate context
-- **Memory Summaries**: Long-term context provided through AI-generated summaries
-- **Token Estimation**: Tracks approximate token usage across messages and summaries
-- **Automatic Cleanup**: Older messages remain in database but excluded from active context
-- **Smart Summarization**: Triggers only when conversation length exceeds thresholds
+- **In-Session Compaction**: Tool-result compaction + sliding window (last 5 of >10 turns) applied before each model call
+- **Memory Summaries**: Long-term context provided through the 3 most recent AI-generated summaries (see Known Limitation above)
+- **Token Estimation**: Tracks approximate token usage across messages and summaries (~2000 token budget for injected memory instructions)
+- **Summarization Trigger**: Time-based (30 min inactivity), not conversation-length-based
 
 ### Memory Summarization Performance
-- **Asynchronous Processing**: Memory extraction runs in background
-- **Batched Analysis**: Processes conversation chunks efficiently
-- **Caching**: Summary results cached to avoid re-processing
-- **Fallback Handling**: Graceful degradation if summarization fails
+- **Inline Processing**: Memory extraction is awaited synchronously as part of closing a thread (not a background job)
+- **Focused Analysis**: Only user messages (all) plus the last 5 assistant messages (truncated to 200 chars) are sent to the extraction agent
+- **Fallback Handling**: Graceful degradation if summarization fails (logged as a warning, thread closure still proceeds)
 
 ### Database Optimization
 - **Indexes**: Optimized queries on `account_id`, `conversation_thread_id`, and timestamps
@@ -301,6 +295,9 @@ services.Configure<MemoryExtractionOptions>(options =>
 - **Audit Trail**: Complete message history with timestamps
 
 ## Future Enhancements
+
+### Known Issue To Revisit (High Priority)
+- **Durable long-term facts**: Identity-level facts (name, goals, risk tolerance) currently only persist for as long as they appear in one of the 3 most recent `MemorySummary` rows and silently fade out after enough sessions pass (see "Known Limitation" above). Needs a dedicated accumulating/deduplicating profile store (e.g. `UserProfile`/`CoreFact` table) that is always loaded regardless of summary recency.
 
 ### Planned Features
 - **Conversation Search**: Full-text search across message history and summaries
