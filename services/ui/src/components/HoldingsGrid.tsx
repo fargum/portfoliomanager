@@ -22,6 +22,34 @@ function debounce<T extends (...args: any[]) => any>(func: T, wait: number): T {
   }) as T;
 }
 
+// Stable reference: defined outside the component so it never changes identity
+// across renders. Passing a fresh object here on every render makes AG Grid
+// think defaultColDef changed, which can rebuild column UI (including open
+// filter popups) whenever the component re-renders (e.g. from filter debounce).
+const defaultColDef = {
+  sortable: true,
+  filter: true,
+  resizable: true,
+  minWidth: 120,
+  flex: 1,
+};
+
+// Same reasoning: keep aggFuncs identity stable across renders.
+const aggFuncs = {
+  'sum': (params: any) => {
+    const values = params.values.filter((val: any) => val != null && !isNaN(val));
+    return values.reduce((sum: number, val: number) => sum + val, 0);
+  },
+  'avg': (params: any) => {
+    const values = params.values.filter((val: any) => val != null && !isNaN(val));
+    if (values.length === 0) return 0;
+    return values.reduce((sum: number, val: number) => sum + val, 0) / values.length;
+  },
+  'count': (params: any) => {
+    return params.values.filter((val: any) => val != null).length;
+  }
+};
+
 interface HoldingsGridProps {
   // No props needed - account is determined from authentication
 }
@@ -316,6 +344,14 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = () => {
     fetchHoldings();
   }, [fetchHoldings]);
 
+  // Memoized so identity is stable across re-renders (e.g. filter-total
+  // updates) — a fresh columnDefs array on every render makes AG Grid
+  // rebuild column UI, closing any open filter popup mid-typing.
+  const columnDefs = useMemo(
+    () => getHoldingsColumnDefs(handleCellValueChanged),
+    [handleCellValueChanged]
+  );
+
   const totalValue = calculateTotalValue(holdings);
   const totalBoughtValue = calculateTotalBoughtValue(holdings);
   const totalGainLoss = calculateTotalGainLoss(holdings);
@@ -576,17 +612,11 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = () => {
           <div className={`${resolvedTheme === 'dark' ? 'ag-theme-alpine-dark' : 'ag-theme-alpine'} w-full h-full`}>
             <AgGridReact
               rowData={holdings}
-              columnDefs={getHoldingsColumnDefs(handleCellValueChanged)}
+              columnDefs={columnDefs}
               onGridReady={onGridReady}
               onFilterChanged={onFilterChanged}
               onSelectionChanged={onSelectionChanged}
-              defaultColDef={{
-                sortable: true,
-                filter: true,
-                resizable: true,
-                minWidth: 120,
-                flex: 1, // Allow columns to grow to fill available space
-              }}
+              defaultColDef={defaultColDef}
               // Enable cell editing
               singleClickEdit={true}
               stopEditingWhenCellsLoseFocus={true}
@@ -597,21 +627,7 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = () => {
               suppressRowClickSelection={false}
               // Enable aggregation
               enableRangeSelection={true}
-              aggFuncs={{
-                // Keep basic aggregation functions for selection ranges
-                'sum': (params: any) => {
-                  const values = params.values.filter((val: any) => val != null && !isNaN(val));
-                  return values.reduce((sum: number, val: number) => sum + val, 0);
-                },
-                'avg': (params: any) => {
-                  const values = params.values.filter((val: any) => val != null && !isNaN(val));
-                  if (values.length === 0) return 0;
-                  return values.reduce((sum: number, val: number) => sum + val, 0) / values.length;
-                },
-                'count': (params: any) => {
-                  return params.values.filter((val: any) => val != null).length;
-                }
-              }}
+              aggFuncs={aggFuncs}
               pagination={true}
               paginationPageSize={50}
               suppressHorizontalScroll={false} // Enable horizontal scroll when needed
