@@ -114,5 +114,8 @@ public record ContentStreamingMessageDto(string Content) : StreamingMessageDto
 /// </summary>
 public record CompletionStreamingMessageDto() : StreamingMessageDto
 {
+    public string? ExecutionId { get; init; }
+    public string? TraceId { get; init; }
+    public string? Outcome { get; init; }
     public override string MessageType => "completion";
 }

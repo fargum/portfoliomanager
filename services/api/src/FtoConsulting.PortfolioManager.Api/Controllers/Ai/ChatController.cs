@@ -69,15 +69,17 @@ public class ChatController(
             logger.LogInformation("Processing streaming AI chat query with memory for account {AccountId}, thread {ThreadId}: {Query}", 
                 accountId, request.ThreadId, request.Query);
 
-            // Set up Server-Sent Events headers
+            // Newline-delimited JSON envelopes (the existing streaming client contract).
             Response.Headers["Content-Type"] = "text/plain; charset=utf-8";
             Response.Headers["Cache-Control"] = "no-cache";
             Response.Headers["Connection"] = "keep-alive";
+            if (Activity.Current is { } currentActivity) Response.Headers["X-Trace-Id"] = currentActivity.TraceId.ToHexString();
 
             // Use unified memory-aware streaming with status updates from the AI service
-            await aiOrchestrationService.ProcessPortfolioQueryAsync(
+            var execution = await aiOrchestrationService.ExecutePortfolioQueryAsync(
                 request.Query, 
                 accountId,  // SECURITY: Use authenticated accountId, not from request
+                new AgentExecutionOptions(),
                 onStatusUpdate: async (status) =>
                 {
                     if (!cancellationToken.IsCancellationRequested)
@@ -106,17 +108,23 @@ public class ChatController(
             // Send completion message
             if (!cancellationToken.IsCancellationRequested)
             {
-                var completionMessage = new CompletionStreamingMessageDto();
+                var completionMessage = new CompletionStreamingMessageDto
+                {
+                    ExecutionId = execution.ExecutionId,
+                    TraceId = execution.TraceId,
+                    Outcome = execution.Status.ToString()
+                };
                 var jsonMessage = System.Text.Json.JsonSerializer.Serialize(completionMessage);
                 await Response.WriteAsync($"{jsonMessage}\n", cancellationToken);
                 await Response.Body.FlushAsync(cancellationToken);
             }
 
-            logger.LogInformation("Successfully completed streaming AI chat query with memory for account {AccountId}", 
-                accountId);
+            logger.LogInformation("Streaming AI query ended for account {AccountId}: {Outcome}, execution {ExecutionId}",
+                accountId, execution.Status, execution.ExecutionId);
 
-            activity?.SetStatus(ActivityStatusCode.Ok);
-            activity?.SetTag("response.completed", "true");
+            activity?.SetStatus(execution.Status == AgentExecutionStatus.Completed ? ActivityStatusCode.Ok : ActivityStatusCode.Error);
+            activity?.SetTag("response.completed", execution.Status == AgentExecutionStatus.Completed);
+            activity?.SetTag("portfolio.execution.status", execution.Status.ToString());
 
             return new EmptyResult();
         }

@@ -1,0 +1,3 @@
+# Captured portfolio conversations and cloud result payloads are local artifacts.
+artifacts/
+appsettings.Local.json

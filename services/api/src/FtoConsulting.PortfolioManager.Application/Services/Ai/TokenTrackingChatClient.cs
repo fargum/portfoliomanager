@@ -11,7 +11,7 @@ namespace FtoConsulting.PortfolioManager.Application.Services.Ai;
 public class TokenTrackingChatClient : IChatClient
 {
     private static readonly ActivitySource s_activitySource = new("PortfolioManager.AI.TokenTracking");
-    
+
     private readonly IChatClient _innerClient;
     private readonly ILogger<TokenTrackingChatClient> _logger;
     private readonly int _accountId;
@@ -36,21 +36,21 @@ public class TokenTrackingChatClient : IChatClient
     }
 
     public async Task<ChatResponse> GetResponseAsync(
-        IEnumerable<ChatMessage> chatMessages, 
-        ChatOptions? options = null, 
+        IEnumerable<ChatMessage> chatMessages,
+        ChatOptions? options = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(chatMessages);
-        
+
         using var activity = s_activitySource.StartActivity("ChatCompletion");
         var stopwatch = Stopwatch.StartNew();
         var callId = Guid.NewGuid().ToString("N")[..12];
-        
+
         // Log request details
         var messageCount = chatMessages.Count();
         var estimatedInputTokens = EstimateTokens(chatMessages);
         var toolCount = options?.Tools?.Count ?? 0;
-        
+
         activity?.SetTag("client.id", _clientId);
         activity?.SetTag("account.id", _accountId.ToString());
         activity?.SetTag("call.id", callId);
@@ -69,9 +69,10 @@ public class TokenTrackingChatClient : IChatClient
 
             // Extract token usage from response
             var usage = response.Usage;
-            var completionTokens = usage?.OutputTokenCount ?? 0;
-            var promptTokens = usage?.InputTokenCount ?? estimatedInputTokens;
-            var totalTokens = usage?.TotalTokenCount ?? (promptTokens + completionTokens);
+            var completionTokens = usage?.OutputTokenCount;
+            var promptTokens = usage?.InputTokenCount;
+            var totalTokens = usage?.TotalTokenCount;
+            activity?.SetTag("usage.source", usage == null ? "unavailable" : "provider");
 
             // Log response details
             activity?.SetTag("output.completion_tokens", completionTokens.ToString());
@@ -94,31 +95,31 @@ public class TokenTrackingChatClient : IChatClient
         {
             stopwatch.Stop();
             activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
-            
+
             _logger.LogError(ex,
                 "[LLM Call Error] Client={ClientId} Account={AccountId} CallId={CallId} Duration={DurationMs}ms Error={ErrorMessage}",
                 _clientId, _accountId, callId, stopwatch.ElapsedMilliseconds, ex.Message);
-            
+
             throw;
         }
     }
 
     public async IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(
-        IEnumerable<ChatMessage> chatMessages, 
-        ChatOptions? options = null, 
+        IEnumerable<ChatMessage> chatMessages,
+        ChatOptions? options = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(chatMessages);
-        
+
         using var activity = s_activitySource.StartActivity("StreamingChatCompletion");
         var stopwatch = Stopwatch.StartNew();
         var callId = Guid.NewGuid().ToString("N")[..12];
-        
+
         // Log request details
         var messageCount = chatMessages.Count();
         var estimatedInputTokens = EstimateTokens(chatMessages);
         var toolCount = options?.Tools?.Count ?? 0;
-        
+
         activity?.SetTag("client.id", _clientId);
         activity?.SetTag("account.id", _accountId.ToString());
         activity?.SetTag("call.id", callId);
@@ -135,42 +136,51 @@ public class TokenTrackingChatClient : IChatClient
         var chunkCount = 0;
         string? finishReason = null;
 
-        await foreach (var update in _innerClient.GetStreamingResponseAsync(chatMessages, options, cancellationToken))
+        UsageDetails? usage = null;
+        var completed = false;
+        await using var iterator = _innerClient.GetStreamingResponseAsync(chatMessages, options, cancellationToken).GetAsyncEnumerator(cancellationToken);
+        try
         {
-            chunkCount++;
-            totalStreamedText += update.Text?.Length ?? 0;
-            
-            // Capture finish reason when available
-            if (update.FinishReason != null)
+            while (true)
             {
-                finishReason = update.FinishReason.ToString();
+                bool next;
+                try { next = await iterator.MoveNextAsync().ConfigureAwait(false); }
+                catch (Exception ex)
+                {
+                    activity?.SetStatus(ActivityStatusCode.Error, ex.GetType().Name);
+                    activity?.SetTag("error.type", ex.GetType().FullName);
+                    throw;
+                }
+                if (!next) { completed = true; break; }
+                var update = iterator.Current;
+                chunkCount++;
+                totalStreamedText += update.Text?.Length ?? 0;
+                if (update.FinishReason != null) finishReason = update.FinishReason.ToString();
+                foreach (var content in update.Contents.OfType<UsageContent>())
+                {
+                    usage ??= new UsageDetails();
+                    usage.Add(content.Details);
+                }
+                yield return update;
             }
-
-            yield return update;
         }
-
-        // Log completion (this runs after the enumeration is complete)
-        stopwatch.Stop();
-
-        // Log completion details
-        var completionTokens = EstimateTokens(totalStreamedText);
-        var promptTokens = estimatedInputTokens;
-        var totalTokens = promptTokens + completionTokens;
-
-        activity?.SetTag("output.completion_tokens", completionTokens.ToString());
-        activity?.SetTag("output.prompt_tokens", promptTokens.ToString());
-        activity?.SetTag("output.total_tokens", totalTokens.ToString());
-        activity?.SetTag("response.text_length", totalStreamedText.ToString());
-        activity?.SetTag("response.chunk_count", chunkCount.ToString());
-        activity?.SetTag("response.finish_reason", finishReason ?? "unknown");
-        activity?.SetTag("duration.ms", stopwatch.ElapsedMilliseconds.ToString());
-
-        _logger.LogInformation(
-            "[LLM Streaming Complete] Client={ClientId} Account={AccountId} CallId={CallId} " +
-            "PromptTokens={PromptTokens} CompletionTokens={CompletionTokens} TotalTokens={TotalTokens} " +
-            "StreamedLength={StreamedLength} Chunks={ChunkCount} Duration={DurationMs}ms FinishReason={FinishReason}",
-            _clientId, _accountId, callId, promptTokens, completionTokens, totalTokens,
-            totalStreamedText, chunkCount, stopwatch.ElapsedMilliseconds, finishReason);
+        finally
+        {
+            stopwatch.Stop();
+            activity?.SetTag("usage.source", usage == null ? "unavailable" : "provider");
+            activity?.SetTag("output.completion_tokens", usage?.OutputTokenCount);
+            activity?.SetTag("output.prompt_tokens", usage?.InputTokenCount);
+            activity?.SetTag("output.total_tokens", usage?.TotalTokenCount);
+            activity?.SetTag("output.estimated_tokens", EstimateTokens(totalStreamedText));
+            activity?.SetTag("response.text_length", totalStreamedText);
+            activity?.SetTag("response.chunk_count", chunkCount);
+            activity?.SetTag("response.finish_reason", finishReason ?? "unknown");
+            activity?.SetTag("response.completed", completed);
+            activity?.SetTag("duration.ms", stopwatch.ElapsedMilliseconds);
+            if (!completed) activity?.SetStatus(ActivityStatusCode.Error, "Stream did not complete");
+            _logger.LogInformation("[LLM Streaming End] Client={ClientId} Account={AccountId} CallId={CallId} Completed={Completed} PromptTokens={PromptTokens} CompletionTokens={CompletionTokens} Duration={DurationMs}ms",
+                _clientId, _accountId, callId, completed, usage?.InputTokenCount, usage?.OutputTokenCount, stopwatch.ElapsedMilliseconds);
+        }
     }
 
     /// <summary>
@@ -181,7 +191,7 @@ public class TokenTrackingChatClient : IChatClient
         var totalLength = messages
             .Where(m => m.Text != null)
             .Sum(m => m.Text!.Length);
-            
+
         return Math.Max(1, totalLength / 4);
     }
 

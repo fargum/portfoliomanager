@@ -37,6 +37,9 @@ public class AzureFoundryOptions
     /// </summary>
     public int TimeoutSeconds { get; set; } = 120;
 
+    /// <summary>Opt in to exporting prompt, response and tool payloads outside evaluation runs.</summary>
+    public bool CaptureSensitiveTelemetry { get; set; }
+
     /// <summary>
     /// Models available for selection in the UI.
     /// Add entries here to expose additional Foundry deployments without code changes.

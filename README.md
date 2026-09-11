@@ -18,7 +18,15 @@ Since I built the bulk of this around October 2025, much has happened in the AI 
 Microsoft has finally released Microsoft Agent Framework 1.0 which has been incorporated here.
 Azure Foundry capabilities have advanced significantly - with better support for evals, guardrails and
 model fine tuning.  Coding tools have been revolutionized. I use both GitHub copilot and Claude code on this and other repos and have experimented in building custom coding agents and skills for both.
-I use both the sonnet and opus models for claude, but with price rises, I am trying new ways to optimize their use.  
+I use both the sonnet and opus models for claude, but with price rises, I am trying new ways to optimize their use. 
+
+addendum september 2026
+
+evaluation has come a long way since i initally built this last year. Then, I used a rather simple, half complete python script based
+on what I saw at last November's azure build conference in Lisbon.
+Now, as of Sept 2026, Microsoft has produced a much more complete evaluation library in Azure foundry which is compatible with
+Agent Framework.  So I used a c# version here, rather than python, for compatibility with the existing solution. This also gave me 
+an opportunity to put the new open AI astra model through its paces in codex.
 
 ## Quick Start
 
@@ -48,7 +56,7 @@ services/
 │   ├── Infrastructure # EF Core, PostgreSQL, EOD integration
 │   └── Api            # Controllers, auth, telemetry
 ├── ui/                # Next.js frontend with Azure AD auth
-└── evaluation/        # Python-based AI evaluation framework
+└── evaluation/        # C# agent evaluation and trace verification
 ```
 
 ### Key Layers
@@ -72,7 +80,7 @@ services/
 - **Market Context**: Real-time news and sentiment analysis via EOD API and Tavily Search API
 - **Agent Tools**: GetMarketContext, AnalyzePortfolio, ComparePerformance, GetMarketSentiment, TavilySearchTool
 - **Memory System**: Persistent conversation context stored in PostgreSQL with account-scoped memory summaries and sliding window chat history
-- **Evaluation Framework**: Python-based testing with quality metrics
+- **Evaluation Framework**: C# testing with real tool-call capture, trace verification and Foundry quality metrics
 
 ### Integration & Security
 - **Azure AD B2C**: OAuth 2.0 authentication with JWT tokens

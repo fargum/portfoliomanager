@@ -1,0 +1,11 @@
+{
+  "version": "portfolio-v1",
+  "effectiveTime": "2026-09-11T12:00:00Z",
+  "accountId": 42,
+  "holdings": [
+    { "date": "2026-09-10", "ticker": "ALPHA.L", "name": "Alpha Fixture", "units": 10, "boughtValue": 1000, "currentValue": 1100, "dailyProfitLoss": 10 },
+    { "date": "2026-09-10", "ticker": "BETA.L", "name": "Beta Fixture", "units": 20, "boughtValue": 2000, "currentValue": 1900, "dailyProfitLoss": -10 },
+    { "date": "2026-09-11", "ticker": "ALPHA.L", "name": "Alpha Fixture", "units": 10, "boughtValue": 1000, "currentValue": 1200, "dailyProfitLoss": 100 },
+    { "date": "2026-09-11", "ticker": "BETA.L", "name": "Beta Fixture", "units": 20, "boughtValue": 2000, "currentValue": 1800, "dailyProfitLoss": -100 }
+  ]
+}

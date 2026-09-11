@@ -33,20 +33,20 @@ public class PortfolioHoldingsTool
             date.ToLowerInvariant().Contains("current") ||
             date.ToLowerInvariant().Contains("now"))
         {
-            effectiveDate = DateTime.UtcNow.ToString("yyyy-MM-dd");
+            effectiveDate = PortfolioClock.UtcNow.ToString("yyyy-MM-dd");
         }
 
         var parsedDate = DateUtilities.ParseDate(effectiveDate);
         var holdings = !string.IsNullOrWhiteSpace(ticker)
             ? await _holdingService.GetHoldingsByAccountDateAndTickerAsync(accountId, parsedDate, ticker, cancellationToken)
             : await _holdingService.GetHoldingsByAccountAndDateAsync(accountId, parsedDate, cancellationToken);
-        
+
         return new
         {
             AccountId = accountId,
             RequestedDate = date,
             EffectiveDate = effectiveDate,
-            IsRealTimeData = parsedDate == DateOnly.FromDateTime(DateTime.UtcNow),
+            IsRealTimeData = parsedDate == DateOnly.FromDateTime(PortfolioClock.UtcNow),
             HoldingsCount = holdings.Count(),
             Holdings = holdings.Select(h => new
             {

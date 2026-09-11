@@ -1,254 +1,88 @@
-# Portfolio Manager AI Evaluation
+# C# portfolio agent evaluation
 
-This directory contains the evaluation framework for testing the Portfolio Manager's AI capabilities using Azure AI Evaluation SDK.
+This runner calls the same `IAiOrchestrationService` as the API. It records each real model round and function invocation, makes deterministic assertions locally, and can submit the captured interaction to Foundry's hosted evaluators. Cloud evaluation remains preview and requires a live acceptance run in your Foundry project before enforcing CI gates.
 
-## Quick Start
+## Run locally
 
-1. **Install dependencies**: `pip install -r requirements.txt`
-2. **Configure Azure OpenAI**: Set `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_DEPLOYMENT`
-3. **Start Portfolio Manager API**: Ensure running at `http://localhost:8080`
-4. **Run evaluation**: `python portfolio_evaluator.py`
+From the repository root, with .NET 10 installed:
 
-## Key Files
-
-- `portfolio_evaluator.py` - Main evaluation framework
-- `performance_analyzer.py` - Performance analysis tool
-- `requirements.txt` - Python dependencies
-- `setup.py` - Environment setup
-
-## Results
-
-Evaluation results are saved to `evaluation_results/` directory with detailed metrics for:
-- Tool call accuracy
-- Response relevance
-- Response personality
-
-## Full Documentation
-
-📖 **Complete documentation available at**: [`../docs/AI-Evaluation-Framework.md`](../docs/AI-Evaluation-Framework.md)
-
-The main documentation includes:
-- Detailed architecture overview
-- Configuration options
-- Troubleshooting guide
-- Advanced usage examples
-- CI/CD integration
-- Custom evaluator development
-
-1. **Creating test scenarios** - Portfolio analysis, comparison, and market intelligence queries
-2. **Calling your live API** - Makes HTTP requests to your running Portfolio Manager
-3. **Evaluating responses** - Uses Azure AI Evaluation SDK to assess:
-   - **Tool Call Accuracy**: Does the AI select the right tools with correct parameters?
-   - **Response Relevance**: Are responses helpful and directly address user questions?  
-   - **Response Personality**: Do responses have engaging personality vs dry technical language?
-
-## Architecture
-
-```
-┌─────────────────┐    HTTP API Calls    ┌──────────────────┐
-│   Python        │ ────────────────────▶ │  .NET Portfolio  │
-│   Evaluation    │                       │  Manager API     │
-│   Framework     │ ◀──────────────────── │                  │
-└─────────────────┘    JSON Responses     └──────────────────┘
-        │
-        ▼
-┌─────────────────┐
-│  Azure AI       │
-│  Evaluation SDK │
-│  (Metrics &     │
-│   Analysis)     │
-└─────────────────┘
+```powershell
+dotnet restore evaluation/FtoConsulting.PortfolioManager.Evaluation --locked-mode
+dotnet test evaluation/FtoConsulting.PortfolioManager.Evaluation.Tests
+$runner = 'evaluation/FtoConsulting.PortfolioManager.Evaluation'
+dotnet run --project $runner -- --help
 ```
 
-## Quick Start
+Copy `evaluation/appsettings.example.json` to the ignored `evaluation/appsettings.Local.json` and set the inference endpoint and deployment. Supply `AzureFoundry__ApiKey` through environment configuration. The model inference URL ends in `/openai/v1/`; the evaluation project URL ends in `/api/projects/PROJECT`. They are different endpoints.
 
-### 1. Setup Environment
-
-```bash
-# Run the setup script
-python setup.py
-
-# Or manually install requirements
-pip install -r requirements.txt
+```powershell
+dotnet run --project $runner -- collect --config evaluation/appsettings.Local.json --suite evaluation/suites/regression.jsonl --fixture evaluation/fixtures/portfolio-v1.json --output evaluation/artifacts/run-001
+dotnet run --project $runner -- assert --input evaluation/artifacts/run-001
 ```
 
-### 2. Configure Azure OpenAI
+Collection still calls your deployed model and consumes inference tokens. Fixture mode replaces holdings data, uses a fixed effective date, and rejects external market tools. The real agent, guardrails, function loop, MCP dispatcher and portfolio tools run. It does not start the API or background schedulers, load account memory, or write conversation history. Automated tests use scripted model responses and need no credentials, network or database.
 
-```bash
-# Set these environment variables
-export AZURE_OPENAI_ENDPOINT="https://your-openai-resource.openai.azure.com/"
-export AZURE_OPENAI_DEPLOYMENT="your-gpt-4-deployment"
+The example regression suite includes explicit tool-routing checks, isolated greeting, seeded follow-up and input blocking. These are starter cases, not a comprehensive quality benchmark. Extend it with natural-language routing, numerical answer checks and domain-specific expectations. Unit tests separately cover parallel calls, errors and cancellation.
 
-# On Windows:
-# set AZURE_OPENAI_ENDPOINT=https://your-openai-resource.openai.azure.com/
-# set AZURE_OPENAI_DEPLOYMENT=your-gpt-4-deployment
+For live integrations, explicitly use `--live --account-id TEST_ACCOUNT_ID` instead of `--fixture`, configure `ConnectionStrings__EvaluationDatabase` for a test database and supply the applicable EOD/Tavily configuration. `live-integration.jsonl` demonstrates this mode. The default context is still isolated. `Production` context explicitly uses account memory/history and can write to the configured database. `Seeded` context accepts only the supplied messages. Inference configuration is loaded only from the requested JSON file and environment, never automatically from production appsettings or `.env`.
+
+## Evidence and assertions
+
+Every run requires a new output directory. `manifest.json` records the suite hash, fixture and scenarios. Each `case-EXECUTION_ID.json` contains schema-versioned evidence, timestamps, effective date, model deployment, prompt/schema hashes, model-round messages, requested tool arguments, server-injected execution arguments, results, outcomes and trace/span IDs. Set `CODE_REVISION` (or `GITHUB_SHA`) for revision provenance. Attempts default to one; collection never silently retries an entire scenario.
+
+Tool calls are observed inside `FunctionInvokingChatClient.FunctionInvoker`, immediately around the actual function delegate. Calls are not inferred from prose, status messages or tool descriptions. Original call IDs distinguish repeated and parallel uses of the same tool. The existing `execute_tool` activity supplies the span ID; no duplicate tool span is created. A tool returning an `Error` object is recorded separately from a thrown exception. The next model input establishes what the model actually received.
+
+Assertions check terminal outcome, capture completeness, unique call IDs, actual execution, results returned to later model rounds, tool outcomes, required arguments, allowed/forbidden tools, call counts, dependency ordering and response substrings. Empty capture never counts as a successful no-tool answer. Local reports separate capture failures from agent/tool failures.
+
+Exit codes: `0` checks passed or cloud submission succeeded; `1` deterministic or opted-in judge failure; `2` configuration/capture/trace/cloud failure; `130` cancellation or operation timeout. Submission success is not a passing evaluation. `--timeout-seconds` defaults to 180 per scenario or polling operation. Ctrl+C cancels collection; finished/in-flight execution evidence is retained when orchestration returns a cancellation outcome.
+
+Artifacts contain prompts, seeded history, tool arguments/results and portfolio data. Keep them in the ignored artifacts directory and apply your normal access and retention controls. Evaluation capture enables sensitive GenAI telemetry for those runs. Production payload export defaults off and can be enabled explicitly through `AzureFoundry__CaptureSensitiveTelemetry=true`. Existing application logs may still contain query/tool data; this switch controls GenAI telemetry, not all application logging.
+
+## Foundry evaluation
+
+Set `AZURE_AI_PROJECT_ENDPOINT` and authenticate using `DefaultAzureCredential` (for example, an existing Azure CLI login or a workload identity). The caller needs evaluation permissions on that project and access to the judge deployment. The preview SDK is isolated in this console project and pinned to `Azure.AI.Projects 3.0.0-beta.2`; a package lock records transitive versions.
+
+```powershell
+dotnet run --project $runner -- evaluate --config evaluation/appsettings.Local.json --input evaluation/artifacts/run-001 --judge YOUR-JUDGE-DEPLOYMENT --evaluator tool_call_accuracy
+dotnet run --project $runner -- report --config evaluation/appsettings.Local.json --input evaluation/artifacts/run-001 --run evaluation/artifacts/run-001/foundry-RECEIPT.json --fail-on-judge
+dotnet run --project $runner -- cancel --config evaluation/appsettings.Local.json --run evaluation/artifacts/run-001/foundry-RECEIPT.json
 ```
 
-### 3. Start Portfolio Manager API
+Supported evaluators: `relevance`, `groundedness`, `task_adherence`, `tool_call_accuracy`, `tool_output_utilization`. Submit each independently so applicability is explicit. Blocked, cancelled, failed and invalid captures are excluded. Tool evaluators also exclude no-tool interactions. The console reports submitted/total counts; zero applicable cases is an error. Local deterministic failures remain visible and are not replaced by judge scores.
 
-```bash
-# From your Portfolio Manager project root
-dotnet run
+The adapter uses `AIProjectClient.ProjectOpenAIClient.GetEvaluationClient()` and protocol `BinaryContent` for custom JSONL inline evidence or exact trace IDs. A receipt records evaluation/run IDs, evaluator, judge and execution-to-trace mapping. Reporting polls to a terminal state, retrieves every output page and retains raw scores/reasons/report URL. A local timeout does not cancel an already submitted cloud run; use the saved receipt with `cancel`. Do not blindly resubmit an ambiguous create-run failure: inspect the Foundry portal first, because a service-side run may already exist.
 
-# Or using Docker
-docker-compose up
+Microsoft's current cloud C# examples use `initialization_parameters.model`; some evaluator overview examples still use `deployment_name`. This adapter follows the cloud C# contract and isolates that choice in one file. Validate against the target project before enforcing judge gates.
 
-# Verify API is running at http://localhost:5000
+The Foundry package resolves OpenAI 2.12.0 in the evaluation process; the existing application currently resolves 2.10.0. Application source and Agent Framework middleware are shared, but these runtime dependency sets differ. The manifest records loaded versions. Production package versions have not been upgraded as part of this change; include a production-runtime smoke comparison in acceptance, or separate collection and cloud submission into processes if strict binary parity is required.
+
+## OpenTelemetry correlation
+
+The application starts `portfolio.query`, then the Agent Framework `invoke_agent` span wraps token tracking, function orchestration, model spans and existing `execute_tool` spans. Execution, scenario and suite IDs supplement W3C trace IDs. The agent has stable ID `portfolio-manager`. Child scopes retain the original function call ID and active trace/span context.
+
+Foundry reads conversation attributes on `invoke_agent`, not arbitrary child spans. Agent Framework emits the actual streamed tool calls/results there; this implementation also puts the real function schemas and first actual model input (including instructions and memory/seed context) on that span before export. Capture and export tests verify the agent identity, tool call IDs, arguments, results, instructions and schemas. The API's existing newline-JSON completion envelope now includes `ExecutionId`, `TraceId` and `Outcome`; it also exposes `X-Trace-Id` on the response. No capture endpoint was added.
+
+Configure `APPLICATIONINSIGHTS_CONNECTION_STRING` for the evaluation process, and connect that Application Insights resource to the Foundry project. `LOG_ANALYTICS_WORKSPACE_ID` is the workspace GUID, not the Application Insights application ID. The CLI identity needs permission to query that workspace. Microsoft's trace evaluation guide also requires the project managed identity to have Log Analytics Reader on the linked resources; protected tables require the additional documented reader role.
+
+```powershell
+dotnet run --project $runner -- verify-traces --config evaluation/appsettings.Local.json --input evaluation/artifacts/run-001 --timeout-seconds 300
+dotnet run --project $runner -- evaluate-traces --config evaluation/appsettings.Local.json --input evaluation/artifacts/run-001 --judge YOUR-JUDGE-DEPLOYMENT --evaluator tool_call_accuracy --timeout-seconds 300
 ```
 
-### 4. Run Evaluation
+The runner uses full sampling and flushes before exit. Verification queries the workspace by exact W3C trace ID, checks the captured agent/tool span IDs and call IDs, compares exported tool arguments/results, and requires agent-level messages and schemas. It retries for ingestion delay. Missing or truncated telemetry fails verification; `evaluate-traces` verifies again before submission. `OTEL_EXPORTER_OTLP_ENDPOINT` optionally exports to an OTLP collector, but a collector alone does not make traces available to Foundry. Payload limits and ingestion behavior must be verified in Azure; large tool results may exceed Application Insights attribute limits even when local capture is complete.
 
-```bash
-python portfolio_evaluator.py
-```
+## Azure acceptance checks
 
-## Test Scenarios
+1. Run the fixture suite using the intended model deployment. Review deterministic failures independently of judge scores.
+2. Submit one captured interaction to each intended evaluator, then retrieve its scores and reasons with the receipt.
+3. Confirm the same execution's complete agent/tool evidence in Application Insights, and evaluate its exact trace ID.
+4. Run the dedicated live test account suite, including cancellation and dependency failures, then add CI thresholds based on an accepted baseline.
 
-The evaluation includes these Portfolio Manager scenarios:
+No Azure resource setup, deployment or continuous-evaluation policy is performed by this runner. Existing output-validation code is not wired into the application's streaming path; this work does not claim that responses undergo output safety validation.
 
-### Portfolio Analysis
-- "How is my portfolio performing today?"
-- "What was my portfolio value yesterday?"
-- "Can you analyze my portfolio for November 15, 2025?"
+References reviewed on 2026-09-11:
 
-### Portfolio Comparison  
-- "How does my portfolio today compare to last week?"
-- "Compare my current portfolio performance to last month"
-- "Show me the difference between my portfolio on Nov 10 vs Nov 17, 2025"
-
-### Market Intelligence
-- "What's the market sentiment for Apple stock?"
-- "Can you give me intel on Tesla's market situation?"
-- "How does the market feel about GEN.L right now?"
-
-### Multi-Intent Scenarios
-- "What's my total portfolio value and how is MSFT doing in the market?"
-- "I want to see how my investments have changed and also check sentiment for Amazon"
-
-## Evaluation Metrics
-
-### 1. Tool Call Accuracy ⚡
-- **Purpose**: Verifies AI selects correct tools (PortfolioAnalysisTool, PortfolioComparisonTool, MarketIntelligenceTool)
-- **Evaluator**: Built-in `ToolCallAccuracyEvaluator` (Azure AI SDK)
-- **Scoring**: Percentage accuracy of tool selection and parameter passing
-
-### 2. Response Relevance 🎯  
-- **Purpose**: Assesses how well responses address user's portfolio questions
-- **Evaluator**: Built-in `RelevanceEvaluator` (Azure AI SDK)
-- **Scoring**: 1-5 scale for relevance to user query
-
-### 3. Response Personality 🎭
-- **Purpose**: Ensures responses have engaging personality vs dry technical language
-- **Evaluator**: Custom prompt-based evaluator
-- **Scoring**: 1-5 scale for personality and engagement level
-
-## Output
-
-After running evaluation, you'll get:
-
-```
-📊 Portfolio Manager AI Evaluation Results
-Overall Evaluation Completed: 2025-11-18 14:30:15
-
-🎯 Tool Call Accuracy: 85.7%
-🎯 Response Relevance: 4.2/5.0  
-🎭 Response Personality: 4.0/5.0
-
-📁 Detailed results saved to evaluation_results/
-```
-
-Detailed results include:
-- Individual scores for each test scenario
-- Reasoning for evaluation decisions
-- Full API responses for debugging
-- Aggregate statistics and trends
-
-## Configuration
-
-### Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORTFOLIO_API_URL` | `http://localhost:5000` | Your Portfolio Manager API endpoint |
-| `TEST_ACCOUNT_ID` | `1` | Account ID to use for testing |
-| `AZURE_OPENAI_ENDPOINT` | None | Azure OpenAI resource endpoint |
-| `AZURE_OPENAI_DEPLOYMENT` | None | GPT model deployment name |
-
-### Customizing Test Scenarios
-
-Edit `portfolio_evaluator.py` and modify the `test_scenarios` list in `create_test_dataset()` to add your own test cases:
-
-```python
-{
-    "query": "Your custom portfolio query",
-    "expected_tool": "PortfolioAnalysisTool",
-    "expected_params": {"valuationDate": "today"},
-    "scenario_type": "portfolio_analysis"
-}
-```
-
-## Files
-
-| File | Purpose |
-|------|---------|
-| `portfolio_evaluator.py` | Main evaluation framework |
-| `response_personality.prompty` | Custom personality evaluator prompt |
-| `requirements.txt` | Python dependencies |
-| `setup.py` | Environment setup script |
-| `README.md` | This documentation |
-
-## Troubleshooting
-
-### API Connection Issues
-```
-❌ Portfolio Manager API at http://localhost:5000 is not healthy
-```
-**Solution**: Ensure your .NET API is running and accessible
-
-### Azure OpenAI Configuration  
-```
-❌ Azure OpenAI configuration required
-```
-**Solution**: Set `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_DEPLOYMENT` environment variables
-
-### Package Installation Issues
-```
-❌ Import "azure.ai.evaluation" could not be resolved
-```
-**Solution**: Install requirements: `pip install -r requirements.txt`
-
-### Authentication Issues
-**Solution**: Ensure Azure credentials are configured:
-- Azure CLI: `az login`
-- Service Principal: Set `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TENANT_ID`
-- Managed Identity: Automatic in Azure environments
-
-## Advanced Usage
-
-### Running Specific Evaluations
-
-You can run individual evaluators:
-
-```python
-# Only tool accuracy
-evaluator.run_evaluation(
-    data_file=dataset,
-    evaluators={"tool_accuracy": evaluator.tool_accuracy_evaluator}
-)
-```
-
-### Custom Account Testing
-
-```bash
-# Test with different account ID
-TEST_ACCOUNT_ID=42 python portfolio_evaluator.py
-```
-
-### Different API Endpoints
-
-```bash  
-# Test against staging environment
-PORTFOLIO_API_URL=https://staging-api.yoursite.com python portfolio_evaluator.py
-```
-
-This evaluation framework provides comprehensive testing of your Portfolio Manager's AI capabilities, ensuring high-quality, accurate, and engaging responses for your portfolio management needs.
+- [Microsoft cloud evaluation client setup](https://learn.microsoft.com/en-us/azure/foundry/observability/how-to/cloud-evaluation)
+- [Evaluate deployed interactions and trace data requirements](https://learn.microsoft.com/en-us/azure/foundry/observability/how-to/cloud-evaluation-deployed-interactions)
+- [Agent evaluator input contracts](https://learn.microsoft.com/en-us/azure/foundry/concepts/evaluation-evaluators/agent-evaluators)
+- [Get results, paginate and cancel](https://learn.microsoft.com/en-us/azure/foundry/observability/how-to/cloud-evaluation-results)

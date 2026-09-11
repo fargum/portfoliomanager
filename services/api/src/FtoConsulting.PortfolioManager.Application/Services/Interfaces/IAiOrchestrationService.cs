@@ -7,6 +7,11 @@ namespace FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 /// </summary>
 public interface IAiOrchestrationService
 {
+    Task<AgentExecution> ExecutePortfolioQueryAsync(string query, int accountId, AgentExecutionOptions options,
+        Func<StatusUpdateDto, Task>? onStatusUpdate = null, Func<string, Task>? onTokenReceived = null,
+        int? threadId = null, string? modelId = null, bool storeInHistory = true,
+        CancellationToken cancellationToken = default);
+
     /// <summary>
     /// Process a natural language query about portfolio data with streaming support, memory, and status updates
     /// </summary>
@@ -20,15 +25,15 @@ public interface IAiOrchestrationService
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Task that completes when streaming finishes</returns>
     Task ProcessPortfolioQueryAsync(
-        string query, 
-        int accountId, 
+        string query,
+        int accountId,
         Func<StatusUpdateDto, Task>? onStatusUpdate,
         Func<string, Task> onTokenReceived,
         int? threadId = null,
         string? modelId = null,
         bool storeInHistory = true,
         CancellationToken cancellationToken = default);
-    
+
     /// <summary>
     /// Get available AI tools for the MCP server
     /// </summary>

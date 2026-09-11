@@ -26,23 +26,23 @@ public class PortfolioAnalysisTool
     {
         // Smart date handling: if asking for 'today', 'current', or similar, use today's date
         var effectiveDate = analysisDate;
-        if (string.IsNullOrEmpty(analysisDate) || 
-            analysisDate.ToLowerInvariant().Contains("today") || 
+        if (string.IsNullOrEmpty(analysisDate) ||
+            analysisDate.ToLowerInvariant().Contains("today") ||
             analysisDate.ToLowerInvariant().Contains("current") ||
             analysisDate.ToLowerInvariant().Contains("now"))
         {
-            effectiveDate = DateTime.UtcNow.ToString("yyyy-MM-dd");
+            effectiveDate = PortfolioClock.UtcNow.ToString("yyyy-MM-dd");
         }
-        
+
         var parsedDate = DateUtilities.ParseDateTime(effectiveDate);
         var analysis = await _portfolioAnalysisService.AnalyzePortfolioPerformanceAsync(accountId, parsedDate, cancellationToken);
-        
+
         return new
         {
             AccountId = accountId,
             RequestedDate = analysisDate,
             EffectiveDate = effectiveDate,
-            IsRealTimeAnalysis = parsedDate.Date == DateTime.UtcNow.Date,
+            IsRealTimeAnalysis = parsedDate.Date == PortfolioClock.UtcNow.Date,
             Analysis = analysis
         };
     }

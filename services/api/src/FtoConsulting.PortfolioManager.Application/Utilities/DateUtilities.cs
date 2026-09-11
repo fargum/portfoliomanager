@@ -41,11 +41,11 @@ public static class DateUtilities
         switch (normalizedDateString)
         {
             case "today":
-                return DateOnly.FromDateTime(DateTime.UtcNow);
+                return DateOnly.FromDateTime(PortfolioClock.UtcNow);
             case "yesterday":
-                return DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1));
+                return DateOnly.FromDateTime(PortfolioClock.UtcNow.AddDays(-1));
             case "tomorrow":
-                return DateOnly.FromDateTime(DateTime.UtcNow.AddDays(1));
+                return DateOnly.FromDateTime(PortfolioClock.UtcNow.AddDays(1));
         }
 
         // Try parsing with UK culture first (dd/MM/yyyy preference)
@@ -141,7 +141,7 @@ public static class DateUtilities
     /// <returns>Previous working day as DateOnly</returns>
     public static DateOnly GetPreviousWorkingDay(DateOnly? fromDate = null)
     {
-        var date = fromDate ?? DateOnly.FromDateTime(DateTime.UtcNow);
+        var date = fromDate ?? DateOnly.FromDateTime(PortfolioClock.UtcNow);
         
         // Go back one day
         date = date.AddDays(-1);
@@ -162,7 +162,7 @@ public static class DateUtilities
     /// <returns>Previous working day as DateTime</returns>
     public static DateTime GetPreviousWorkingDateTime(DateTime? fromDate = null)
     {
-        var date = fromDate ?? DateTime.UtcNow;
+        var date = fromDate ?? PortfolioClock.UtcNow;
         var dateOnly = DateOnly.FromDateTime(date);
         var previousWorkingDay = GetPreviousWorkingDay(dateOnly);
         return previousWorkingDay.ToDateTime(TimeOnly.MinValue);

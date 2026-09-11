@@ -69,25 +69,6 @@ builder.Logging.AddJsonConsole(options =>
     options.UseUtcTimestamp = true;
 });
 
-// Add OpenTelemetry logging provider
-builder.Logging.AddOpenTelemetry(options =>
-{
-    options.SetResourceBuilder(ResourceBuilder.CreateDefault()
-        .AddService("PortfolioManager.API", "1.0.0")
-        .AddAttributes(new Dictionary<string, object>
-        {
-            ["deployment.environment"] = builder.Environment.EnvironmentName,
-            ["service.instance.id"] = Environment.MachineName
-        }));
-        
-    options.AddOtlpExporter(otlpOptions =>
-    {
-        var otlpEndpoint = builder.Configuration["OTLP_ENDPOINT"] ?? "http://host.docker.internal:18889";
-        otlpOptions.Endpoint = new Uri(otlpEndpoint);
-    });
-    options.AddConsoleExporter();
-});
-
 if (builder.Environment.IsDevelopment())
 {
     builder.Logging.SetMinimumLevel(LogLevel.Information);
@@ -369,6 +350,7 @@ builder.Services.AddSingleton(meterProvider);
 // Configure logging to be exported via OpenTelemetry
 builder.Logging.AddOpenTelemetry(logging =>
 {
+    logging.SetResourceBuilder(resourceBuilder);
     logging.IncludeFormattedMessage = true;
     logging.IncludeScopes = true;
     logging.AddOtlpExporter(options =>
@@ -479,7 +461,8 @@ app.MapGet("/health", (ILogger<Program> logger) =>
             "OpenTelemetry+Aspire Dashboard");
     }
     
-    return Results.Ok(new { 
+    return Results.Ok(new
+    {
         Status = "Healthy", 
         Timestamp = DateTime.UtcNow,
         Environment = app.Environment.EnvironmentName,
@@ -494,19 +477,22 @@ app.MapGet("/debug/claims", (HttpContext context) =>
 {
     if (context.User.Identity?.IsAuthenticated != true)
     {
-        return Results.Ok(new { 
+        return Results.Ok(new
+        {
             IsAuthenticated = false,
             Message = "No authentication token present",
             Headers = context.Request.Headers.ToDictionary(h => h.Key, h => h.Value.ToString())
         });
     }
     
-    var claims = context.User.Claims.Select(c => new { 
+    var claims = context.User.Claims.Select(c => new
+    {
         Type = c.Type, 
         Value = c.Value 
     }).ToList();
     
-    return Results.Ok(new { 
+    return Results.Ok(new
+    {
         IsAuthenticated = context.User.Identity.IsAuthenticated,
         Claims = claims
     });
@@ -515,7 +501,8 @@ app.MapGet("/debug/claims", (HttpContext context) =>
 // Add a simple authenticated endpoint for testing
 app.MapGet("/debug/auth-test", (HttpContext context) => 
 {
-    return Results.Ok(new { 
+    return Results.Ok(new
+    {
         Message = "You are authenticated!",
         IsAuthenticated = context.User.Identity?.IsAuthenticated ?? false,
         UserName = context.User.Identity?.Name ?? "Unknown",

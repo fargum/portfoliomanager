@@ -1,3 +1,4 @@
+using FtoConsulting.PortfolioManager.Application.Utilities;
 using FtoConsulting.PortfolioManager.Application.DTOs;
 using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 using FtoConsulting.PortfolioManager.Application.Services.Ai.Tools;
@@ -34,7 +35,7 @@ public class HoldingService(
 
         try
         {
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var today = DateOnly.FromDateTime(PortfolioClock.UtcNow);
             IEnumerable<Holding> holdings;
             var dateTime = DateTime.SpecifyKind(valuationDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
             
@@ -108,7 +109,7 @@ public class HoldingService(
 
         try
         {
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var today = DateOnly.FromDateTime(PortfolioClock.UtcNow);
             IEnumerable<Holding> holdings;
 
             if (valuationDate < today)

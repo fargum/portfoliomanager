@@ -1,0 +1,2 @@
+{"id":"live-holdings","query":"Summarize my portfolio holdings today.","requiredTools":[{"name":"GetPortfolioHoldings"}],"allowedTools":["GetPortfolioHoldings","AnalyzePortfolioPerformance"]}
+{"id":"live-market","query":"Get the latest price for MSFT.US using GetRealTimePrices.","requiredTools":[{"name":"GetRealTimePrices","arguments":{"tickers":["MSFT.US"]}}],"allowedTools":["GetRealTimePrices"],"maximumToolCalls":1}

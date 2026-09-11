@@ -162,62 +162,62 @@ public static class PortfolioToolRegistry
     /// Create AI functions for the Microsoft Agent Framework
     /// NOTE: accountId is NOT exposed to the AI - it's injected from authenticated context for security
     /// </summary>
-    public static IEnumerable<AITool> CreateAiFunctions(int authenticatedAccountId, Func<string, Dictionary<string, object>, Task<object>> toolExecutor)
+    public static IEnumerable<AITool> CreateAiFunctions(int authenticatedAccountId, Func<string, Dictionary<string, object>, CancellationToken, Task<object>> toolExecutor)
     {
         var functions = new List<AITool>
         {
             AIFunctionFactory.Create(
-                method: (string date) => toolExecutor("GetPortfolioHoldings", new Dictionary<string, object> { ["accountId"] = authenticatedAccountId, ["date"] = date }),
+                method: (string date, CancellationToken cancellationToken) => toolExecutor("GetPortfolioHoldings", new Dictionary<string, object> { ["accountId"] = authenticatedAccountId, ["date"] = date }, cancellationToken),
                 name: "GetPortfolioHoldings",
                 description: "Retrieve portfolio holdings for the authenticated user's account and date. For current/today performance, use 'today' or current date to get real-time data."),
 
             AIFunctionFactory.Create(
-                method: (string analysisDate) => toolExecutor("AnalyzePortfolioPerformance", new Dictionary<string, object> { ["accountId"] = authenticatedAccountId, ["analysisDate"] = analysisDate }),
+                method: (string analysisDate, CancellationToken cancellationToken) => toolExecutor("AnalyzePortfolioPerformance", new Dictionary<string, object> { ["accountId"] = authenticatedAccountId, ["analysisDate"] = analysisDate }, cancellationToken),
                 name: "AnalyzePortfolioPerformance",
                 description: "Analyze portfolio performance and generate insights for the authenticated user's account on a specific date. For current/today performance, use 'today' or current date to get real-time analysis."),
 
             AIFunctionFactory.Create(
-                method: (string startDate, string endDate) => toolExecutor("ComparePortfolioPerformance", new Dictionary<string, object> { ["accountId"] = authenticatedAccountId, ["startDate"] = startDate, ["endDate"] = endDate }),
+                method: (string startDate, string endDate, CancellationToken cancellationToken) => toolExecutor("ComparePortfolioPerformance", new Dictionary<string, object> { ["accountId"] = authenticatedAccountId, ["startDate"] = startDate, ["endDate"] = endDate }, cancellationToken),
                 name: "ComparePortfolioPerformance",
                 description: "Compare portfolio performance for the authenticated user's account between two dates"),
 
             AIFunctionFactory.Create(
-                method: (string[] tickers, string date) => toolExecutor("GetMarketContext", new Dictionary<string, object> { ["tickers"] = tickers, ["date"] = date }),
+                method: (string[] tickers, string date, CancellationToken cancellationToken) => toolExecutor("GetMarketContext", new Dictionary<string, object> { ["tickers"] = tickers, ["date"] = date }, cancellationToken),
                 name: "GetMarketContext",
                 description: "Get market context and news for specific stock tickers"),
 
             AIFunctionFactory.Create(
-                method: (string date) => toolExecutor("GetMarketSentiment", new Dictionary<string, object> { ["date"] = date }),
+                method: (string date, CancellationToken cancellationToken) => toolExecutor("GetMarketSentiment", new Dictionary<string, object> { ["date"] = date }, cancellationToken),
                 name: "GetMarketSentiment",
                 description: "Get overall market sentiment and indicators for a specific date"),
 
             AIFunctionFactory.Create(
-                method: (string[] tickers) => toolExecutor("GetRealTimePrices", new Dictionary<string, object> { ["tickers"] = tickers }),
+                method: (string[] tickers, CancellationToken cancellationToken) => toolExecutor("GetRealTimePrices", new Dictionary<string, object> { ["tickers"] = tickers }, cancellationToken),
                 name: "GetRealTimePrices",
                 description: "Get current real-time stock prices for specific tickers. Use this when the user asks for current price, live price, real-time price, or what a stock is trading at right now."),
 
             AIFunctionFactory.Create(
-                method: (string ticker, string date) => toolExecutor("GetHoldingByTicker", new Dictionary<string, object> { ["accountId"] = authenticatedAccountId, ["ticker"] = ticker, ["date"] = date }),
+                method: (string ticker, string date, CancellationToken cancellationToken) => toolExecutor("GetHoldingByTicker", new Dictionary<string, object> { ["accountId"] = authenticatedAccountId, ["ticker"] = ticker, ["date"] = date }, cancellationToken),
                 name: "GetHoldingByTicker",
                 description: "Retrieve the user's current position in a specific stock by ticker symbol. Use this when the user asks about their position, holding, or exposure in a named company or stock — instead of fetching the entire portfolio."),
 
             AIFunctionFactory.Create(
-                method: (string[] tickers, string companyNames) => toolExecutor("SearchRecentNews", new Dictionary<string, object> { ["tickers"] = tickers, ["companyNames"] = companyNames }),
+                method: (string[] tickers, string companyNames, CancellationToken cancellationToken) => toolExecutor("SearchRecentNews", new Dictionary<string, object> { ["tickers"] = tickers, ["companyNames"] = companyNames }, cancellationToken),
                 name: "SearchRecentNews",
                 description: "Search for recent news articles about specific stock tickers from the past week. Use this for up-to-date market news, company announcements, and market-moving events."),
 
             AIFunctionFactory.Create(
-                method: (string ticker, string companyName) => toolExecutor("ResearchCompanyFundamentals", new Dictionary<string, object> { ["ticker"] = ticker, ["companyName"] = companyName }),
+                method: (string ticker, string companyName, CancellationToken cancellationToken) => toolExecutor("ResearchCompanyFundamentals", new Dictionary<string, object> { ["ticker"] = ticker, ["companyName"] = companyName }, cancellationToken),
                 name: "ResearchCompanyFundamentals",
                 description: "Research company fundamentals including P/E ratio, earnings, EPS, analyst ratings, and price targets for a specific stock. Returns an AI-generated summary with sources."),
 
             AIFunctionFactory.Create(
-                method: (string ticker, string companyName) => toolExecutor("GetCompanyOverview", new Dictionary<string, object> { ["ticker"] = ticker, ["companyName"] = companyName }),
+                method: (string ticker, string companyName, CancellationToken cancellationToken) => toolExecutor("GetCompanyOverview", new Dictionary<string, object> { ["ticker"] = ticker, ["companyName"] = companyName }, cancellationToken),
                 name: "GetCompanyOverview",
                 description: "Get a general overview of a company including its business model, competitive position, and recent strategic developments."),
 
             AIFunctionFactory.Create(
-                method: (string? focus) => toolExecutor("GetMarketOverview", new Dictionary<string, object> { ["focus"] = focus ?? string.Empty }),
+                method: (string? focus, CancellationToken cancellationToken) => toolExecutor("GetMarketOverview", new Dictionary<string, object> { ["focus"] = focus ?? string.Empty }, cancellationToken),
                 name: "GetMarketOverview",
                 description: "Get a broad overview of current market conditions, major indices, and top financial news. Use this for general questions like 'how are markets doing today?', 'what's happening in the markets?', or 'any big stories today?' — no specific tickers needed. Optionally focus on a region or sector.")
         };
