@@ -24,15 +24,19 @@ public sealed class FoundryEvaluationClient
 
     public static object Definition(string judgeModel, string evaluator, bool traces)
     {
-        if (evaluator is not ("relevance" or "tool_call_accuracy" or "tool_output_utilization" or "groundedness" or "task_adherence"))
-            throw new ArgumentException("Unsupported evaluator; add and test its input contract explicitly.", nameof(evaluator));
-        var mapping = new Dictionary<string, string>
+        // Explicit external contracts: agent groundedness extracts context from captured
+        // tool-result messages and also needs the available tool schemas.
+        // https://learn.microsoft.com/en-us/azure/foundry/concepts/evaluation-evaluators/rag-evaluators
+        string[] fields = evaluator switch
         {
-            ["query"] = "{{item.query}}",
-            ["response"] = "{{item.response}}"
+            "relevance" => ["query", "response"],
+            "task_adherence" => ["query", "response"],
+            "groundedness" => ["query", "response", "tool_definitions"],
+            "tool_call_accuracy" => ["query", "response", "tool_calls", "tool_definitions"],
+            "tool_output_utilization" => ["query", "response", "tool_definitions"],
+            _ => throw new ArgumentException("Unsupported evaluator; add and test its input contract explicitly.", nameof(evaluator))
         };
-        if (evaluator.StartsWith("tool_")) mapping["tool_definitions"] = "{{item.tool_definitions}}";
-        if (evaluator == "tool_call_accuracy") mapping["tool_calls"] = "{{item.tool_calls}}";
+        var mapping = fields.ToDictionary(field => field, field => "{{item." + field + "}}");
         return new
         {
             name = $"portfolio-{evaluator}-{(traces ? "traces" : "captured")}",

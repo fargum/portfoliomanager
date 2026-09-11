@@ -12,6 +12,28 @@ namespace FtoConsulting.PortfolioManager.Evaluation.Tests;
 public sealed class FoundryClientTests
 {
     [Theory]
+    [InlineData("relevance", "query,response")]
+    [InlineData("task_adherence", "query,response")]
+    [InlineData("groundedness", "query,response,tool_definitions")]
+    [InlineData("tool_call_accuracy", "query,response,tool_calls,tool_definitions")]
+    [InlineData("tool_output_utilization", "query,response,tool_definitions")]
+    public void Definition_MapsExactEvaluatorContract_ForCapturedAndTraceSources(string evaluator, string expectedFields)
+    {
+        foreach (var traces in new[] { false, true })
+        {
+            var definition = JsonSerializer.SerializeToElement(FoundryEvaluationClient.Definition("judge", evaluator, traces));
+            var mapping = definition.GetProperty("testing_criteria")[0].GetProperty("data_mapping");
+            Assert.Equal(expectedFields.Split(',').Order(), mapping.EnumerateObject().Select(p => p.Name).Order());
+            foreach (var field in expectedFields.Split(','))
+                Assert.Equal("{{item." + field + "}}", mapping.GetProperty(field).GetString());
+        }
+    }
+
+    [Fact]
+    public void Definition_RejectsUnknownEvaluator_InsteadOfInferringContractFromName()
+        => Assert.Throws<ArgumentException>(() => FoundryEvaluationClient.Definition("judge", "tool_unknown", false));
+
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task Submit_UsesPublishedProtocol_AndPreservesExecutionCorrelation(bool traces)
