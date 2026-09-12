@@ -31,6 +31,8 @@ public static class ExecutionDataset
             }
             response.AddRange(round.Output.Select(ToMessage));
         }
+        // Use one conversation shape. Azure validates every recognized inline field;
+        // also including unified messages makes these mappings mutually incompatible.
         return new
         {
             execution_id = execution.ExecutionId,
@@ -38,7 +40,6 @@ public static class ExecutionDataset
             trace_id = execution.TraceId,
             query,
             response,
-            messages = query.Concat(response).ToArray(),
             response_text = execution.Response,
             query_text = execution.Query,
             tool_definitions = execution.ToolDefinitions.Select(t => new { name = t.Name, description = t.Description, parameters = t.Parameters }),

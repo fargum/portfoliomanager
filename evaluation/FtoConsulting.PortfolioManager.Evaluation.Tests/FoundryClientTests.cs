@@ -13,7 +13,7 @@ public sealed class FoundryClientTests
 {
     [Theory]
     [InlineData("relevance", "query,response")]
-    [InlineData("task_adherence", "query,response")]
+    [InlineData("task_adherence", "query,response,tool_definitions")]
     [InlineData("groundedness", "query,response,tool_definitions")]
     [InlineData("tool_call_accuracy", "query,response,tool_calls,tool_definitions")]
     [InlineData("tool_output_utilization", "query,response,tool_definitions")]
@@ -23,9 +23,13 @@ public sealed class FoundryClientTests
         {
             var definition = JsonSerializer.SerializeToElement(FoundryEvaluationClient.Definition("judge", evaluator, traces));
             var mapping = definition.GetProperty("testing_criteria")[0].GetProperty("data_mapping");
-            Assert.Equal(expectedFields.Split(',').Order(), mapping.EnumerateObject().Select(p => p.Name).Order());
+            var fields = expectedFields.Split(',').ToList();
+            if (traces && evaluator == "groundedness") fields.Add("context");
+            Assert.Equal(fields.Order(), mapping.EnumerateObject().Select(p => p.Name).Order());
             foreach (var field in expectedFields.Split(','))
                 Assert.Equal("{{item." + field + "}}", mapping.GetProperty(field).GetString());
+            if (traces && evaluator == "groundedness")
+                Assert.Equal("{{item.tool_calls}}", mapping.GetProperty("context").GetString());
         }
     }
 
@@ -50,7 +54,17 @@ public sealed class FoundryClientTests
         var source = handler.Bodies[1].GetProperty("data_source");
         Assert.Equal(traces ? "azure_ai_traces" : "jsonl", source.GetProperty("type").GetString());
         if (traces) Assert.Equal(execution.TraceId, source.GetProperty("trace_ids")[0].GetString());
-        else Assert.Equal(execution.ExecutionId, source.GetProperty("source").GetProperty("content")[0].GetProperty("item").GetProperty("execution_id").GetString());
+        else
+        {
+            var item = source.GetProperty("source").GetProperty("content")[0].GetProperty("item");
+            Assert.Equal(execution.ExecutionId, item.GetProperty("execution_id").GetString());
+            Assert.Equal(1, item.GetProperty("query").GetArrayLength());
+            Assert.Equal(1, item.GetProperty("response").GetArrayLength());
+            // Azure rejects inline datasets mixing unified and query/response shapes.
+            Assert.False(item.TryGetProperty("messages", out _));
+            Assert.False(definition.GetProperty("data_source_config").GetProperty("item_schema")
+                .GetProperty("properties").TryGetProperty("messages", out _));
+        }
     }
 
     [Fact]

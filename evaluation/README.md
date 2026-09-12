@@ -54,6 +54,8 @@ The adapter uses `AIProjectClient.ProjectOpenAIClient.GetEvaluationClient()` and
 
 Microsoft's current cloud C# examples use `initialization_parameters.model`; some evaluator overview examples still use `deployment_name`. This adapter follows the cloud C# contract and isolates that choice in one file. Validate against the target project before enforcing judge gates.
 
+Live validation on 2026-09-12 showed that supplying both unified `messages` and separate `query`/`response` fields causes conflicting mapping requirements for task adherence and groundedness. The adapter sends only the separate conversation arrays, retaining system instructions, real tool calls and tool results. Task adherence also maps the supplied tool definitions.
+
 The Foundry package resolves OpenAI 2.12.0 in the evaluation process; the existing application currently resolves 2.10.0. Application source and Agent Framework middleware are shared, but these runtime dependency sets differ. The manifest records loaded versions. Production package versions have not been upgraded as part of this change; include a production-runtime smoke comparison in acceptance, or separate collection and cloud submission into processes if strict binary parity is required.
 
 ## OpenTelemetry correlation

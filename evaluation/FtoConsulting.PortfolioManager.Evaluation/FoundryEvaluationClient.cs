@@ -30,13 +30,16 @@ public sealed class FoundryEvaluationClient
         string[] fields = evaluator switch
         {
             "relevance" => ["query", "response"],
-            "task_adherence" => ["query", "response"],
+            "task_adherence" => ["query", "response", "tool_definitions"],
             "groundedness" => ["query", "response", "tool_definitions"],
             "tool_call_accuracy" => ["query", "response", "tool_calls", "tool_definitions"],
             "tool_output_utilization" => ["query", "response", "tool_definitions"],
             _ => throw new ArgumentException("Unsupported evaluator; add and test its input contract explicitly.", nameof(evaluator))
         };
         var mapping = fields.ToDictionary(field => field, field => "{{item." + field + "}}");
+        // Trace extraction separates tool-result messages from the final response.
+        // Without explicit context, the service can ground the answer in itself.
+        if (traces && evaluator == "groundedness") mapping["context"] = "{{item.tool_calls}}";
         return new
         {
             name = $"portfolio-{evaluator}-{(traces ? "traces" : "captured")}",
@@ -54,7 +57,6 @@ public sealed class FoundryEvaluationClient
                         trace_id = new { type = "string" },
                         query = new { type = "array" },
                         response = new { type = "array" },
-                        messages = new { type = "array" },
                         tool_definitions = new { type = "array" },
                         tool_calls = new { type = "array" }
                     },
