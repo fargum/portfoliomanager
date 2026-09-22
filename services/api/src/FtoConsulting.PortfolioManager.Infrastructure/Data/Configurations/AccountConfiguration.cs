@@ -8,7 +8,16 @@ public class AccountConfiguration : IEntityTypeConfiguration<Account>
 {
     public void Configure(EntityTypeBuilder<Account> builder)
     {
-        builder.ToTable("accounts", "app");
+        builder.ToTable("accounts", "app", table => table.HasCheckConstraint(
+            "ck_accounts_identity_mode",
+            "(mode = 0 AND owner_account_id IS NULL AND external_user_id IS NOT NULL AND email IS NOT NULL) OR " +
+            "(mode = 1 AND owner_account_id IS NOT NULL AND owner_account_id <> id AND external_user_id IS NULL AND email IS NULL)"));
+
+        builder.Property(x => x.Mode).HasColumnName("mode").HasConversion<int>().HasDefaultValue(AccountMode.Personal);
+        builder.Property(x => x.OwnerAccountId).HasColumnName("owner_account_id");
+        builder.HasIndex(x => x.OwnerAccountId).IsUnique().HasDatabaseName("ix_accounts_owner_account_id");
+        builder.HasOne(x => x.OwnerAccount).WithOne().HasForeignKey<Account>(x => x.OwnerAccountId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         builder.HasKey(x => x.Id);
 
@@ -19,12 +28,12 @@ public class AccountConfiguration : IEntityTypeConfiguration<Account>
 
         builder.Property(x => x.ExternalUserId)
             .HasColumnName("external_user_id")
-            .IsRequired()
+            .IsRequired(false)
             .HasMaxLength(255);
 
         builder.Property(x => x.Email)
             .HasColumnName("email")
-            .IsRequired()
+            .IsRequired(false)
             .HasMaxLength(255);
 
         builder.Property(x => x.DisplayName)

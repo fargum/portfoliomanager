@@ -7,6 +7,8 @@ namespace FtoConsulting.PortfolioManager.Infrastructure.Repositories;
 
 public class AccountRepository : Repository<Account>, IAccountRepository
 {
+    public Task<Account?> GetDemoByOwnerAccountIdAsync(int ownerAccountId) =>
+        _dbSet.SingleOrDefaultAsync(a => a.Mode == AccountMode.Demo && a.OwnerAccountId == ownerAccountId);
     public AccountRepository(PortfolioManagerDbContext context) : base(context)
     {
     }
@@ -15,24 +17,24 @@ public class AccountRepository : Repository<Account>, IAccountRepository
     {
         return await _dbSet
             .Include(a => a.Portfolios)
-            .FirstOrDefaultAsync(a => a.ExternalUserId == externalUserId);
+            .FirstOrDefaultAsync(a => a.Mode == AccountMode.Personal && a.ExternalUserId == externalUserId);
     }
 
     public async Task<Account?> GetByEmailAsync(string email)
     {
         return await _dbSet
             .Include(a => a.Portfolios)
-            .FirstOrDefaultAsync(a => a.Email == email);
+            .FirstOrDefaultAsync(a => a.Mode == AccountMode.Personal && a.Email == email);
     }
 
     public async Task<bool> ExternalUserIdExistsAsync(string externalUserId)
     {
-        return await _dbSet.AnyAsync(a => a.ExternalUserId == externalUserId);
+        return await _dbSet.AnyAsync(a => a.Mode == AccountMode.Personal && a.ExternalUserId == externalUserId);
     }
 
     public async Task<bool> EmailExistsAsync(string email)
     {
-        return await _dbSet.AnyAsync(a => a.Email == email);
+        return await _dbSet.AnyAsync(a => a.Mode == AccountMode.Personal && a.Email == email);
     }
 
     public async Task<Account> CreateOrUpdateExternalUserAsync(string externalUserId, string email, string displayName)

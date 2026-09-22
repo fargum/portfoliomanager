@@ -60,6 +60,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<ICurrencyConversionService, CurrencyConversionService>();
         services.AddScoped<IPricingCalculationService, PricingCalculationService>();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
+        services.AddScoped<IAccountContextResolver, AccountContextResolver>();
         
         // Register new holding management services
         services.AddScoped<IInstrumentManagementService, InstrumentManagementService>();

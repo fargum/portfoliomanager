@@ -5,6 +5,7 @@ namespace FtoConsulting.PortfolioManager.Domain.Repositories;
 
 public interface IAccountRepository : IRepository<Account>
 {
+    Task<Account?> GetDemoByOwnerAccountIdAsync(int ownerAccountId);
     // External user management methods
     Task<Account?> GetByExternalUserIdAsync(string externalUserId);
     Task<Account?> GetByEmailAsync(string email);
