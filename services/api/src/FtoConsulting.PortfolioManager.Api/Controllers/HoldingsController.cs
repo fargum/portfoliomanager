@@ -3,6 +3,7 @@ using FtoConsulting.PortfolioManager.Api.Models.Requests;
 using FtoConsulting.PortfolioManager.Api.Services;
 using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 using FtoConsulting.PortfolioManager.Application.DTOs;
+using FtoConsulting.PortfolioManager.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -22,7 +23,7 @@ namespace FtoConsulting.PortfolioManager.Api.Controllers;
 public class HoldingsController(
     IHoldingService holdingService,
     IPortfolioMappingService mappingService,
-    ICurrentUserService currentUserService,
+    IAccountContextResolver accountContextResolver,
     MetricsService metrics,
     ILogger<HoldingsController> logger) : ControllerBase
 {
@@ -32,6 +33,7 @@ public class HoldingsController(
     /// Retrieve all holdings for the current authenticated user and valuation date
     /// </summary>
     /// <param name="valuationDate">The valuation date to retrieve holdings for (YYYY-MM-DD format)</param>
+    /// <param name="accountMode">Personal or linked Demo account context</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Collection of flattened holdings data including portfolio, instrument, and platform information</returns>
     /// <remarks>
@@ -59,13 +61,13 @@ public class HoldingsController(
     [ProducesResponseType(typeof(ProblemDetails), (int)HttpStatusCode.InternalServerError)]
     public async Task<ActionResult<AccountHoldingsResponse>> GetHoldingsByDate(
         [FromRoute] DateTime valuationDate,
+        [FromHeader(Name = "X-Account-Mode")] AccountMode accountMode = AccountMode.Personal,
         CancellationToken cancellationToken = default)
     {
         using var activity = s_activitySource.StartActivity("GetHoldingsByDate");
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         
-        // Get account ID from authenticated user
-        var accountId = await currentUserService.GetCurrentUserAccountIdAsync();
+        var accountId = (await accountContextResolver.ResolveAsync(accountMode)).AccountId;
         logger.LogInformation("GetHoldingsByDate: Retrieved AccountId from authentication: {AccountId}", accountId);
         
         activity?.SetTag("account.id", accountId.ToString());
@@ -163,6 +165,7 @@ public class HoldingsController(
     /// </summary>
     /// <param name="ticker">The ticker symbol to filter by (e.g. MSFT)</param>
     /// <param name="valuationDate">The valuation date to retrieve holdings for (YYYY-MM-DD format)</param>
+    /// <param name="accountMode">Personal or linked Demo account context</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Collection of holdings for the specified ticker and date</returns>
     /// <response code="200">Returns holdings matching the ticker for the authenticated user and date</response>
@@ -175,11 +178,12 @@ public class HoldingsController(
     public async Task<ActionResult<AccountHoldingsResponse>> GetHoldingsByTickerAndDate(
         [FromRoute] string ticker,
         [FromRoute] DateTime valuationDate,
+        [FromHeader(Name = "X-Account-Mode")] AccountMode accountMode = AccountMode.Personal,
         CancellationToken cancellationToken = default)
     {
         using var activity = s_activitySource.StartActivity("GetHoldingsByTickerAndDate");
 
-        var accountId = await currentUserService.GetCurrentUserAccountIdAsync();
+        var accountId = (await accountContextResolver.ResolveAsync(accountMode)).AccountId;
         logger.LogInformation("GetHoldingsByTickerAndDate: AccountId={AccountId}, Ticker={Ticker}, Date={Date}", accountId, ticker, valuationDate);
 
         activity?.SetTag("account.id", accountId.ToString());
@@ -230,6 +234,7 @@ public class HoldingsController(
     /// </summary>
     /// <param name="portfolioId">The portfolio ID to add the holding to</param>
     /// <param name="request">The holding details to add</param>
+    /// <param name="accountMode">Personal or linked Demo account context</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Result of the add operation</returns>
     /// <remarks>
@@ -276,13 +281,13 @@ public class HoldingsController(
     public async Task<ActionResult<AddHoldingApiResponse>> AddHolding(
         [FromRoute] int portfolioId,
         [FromBody] AddHoldingApiRequest request,
+        [FromHeader(Name = "X-Account-Mode")] AccountMode accountMode = AccountMode.Personal,
         CancellationToken cancellationToken = default)
     {
         using var activity = s_activitySource.StartActivity("AddHolding");
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         
-       // Get account ID from authenticated user
-        var accountId = await currentUserService.GetCurrentUserAccountIdAsync();
+        var accountId = (await accountContextResolver.ResolveAsync(accountMode)).AccountId;
         logger.LogInformation("AddHolding: Retrieved AccountId from authentication: {AccountId}", accountId);
         
         activity?.SetTag("account.id", accountId.ToString());
@@ -412,6 +417,7 @@ public class HoldingsController(
     /// </summary>
     /// <param name="holdingId">The ID of the holding to update</param>
     /// <param name="request">The new unit amount</param>
+    /// <param name="accountMode">Personal or linked Demo account context</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Result of the update operation</returns>
     /// <remarks>
@@ -449,13 +455,13 @@ public class HoldingsController(
     public async Task<ActionResult<UpdateHoldingApiResponse>> UpdateHoldingUnits(
         [FromRoute] int holdingId,
         [FromBody] UpdateHoldingUnitsApiRequest request,
+        [FromHeader(Name = "X-Account-Mode")] AccountMode accountMode = AccountMode.Personal,
         CancellationToken cancellationToken = default)
     {
         using var activity = s_activitySource.StartActivity("UpdateHoldingUnits");
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         
-        // Get account ID from authenticated user
-        var accountId = await currentUserService.GetCurrentUserAccountIdAsync();
+        var accountId = (await accountContextResolver.ResolveAsync(accountMode)).AccountId;
         logger.LogInformation("UpdateHoldingUnits: Retrieved AccountId from authentication: {AccountId}", accountId);
         
         activity?.SetTag("account.id", accountId.ToString());
@@ -542,6 +548,7 @@ public class HoldingsController(
     /// Delete a holding from a portfolio
     /// </summary>
     /// <param name="holdingId">The ID of the holding to delete</param>
+    /// <param name="accountMode">Personal or linked Demo account context</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Result of the delete operation</returns>
     /// <remarks>
@@ -571,13 +578,13 @@ public class HoldingsController(
     [ProducesResponseType(typeof(ProblemDetails), (int)HttpStatusCode.InternalServerError)]
     public async Task<ActionResult<DeleteHoldingApiResponse>> DeleteHolding(
         [FromRoute] int holdingId,
+        [FromHeader(Name = "X-Account-Mode")] AccountMode accountMode = AccountMode.Personal,
         CancellationToken cancellationToken = default)
     {
         using var activity = s_activitySource.StartActivity("DeleteHolding");
         var stopwatch = System.Diagnostics.Stopwatch.StartNew();
         
-        // Get account ID from authenticated user
-        var accountId = await currentUserService.GetCurrentUserAccountIdAsync();
+        var accountId = (await accountContextResolver.ResolveAsync(accountMode)).AccountId;
         logger.LogInformation("DeleteHolding: Retrieved AccountId from authentication: {AccountId}", accountId);
         
         activity?.SetTag("account.id", accountId.ToString());

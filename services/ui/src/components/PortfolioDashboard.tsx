@@ -2,15 +2,16 @@
 
 import React from 'react';
 import { HoldingsGrid } from '@/components/HoldingsGrid';
+import { AccountMode } from '@/lib/api-client';
 
 interface PortfolioDashboardProps {
-  accountId: number;
+  accountMode: AccountMode;
 }
 
-export function PortfolioDashboard({ accountId }: PortfolioDashboardProps) {
+export function PortfolioDashboard({ accountMode }: PortfolioDashboardProps) {
   return (
     <div className="w-full h-full">
-      <HoldingsGrid />
+      <HoldingsGrid accountMode={accountMode} />
     </div>
   );
 }

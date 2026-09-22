@@ -4,17 +4,17 @@ import React, { useState, useRef, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Send, Bot, User, AlertCircle, TrendingUp, TrendingDown, Activity, Clock, Lightbulb, LogIn } from 'lucide-react';
-import { apiClient } from '@/lib/api-client';
+import { AccountMode, apiClient } from '@/lib/api-client';
 import { useAuth } from '@/contexts/AuthContext';
 import { ChatMessage, ChatState, InsightDto, AiModelDto } from '@/types/chat';
 
 interface AiChatProps {
-  accountId: number;
+  accountMode: AccountMode;
   className?: string;
   isVisible?: boolean;
 }
 
-export function AiChat({ accountId, className = '', isVisible = true }: AiChatProps) {
+export function AiChat({ accountMode, className = '', isVisible = true }: AiChatProps) {
   const [inputValue, setInputValue] = useState('');
   const [currentThreadId, setCurrentThreadId] = useState<number | undefined>(undefined);
   const [selectedModelId, setSelectedModelId] = useState<string | undefined>(undefined);
@@ -56,7 +56,7 @@ I can analyze your holdings, market conditions, and provide insights to help you
     }
   }, [isVisible]);
 
-  // SECURITY: Clear threadId when accountId changes to prevent cross-account thread access
+  // SECURITY: Clear the thread when the selected account changes.
   useEffect(() => {
     setCurrentThreadId(undefined);
     // Optionally clear messages too when switching accounts
@@ -78,7 +78,7 @@ I can analyze your holdings, market conditions, and provide insights to help you
       ],
       isLoading: false,
     });
-  }, [accountId]);
+  }, [accountMode]);
 
   const generateMessageId = () => `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
@@ -165,7 +165,7 @@ I can analyze your holdings, market conditions, and provide insights to help you
           
           // Fallback to regular API call
           try {
-            const response = await apiClient.sendChatQuery(query, accountId, currentThreadId, selectedModelId);
+            const response = await apiClient.sendChatQuery(query, currentThreadId, selectedModelId);
             
             if (response.error) {
               throw new Error(response.error);

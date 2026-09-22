@@ -6,10 +6,8 @@ import { AuthButton } from '@/components/AuthButton';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { apiClient } from '@/lib/api-client';
+import { AccountMode, apiClient } from '@/lib/api-client';
 import { Building2, AlertCircle, CheckCircle, Bot, BarChart3, MessageSquare, Sparkles } from 'lucide-react';
-
-const HARDCODED_ACCOUNT_ID = 1;
 
 interface TabProps {
   id: string;
@@ -39,11 +37,54 @@ function Tab({ id, label, icon, isActive, onClick }: TabProps) {
   );
 }
 
+interface AccountModeToggleProps {
+  value: AccountMode;
+  onChange: (mode: AccountMode) => void;
+}
+
+function AccountModeToggle({ value, onChange }: AccountModeToggleProps) {
+  return (
+    <div
+      className="flex items-center rounded-lg border border-financial-slate-200 bg-white/70 p-1 shadow-sm dark:border-financial-slate-700 dark:bg-financial-slate-900/60"
+      aria-label="Portfolio account"
+    >
+      {(['Personal', 'Demo'] as const).map(mode => (
+        <button
+          key={mode}
+          type="button"
+          aria-pressed={value === mode}
+          onClick={() => onChange(mode)}
+          className={`rounded-md px-3 py-1 text-xs font-semibold transition-colors ${
+            value === mode
+              ? 'bg-financial-blue-600 text-white shadow-sm dark:bg-financial-indigo-700'
+              : 'text-financial-slate-600 hover:text-financial-blue-700 dark:text-financial-slate-300 dark:hover:text-financial-blue-300'
+          }`}
+        >
+          {mode}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export default function HomePage() {
   const [apiStatus, setApiStatus] = useState<'checking' | 'online' | 'offline'>('checking');
   const [aiStatus, setAiStatus] = useState<'checking' | 'online' | 'offline'>('checking');
   const [activeTab, setActiveTab] = useState<'holdings' | 'chat'>('holdings');
+  const [accountMode, setAccountMode] = useState<AccountMode>('Personal');
   const { isAuthenticated } = useAuth();
+
+  const selectAccountMode = (mode: AccountMode) => {
+    apiClient.setAccountMode(mode);
+    setAccountMode(mode);
+  };
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      apiClient.setAccountMode('Personal');
+      setAccountMode('Personal');
+    }
+  }, [isAuthenticated]);
 
   useEffect(() => {
     // Check API and AI service connectivity on page load and when auth changes
@@ -118,6 +159,7 @@ export default function HomePage() {
                 onClick={() => setActiveTab('chat')}
               />
             </div>
+            {isAuthenticated && <AccountModeToggle value={accountMode} onChange={selectAccountMode} />}
           </div>
 
           {/* Desktop Layout - Original */}
@@ -158,6 +200,8 @@ export default function HomePage() {
             
             {/* Right side - Service Status Indicators and Auth */}
             <div className="flex items-center space-x-4">
+              {isAuthenticated && <AccountModeToggle value={accountMode} onChange={selectAccountMode} />}
+
               {/* Authentication */}
               <div className="flex-shrink-0">
                 <AuthButton />
@@ -285,7 +329,7 @@ export default function HomePage() {
           {/* Holdings Tab Content */}
           <div className={activeTab === 'holdings' ? 'block h-full relative z-10' : 'hidden'}>
             <div className="h-full overflow-hidden">
-              <HoldingsGrid />
+              <HoldingsGrid accountMode={accountMode} />
             </div>
           </div>
 
@@ -297,13 +341,13 @@ export default function HomePage() {
                 <div className="min-w-0">
                   <h2 className="text-sm sm:text-lg font-semibold">AI Portfolio Assistant</h2>
                   <p className="text-blue-100 dark:text-financial-slate-300 text-xs sm:text-sm hidden sm:block">
-                    Ask questions about your portfolio and get AI-powered insights for Account {HARDCODED_ACCOUNT_ID}
+                    Ask questions about your {accountMode.toLowerCase()} portfolio and get AI-powered insights
                   </p>
                 </div>
               </div>
             </div>
             <div className="h-[calc(100%-3rem)] sm:h-[calc(100%-5rem)] overflow-hidden">
-              <AiChat accountId={HARDCODED_ACCOUNT_ID} isVisible={activeTab === 'chat'} />
+              <AiChat accountMode={accountMode} isVisible={activeTab === 'chat'} />
             </div>
           </div>
         </div>

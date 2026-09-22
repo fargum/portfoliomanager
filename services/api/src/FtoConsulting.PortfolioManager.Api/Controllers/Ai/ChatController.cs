@@ -6,6 +6,7 @@ using FtoConsulting.PortfolioManager.Application.Services;
 using FtoConsulting.PortfolioManager.Application.DTOs.Ai;
 using FtoConsulting.PortfolioManager.Application.Configuration;
 using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
+using FtoConsulting.PortfolioManager.Domain.Entities;
 using System.Diagnostics;
 
 
@@ -21,7 +22,7 @@ namespace FtoConsulting.PortfolioManager.Api.Controllers.Ai;
 [EnableRateLimiting("ai-chat")]
 public class ChatController(
     IAiOrchestrationService aiOrchestrationService,
-    ICurrentUserService currentUserService,
+    IAccountContextResolver accountContextResolver,
     ILogger<ChatController> logger,
     IOptions<AzureFoundryOptions> azureFoundryOptions) : ControllerBase
 {
@@ -31,6 +32,7 @@ public class ChatController(
     /// Process a natural language query about portfolio data with streaming response and memory
     /// </summary>
     /// <param name="request">Chat request containing query and account information</param>
+    /// <param name="accountMode">Personal or linked Demo account context</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Streaming AI-generated response based on portfolio data with conversation memory</returns>
     [HttpPost("stream")]
@@ -39,12 +41,13 @@ public class ChatController(
     [ProducesResponseType(500)]
     public async Task<IActionResult> StreamPortfolioQuery(
         [FromBody] ChatRequestDto request,
+        [FromHeader(Name = "X-Account-Mode")] AccountMode accountMode = AccountMode.Personal,
         CancellationToken cancellationToken = default)
     {
         using var activity = s_activitySource.StartActivity("StreamPortfolioQuery");
         
-        // SECURITY: Get accountId from authenticated user, NOT from request body
-        var accountId = await currentUserService.GetCurrentUserAccountIdAsync();
+        // SECURITY: Resolve the selected mode against the authenticated owner; the client never supplies an account ID.
+        var accountId = (await accountContextResolver.ResolveAsync(accountMode)).AccountId;
         
         activity?.SetTag("account.id", accountId.ToString());
         activity?.SetTag("thread.id", request.ThreadId?.ToString() ?? "none");

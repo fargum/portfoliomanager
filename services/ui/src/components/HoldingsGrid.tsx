@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { AgGridReact } from 'ag-grid-react';
 import { HoldingResponse } from '@/types/api';
-import { apiClient } from '@/lib/api-client';
+import { AccountMode, apiClient } from '@/lib/api-client';
 import { useAuth } from '@/contexts/AuthContext';
 import { getHoldingsColumnDefs, getGridOptions, calculateTotalValue, calculateTotalBoughtValue, calculateTotalGainLoss, calculateTotalGainLossPercentage, calculateTotalDailyPnL, calculateAverageDailyPnLPercentage, formatCurrency } from '@/lib/grid-utils';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -51,10 +51,10 @@ const aggFuncs = {
 };
 
 interface HoldingsGridProps {
-  // No props needed - account is determined from authentication
+  accountMode: AccountMode;
 }
 
-export const HoldingsGrid: React.FC<HoldingsGridProps> = () => {
+export const HoldingsGrid: React.FC<HoldingsGridProps> = ({ accountMode }) => {
   const { userInfo } = useAuth();
   const { resolvedTheme } = useTheme();
   const [holdings, setHoldings] = useState<HoldingResponse[]>([]);
@@ -76,8 +76,12 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = () => {
   const [displayData, setDisplayData] = useState<any[]>([]);
 
   const fetchHoldings = useCallback(async () => {
+    apiClient.setAccountMode(accountMode);
     setLoading(true);
     setError(null);
+    setHoldings([]);
+    holdingsRef.current = [];
+    setSelectedRows([]);
     
     try {
       const response = await apiClient.getHoldings(valuationDate);
@@ -98,7 +102,7 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = () => {
     } finally {
       setLoading(false);
     }
-  }, [valuationDate]);
+  }, [valuationDate, accountMode]);
 
   // Calculate totals from filtered/displayed data
   const updateFilteredTotals = useCallback(() => {

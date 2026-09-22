@@ -1,9 +1,12 @@
 import { HoldingResponse, ApiResponse, HoldingsListResponse, AddHoldingRequest } from '@/types/api';
 import { ChatRequestDto, ChatResponseDto, AiToolDto, AiModelDto } from '@/types/chat';
 
+export type AccountMode = 'Personal' | 'Demo';
+
 export class PortfolioApiClient {
   private readonly baseUrl: string;
   private accessToken: string | null = null;
+  private accountMode: AccountMode = 'Personal';
 
   constructor(baseUrl?: string) {
     // Use Next.js public environment variable for client-side code
@@ -24,6 +27,10 @@ export class PortfolioApiClient {
     this.accessToken = token;
   }
 
+  setAccountMode(mode: AccountMode): void {
+    this.accountMode = mode;
+  }
+
   /**
    * Get common headers for API requests
    */
@@ -31,6 +38,7 @@ export class PortfolioApiClient {
     const headers: HeadersInit = {
       'Accept': 'application/json',
       'Content-Type': 'application/json',
+      'X-Account-Mode': this.accountMode,
     };
 
     if (this.accessToken) {
@@ -50,6 +58,7 @@ export class PortfolioApiClient {
     const headers: HeadersInit = {
       'Accept': 'text/plain',
       'Content-Type': 'application/json',
+      'X-Account-Mode': this.accountMode,
     };
 
     if (this.accessToken) {
@@ -294,7 +303,7 @@ export class PortfolioApiClient {
   /**
    * Send a chat query to the AI assistant
    */
-  async sendChatQuery(query: string, accountId: number, threadId?: number, modelId?: string): Promise<ApiResponse<ChatResponseDto>> {
+  async sendChatQuery(query: string, threadId?: number, modelId?: string): Promise<ApiResponse<ChatResponseDto>> {
     try {
       const url = `${this.baseUrl}/api/ai/chat/query`;
       
