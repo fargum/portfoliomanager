@@ -295,6 +295,7 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = ({ accountMode }) => {
   const handleAddHolding = useCallback(async (holdingData: {
     ticker: string;
     units: number;
+    boughtValue: number;
     platformId: number;
     description?: string;
     currencyCode?: string;
@@ -320,7 +321,7 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = ({ accountMode }) => {
         platformId: holdingData.platformId,
         ticker: holdingData.ticker,
         units: holdingData.units,
-        boughtValue: 0, // Default to 0 - could be enhanced to ask user for this
+        boughtValue: holdingData.boughtValue,
         instrumentName: holdingData.ticker,
         description: holdingData.description || `${holdingData.ticker} holding`,
         currencyCode: holdingData.currencyCode || 'GBP',
@@ -708,7 +709,7 @@ export const HoldingsGrid: React.FC<HoldingsGridProps> = ({ accountMode }) => {
 interface AddHoldingModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: { ticker: string; units: number; platformId: number; description?: string; currencyCode?: string; quoteUnit?: string; }) => Promise<boolean>;
+  onSubmit: (data: { ticker: string; units: number; boughtValue: number; platformId: number; description?: string; currencyCode?: string; quoteUnit?: string; }) => Promise<boolean>;
   isSubmitting: boolean;
   availablePlatforms: { id: number; name: string; }[];
 }
@@ -720,6 +721,7 @@ const AddHoldingModal: React.FC<AddHoldingModalProps> = ({ isOpen, onClose, onSu
   const [isChecking, setIsChecking] = useState(false);
   const [formData, setFormData] = useState({
     units: '',
+    boughtValue: '',
     platformId: availablePlatforms.length > 0 ? availablePlatforms[0].id.toString() : '',
     currencyCode: 'GBP',
     quoteUnit: 'GBP',
@@ -789,6 +791,11 @@ const AddHoldingModal: React.FC<AddHoldingModalProps> = ({ isOpen, onClose, onSu
     } else if (units > 999999999) {
       newErrors.units = 'Units cannot exceed 999,999,999';
     }
+
+    const boughtValue = parseFloat(formData.boughtValue);
+    if (!formData.boughtValue.trim() || isNaN(boughtValue) || boughtValue < 0) {
+      newErrors.boughtValue = 'Bought value must be a non-negative number';
+    }
     
     // Validate platform selection
     const platformId = parseInt(formData.platformId);
@@ -822,6 +829,7 @@ const AddHoldingModal: React.FC<AddHoldingModalProps> = ({ isOpen, onClose, onSu
     const success = await onSubmit({
       ticker: ticker.trim().toUpperCase(),
       units: parseFloat(formData.units),
+      boughtValue: parseFloat(formData.boughtValue),
       platformId: parseInt(formData.platformId),
       description: formData.description,
       currencyCode: formData.currencyCode,
@@ -840,6 +848,7 @@ const AddHoldingModal: React.FC<AddHoldingModalProps> = ({ isOpen, onClose, onSu
       setInstrumentExists(null);
       setFormData({ 
         units: '', 
+        boughtValue: '',
         platformId: availablePlatforms.length > 0 ? availablePlatforms[0].id.toString() : '',
         currencyCode: 'GBP', 
         quoteUnit: 'GBP', 
@@ -954,6 +963,24 @@ const AddHoldingModal: React.FC<AddHoldingModalProps> = ({ isOpen, onClose, onSu
                     autoFocus
                   />
                   {errors.units && <p className="text-red-500 text-xs mt-1">{errors.units}</p>}
+                </div>
+
+                <div>
+                  <label htmlFor="boughtValue" className="block text-sm font-medium text-gray-700 dark:text-financial-slate-300 mb-1">
+                    Bought Value *
+                  </label>
+                  <input
+                    type="number"
+                    id="boughtValue"
+                    value={formData.boughtValue}
+                    onChange={(e) => setFormData({ ...formData, boughtValue: e.target.value })}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-financial-slate-800 dark:text-financial-slate-100 ${errors.boughtValue ? 'border-red-500' : 'border-gray-300 dark:border-financial-slate-700'}`}
+                    placeholder="0.00"
+                    disabled={isSubmitting}
+                    min="0"
+                    step="0.01"
+                  />
+                  {errors.boughtValue && <p className="text-red-500 text-xs mt-1">{errors.boughtValue}</p>}
                 </div>
                 
                 <div>
