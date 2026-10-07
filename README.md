@@ -52,7 +52,7 @@ Microservices platform with DDD principles:
 services/
 ├── api/                # .NET 10 REST API
 │   ├── Domain         # Core business logic
-│   ├── Application    # CQRS, AI agents, market intelligence
+│   ├── Application    # Services, AI agents, market intelligence
 │   ├── Infrastructure # EF Core, PostgreSQL, EOD integration
 │   └── Api            # Controllers, auth, telemetry
 ├── ui/                # Next.js frontend with Azure AD auth
@@ -62,9 +62,18 @@ services/
 ### Key Layers
 
 - **Domain**: Entities, value objects, aggregates
-- **Application**: CQRS handlers, AI services, tools registry
+- **Application**: Application services, AI services, tools registry
 - **Infrastructure**: Database, external APIs, caching
 - **API**: REST endpoints, JWT auth, OpenTelemetry
+
+### Deliberate trade-offs
+
+This is a personal app, so I chose not to build some things I would insist on in a production system at work:
+
+- **CQRS**: The MediatR command and query interfaces are in place, but I didn't build handlers on top of them. Application services were simpler for one developer. In a team codebase I would route writes and reads through handlers.
+- **DDD**: I kept the layering and aggregates but wasn't doctrinaire about it. Some business rules live in application services rather than in the entities.
+- **Testing**: Tests cover the logic I most wanted to protect (ingestion, revaluation, account resolution and the agent evaluation harness), not the whole codebase. Production work would get broad unit and integration coverage.
+- **Delivery**: I deploy with PowerShell scripts (`build-api.ps1`, `services/ui/build-prod.ps1`) rather than a CI/CD pipeline and infrastructure-as-code. A team environment would get both.
 
 ## Core Features
 
@@ -91,7 +100,7 @@ services/
 
 ## Tech Stack
 
-**Backend**: .NET 10, EF Core, PostgreSQL, MediatR (CQRS)  
+**Backend**: .NET 10, EF Core, PostgreSQL  
 **Frontend**: Next.js 15, React, TailwindCSS, Azure AD auth  
 **AI**: Azure AI Foundry (GPT-5.6 Terra / Reasoning Models), Microsoft Agent Framework, Tavily Search API  
 **Infrastructure**: Docker, Azure Container Apps  

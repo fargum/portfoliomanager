@@ -61,7 +61,7 @@ dotnet run --project evaluation/FtoConsulting.PortfolioManager.Evaluation -- --h
 Api → Application → Domain ← Infrastructure
 ```
 - **Domain** (`FtoConsulting.PortfolioManager.Domain`): Entities, aggregate roots, repository interfaces, domain events. No dependencies on other layers.
-- **Application** (`FtoConsulting.PortfolioManager.Application`): CQRS commands/queries via MediatR, AI orchestration, portfolio services. Depends on Domain only.
+- **Application** (`FtoConsulting.PortfolioManager.Application`): Application services, AI orchestration, portfolio services (MediatR command/query interfaces exist but no handlers are built on them). Depends on Domain only.
 - **Infrastructure** (`FtoConsulting.PortfolioManager.Infrastructure`): EF Core DbContext, repository implementations, external integrations (EOD API, Redis). Depends on Domain.
 - **Api** (`FtoConsulting.PortfolioManager.Api`): Controllers, JWT auth (Azure AD B2C), OpenTelemetry, Swagger. Wires everything together.
 

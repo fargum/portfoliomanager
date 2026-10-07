@@ -131,6 +131,17 @@ public class HoldingRepository : Repository<Holding>, IHoldingRepository
         return latestDate == default ? null : DateOnly.FromDateTime(latestDate);
     }
 
+    public async Task<DateOnly?> GetLatestValuationDateForAccountAsync(int accountId, CancellationToken cancellationToken = default)
+    {
+        var latestDate = await _dbSet
+            .Where(h => h.Portfolio.AccountId == accountId)
+            .OrderByDescending(h => h.ValuationDate)
+            .Select(h => h.ValuationDate)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return latestDate == default ? null : DateOnly.FromDateTime(latestDate);
+    }
+
     public async Task<DateOnly?> GetLatestValuationDateBeforeAsync(DateOnly beforeDate, CancellationToken cancellationToken = default)
     {
         var beforeDateTime = DateTime.SpecifyKind(beforeDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
@@ -167,6 +178,31 @@ public class HoldingRepository : Repository<Holding>, IHoldingRepository
         return await _dbSet
             .AsNoTracking()
             .Where(h => h.ValuationDate.Date == targetDate.Date)
+            .Include(h => h.Instrument)
+            .Include(h => h.Portfolio)
+            .Include(h => h.Platform)
+            .OrderBy(h => h.Instrument.Ticker)
+            .ToListAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Get an account's holdings for a date without tracking - used for real-time pricing scenarios to prevent persistence
+    /// </summary>
+    public async Task<IEnumerable<Holding>> GetHoldingsByAccountAndDateNoTrackingAsync(int accountId, DateOnly valuationDate, string? ticker = null, CancellationToken cancellationToken = default)
+    {
+        var targetDate = DateTime.SpecifyKind(valuationDate.ToDateTime(TimeOnly.MinValue), DateTimeKind.Utc);
+
+        var query = _dbSet
+            .AsNoTracking()
+            .Where(h => h.Portfolio.AccountId == accountId && h.ValuationDate.Date == targetDate.Date);
+
+        if (!string.IsNullOrEmpty(ticker))
+        {
+            var upperTicker = ticker.ToUpperInvariant();
+            query = query.Where(h => h.Instrument.Ticker.ToUpper() == upperTicker);
+        }
+
+        return await query
             .Include(h => h.Instrument)
             .Include(h => h.Portfolio)
             .Include(h => h.Platform)

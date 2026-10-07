@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using System.Net;
 using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
+using FtoConsulting.PortfolioManager.Domain.Entities;
 using System.Diagnostics;
 
 namespace FtoConsulting.PortfolioManager.Api.Controllers;
@@ -20,6 +21,7 @@ namespace FtoConsulting.PortfolioManager.Api.Controllers;
 [EnableRateLimiting("standard-api")]
 public class PortfoliosController(
     IPortfolioIngest portfolioIngest,
+    IAccountContextResolver accountContextResolver,
     IPortfolioMappingService mappingService,
     ILogger<PortfoliosController> logger,
     MetricsService metrics) : ControllerBase
@@ -45,7 +47,6 @@ public class PortfoliosController(
     /// ```json
     /// {
     ///   "portfolioName": "My Investment Portfolio",
-    ///   "accountId": "12345678,
     ///   "holdings": [
     ///     {
     ///       "valuationDate": "2024-01-15T00:00:00Z",
@@ -75,11 +76,14 @@ public class PortfoliosController(
     [ProducesResponseType(typeof(ErrorResponse), (int)HttpStatusCode.InternalServerError)]
     public async Task<ActionResult<IngestPortfolioResponse>> IngestPortfolio(
         [FromBody] IngestPortfolioRequest request,
+        [FromHeader(Name = "X-Account-Mode")] AccountMode accountMode = AccountMode.Personal,
         CancellationToken cancellationToken = default)
     {
         using var activity = s_activitySource.StartActivity("IngestPortfolio");
         var stopwatch = Stopwatch.StartNew();
-        var accountId = request?.AccountId.ToString();
+        // SECURITY: the owning account comes from the authenticated identity, never the request body
+        var resolvedAccountId = (await accountContextResolver.ResolveAsync(accountMode)).AccountId;
+        var accountId = resolvedAccountId.ToString();
         
         activity?.SetTag("portfolio.name", request?.PortfolioName ?? "unknown");
         activity?.SetTag("account.id", accountId ?? "unknown");
@@ -90,7 +94,7 @@ public class PortfoliosController(
             using (logger.BeginScope("Portfolio ingestion for {PortfolioName} with {HoldingsCount} holdings", request?.PortfolioName ?? "Unknown", request?.Holdings?.Count ?? 0))
             {
                 logger.LogInformation("Starting portfolio ingestion for PortfolioName={PortfolioName}, AccountId={AccountId}, HoldingsCount={HoldingsCount}",
-                    request?.PortfolioName ?? "Unknown", request?.AccountId, request?.Holdings?.Count ?? 0);
+                    request?.PortfolioName ?? "Unknown", resolvedAccountId, request?.Holdings?.Count ?? 0);
             }
 
             if (request == null)
@@ -121,7 +125,7 @@ public class PortfoliosController(
             }
 
             // Map DTO to domain entity
-            var portfolio = mappingService.MapToPortfolio(request);
+            var portfolio = mappingService.MapToPortfolio(request, resolvedAccountId);
 
             // Ingest the portfolio using our domain service
             var ingestedPortfolio = await portfolioIngest.IngestPortfolioAsync(portfolio, cancellationToken);

@@ -11,9 +11,9 @@ namespace FtoConsulting.PortfolioManager.Api.Services;
 public interface IPortfolioMappingService
 {
     /// <summary>
-    /// Maps an ingest request to a domain portfolio entity
+    /// Maps an ingest request to a domain portfolio entity owned by the given account
     /// </summary>
-    Portfolio MapToPortfolio(IngestPortfolioRequest request);
+    Portfolio MapToPortfolio(IngestPortfolioRequest request, int accountId);
 
     /// <summary>
     /// Maps a domain portfolio to a response DTO
@@ -41,12 +41,12 @@ public interface IPortfolioMappingService
 /// </summary>
 public class PortfolioMappingService : IPortfolioMappingService
 {
-    public Portfolio MapToPortfolio(IngestPortfolioRequest request)
+    public Portfolio MapToPortfolio(IngestPortfolioRequest request, int accountId)
     {
         if (request == null) throw new ArgumentNullException(nameof(request));
 
         // Create the portfolio entity
-        var portfolio = new Portfolio(request.PortfolioName, request.AccountId);
+        var portfolio = new Portfolio(request.PortfolioName, accountId);
 
         // Create holdings and their associated instruments
         foreach (var holdingDto in request.Holdings)
