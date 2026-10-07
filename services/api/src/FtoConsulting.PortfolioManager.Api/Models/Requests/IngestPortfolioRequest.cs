@@ -15,12 +15,6 @@ public class IngestPortfolioRequest
     public string PortfolioName { get; set; } = string.Empty;
 
     /// <summary>
-    /// ID of the account that owns this portfolio
-    /// </summary>
-    [Required]
-    public int AccountId { get; set; }
-
-    /// <summary>
     /// Collection of holdings to ingest
     /// </summary>
     [Required]

@@ -65,12 +65,11 @@ public class HoldingService(
             }
 
             // Real-time data - get the most recent holdings and apply real-time pricing
-            var latestDate = await holdingRepository.GetLatestValuationDateAsync(cancellationToken);
+            var latestDate = await holdingRepository.GetLatestValuationDateForAccountAsync(accountId, cancellationToken);
             if (latestDate.HasValue)
             {
-                // Get ALL holdings from the latest date, then filter by account (using no-tracking for real-time pricing)
-                var allLatestHoldings = await holdingRepository.GetHoldingsByValuationDateWithInstrumentsNoTrackingAsync(latestDate.Value, cancellationToken);
-                holdings = allLatestHoldings.Where(h => h.Portfolio.AccountId == accountId).ToList();
+                // Get this account's holdings from its latest date (using no-tracking for real-time pricing)
+                holdings = await holdingRepository.GetHoldingsByAccountAndDateNoTrackingAsync(accountId, latestDate.Value, cancellationToken: cancellationToken);
                 logger.LogInformation("Retrieved {Count} latest holdings for account {AccountId} from date {LatestDate} for real-time pricing (no tracking to prevent persistence)", 
                     holdings.Count(), accountId, latestDate.Value);
 
@@ -135,14 +134,10 @@ public class HoldingService(
             }
 
             // Real-time data - get the most recent holdings for this ticker and apply real-time pricing
-            var latestDate = await holdingRepository.GetLatestValuationDateAsync(cancellationToken);
+            var latestDate = await holdingRepository.GetLatestValuationDateForAccountAsync(accountId, cancellationToken);
             if (latestDate.HasValue)
             {
-                var allLatestHoldings = await holdingRepository.GetHoldingsByValuationDateWithInstrumentsNoTrackingAsync(latestDate.Value, cancellationToken);
-                var upperTicker = ticker.ToUpperInvariant();
-                holdings = allLatestHoldings
-                    .Where(h => h.Portfolio.AccountId == accountId && h.Instrument?.Ticker?.ToUpperInvariant() == upperTicker)
-                    .ToList();
+                holdings = await holdingRepository.GetHoldingsByAccountAndDateNoTrackingAsync(accountId, latestDate.Value, ticker, cancellationToken);
                 logger.LogInformation("Retrieved {Count} latest holdings for account {AccountId} from date {LatestDate} for ticker {Ticker} (no tracking)",
                     holdings.Count(), accountId, latestDate.Value, ticker);
 

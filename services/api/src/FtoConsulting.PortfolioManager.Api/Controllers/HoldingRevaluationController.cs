@@ -14,7 +14,7 @@ namespace FtoConsulting.PortfolioManager.Api.Controllers;
 [ApiController]
 [Route("api/[controller]")]
 [Produces("application/json")]
-[Authorize(Policy = "RequirePortfolioScope")] 
+[Authorize(Policy = "SystemApiAccess")] // Revalues every account, so it is not a user operation
 [EnableRateLimiting("standard-api")]
 public class HoldingRevaluationController(
     IHoldingRevaluationService holdingRevaluationService,

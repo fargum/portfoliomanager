@@ -33,7 +33,6 @@ The API includes comprehensive Swagger/OpenAPI documentation available at:
 ```json
 {
   "portfolioName": "string",
-  "accountId": "guid",
   "holdings": [
     {
       "valuationDate": "datetime",
