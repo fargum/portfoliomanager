@@ -6,7 +6,7 @@
 - If the user is wrong, point it out bluntly. 
 
 ## Project Overview
-This is a Domain Driven Design (DDD) based portfolio management solution built with .NET 9 and Entity Framework Core. The solution provides a containerized REST API for managing portfolio holdings and financial data.
+This is a Domain Driven Design (DDD) based portfolio management solution built with .NET 10 and Entity Framework Core. The solution provides a containerized REST API for managing portfolio holdings and financial data.
 
 ## Architecture
 - **Domain Layer**: Core business logic and domain entities
@@ -15,7 +15,7 @@ This is a Domain Driven Design (DDD) based portfolio management solution built w
 - **API Layer**: REST API controllers and presentation layer
 
 ## Technology Stack
-- .NET 9
+- .NET 10
 - Entity Framework Core with PostgreSQL
 - Docker containerization
 - RESTful API with Swagger/OpenAPI
@@ -39,7 +39,7 @@ This is a Domain Driven Design (DDD) based portfolio management solution built w
 - Write unit tests for business logic
 
 ## Container Architecture
-- API Service: Containerized .NET 9 REST API
+- API Service: Containerized .NET 10 REST API
 - Database: External PostgreSQL container
 - UI: next.js with tailwindcss frontend container
 - Python: for evaluation framework
