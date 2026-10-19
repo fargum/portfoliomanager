@@ -17,20 +17,17 @@ public class MarketIntelligenceService : IMarketIntelligenceService
     private readonly HttpClient _httpClient;
     private readonly ILogger<MarketIntelligenceService> _logger;
     private readonly IAiChatService? _aiChatService;
-    private readonly IMcpServerService? _mcpServerService;
     private readonly Func<EodMarketDataTool>? _eodMarketDataToolFactory;
 
     public MarketIntelligenceService(
         HttpClient httpClient,
         ILogger<MarketIntelligenceService> logger,
         IAiChatService? aiChatService = null,
-        IMcpServerService? mcpServerService = null,
         Func<EodMarketDataTool>? eodMarketDataToolFactory = null)
     {
         _httpClient = httpClient;
         _logger = logger;
         _aiChatService = aiChatService;
-        _mcpServerService = mcpServerService;
         _eodMarketDataToolFactory = eodMarketDataToolFactory;
     }
 
@@ -201,7 +198,7 @@ Keep the response professional, accurate, and useful for portfolio management de
             var eodMarketDataTool = _eodMarketDataToolFactory();
             // Request only last 2 weeks of news using API's from parameter
             var twoWeeksAgo = date.AddDays(-14);
-            var realNews = await eodMarketDataTool.GetFinancialNewsAsync(_mcpServerService, tickers, twoWeeksAgo, date);
+            var realNews = await eodMarketDataTool.GetFinancialNewsAsync(tickers, twoWeeksAgo, date);
             
             if (realNews.Any())
             {

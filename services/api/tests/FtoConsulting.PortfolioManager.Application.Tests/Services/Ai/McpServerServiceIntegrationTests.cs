@@ -39,7 +39,6 @@ public class McpServerServiceIntegrationTests
         services.Configure<EodApiOptions>(options =>
         {
             options.Token = ""; // Leave empty to skip EOD initialization
-            options.McpServerUrl = "";
             options.TimeoutSeconds = 30;
         });
         
@@ -61,7 +60,6 @@ public class McpServerServiceIntegrationTests
             serviceProvider.GetRequiredService<IHoldingService>(),
             serviceProvider.GetRequiredService<ILogger<McpServerService>>(),
             serviceProvider.GetRequiredService<IOptions<AzureFoundryOptions>>(),
-            serviceProvider.GetRequiredService<IOptions<EodApiOptions>>(),
             serviceProvider.GetRequiredService<PortfolioHoldingsTool>(),
             serviceProvider.GetRequiredService<PortfolioAnalysisTool>(),
             serviceProvider.GetRequiredService<PortfolioComparisonTool>(),
@@ -117,7 +115,6 @@ public class McpServerServiceIntegrationTests
             serviceProvider.GetRequiredService<IHoldingService>(),
             serviceProvider.GetRequiredService<ILogger<McpServerService>>(),
             serviceProvider.GetRequiredService<IOptions<AzureFoundryOptions>>(),
-            serviceProvider.GetRequiredService<IOptions<EodApiOptions>>(),
             serviceProvider.GetRequiredService<PortfolioHoldingsTool>(),
             serviceProvider.GetRequiredService<PortfolioAnalysisTool>(),
             serviceProvider.GetRequiredService<PortfolioComparisonTool>(),

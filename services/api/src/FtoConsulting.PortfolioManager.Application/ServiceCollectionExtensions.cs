@@ -141,8 +141,7 @@ public static class ServiceCollectionExtensions
             
             var logger = serviceProvider.GetRequiredService<ILogger<MarketIntelligenceService>>();
             var aiChatService = serviceProvider.GetService<IAiChatService>();
-            var mcpServerService = serviceProvider.GetService<IMcpServerService>();
-            
+
             // Create factory for EodMarketDataTool
             Func<EodMarketDataTool>? eodMarketDataToolFactory = null;
             try 
@@ -154,7 +153,7 @@ public static class ServiceCollectionExtensions
                 // If EodMarketDataTool can't be resolved, leave factory as null
             }
             
-            return new MarketIntelligenceService(httpClient, logger, aiChatService, mcpServerService, eodMarketDataToolFactory);
+            return new MarketIntelligenceService(httpClient, logger, aiChatService, eodMarketDataToolFactory);
         });
         
         services.AddScoped<IMcpServerService, McpServerService>();
@@ -173,7 +172,6 @@ public static class ServiceCollectionExtensions
         {
             var logger = serviceProvider.GetRequiredService<ILogger<RealTimePortfolioService>>();
             var holdingRepository = serviceProvider.GetRequiredService<IHoldingRepository>();
-            var mcpServerService = serviceProvider.GetService<IMcpServerService>();
 
             Func<EodMarketDataTool>? eodMarketDataToolFactory = null;
             try
@@ -182,7 +180,7 @@ public static class ServiceCollectionExtensions
             }
             catch { }
 
-            return new RealTimePortfolioService(logger, holdingRepository, mcpServerService, eodMarketDataToolFactory);
+            return new RealTimePortfolioService(logger, holdingRepository, eodMarketDataToolFactory);
         });        // Register MediatR for CQRS
         services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(ServiceCollectionExtensions).Assembly));
         

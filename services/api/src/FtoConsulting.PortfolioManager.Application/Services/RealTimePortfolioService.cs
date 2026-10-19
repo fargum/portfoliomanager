@@ -15,18 +15,15 @@ public class RealTimePortfolioService : IRealTimePortfolioService
 {
     private readonly ILogger<RealTimePortfolioService> _logger;
     private readonly IHoldingRepository _holdingRepository;
-    private readonly IMcpServerService? _mcpServerService;
     private readonly Func<EodMarketDataTool>? _eodMarketDataToolFactory;
 
     public RealTimePortfolioService(
         ILogger<RealTimePortfolioService> logger,
         IHoldingRepository holdingRepository,
-        IMcpServerService? mcpServerService = null,
         Func<EodMarketDataTool>? eodMarketDataToolFactory = null)
     {
         _logger = logger;
         _holdingRepository = holdingRepository;
-        _mcpServerService = mcpServerService;
         _eodMarketDataToolFactory = eodMarketDataToolFactory;
     }
 
@@ -124,7 +121,7 @@ public class RealTimePortfolioService : IRealTimePortfolioService
         IEnumerable<string> tickers, 
         CancellationToken cancellationToken)
     {
-        if (_eodMarketDataToolFactory == null || _mcpServerService == null)
+        if (_eodMarketDataToolFactory == null)
         {
             _logger.LogWarning("EOD market data service not configured, returning empty prices");
             return new Dictionary<string, decimal>();
@@ -133,7 +130,7 @@ public class RealTimePortfolioService : IRealTimePortfolioService
         try
         {
             var eodMarketDataTool = _eodMarketDataToolFactory();
-            var prices = await eodMarketDataTool.GetRealTimePricesAsync(_mcpServerService, tickers, cancellationToken);
+            var prices = await eodMarketDataTool.GetRealTimePricesAsync(tickers, cancellationToken);
             
             _logger.LogInformation("Successfully fetched {Count} real-time prices from EOD", prices.Count);
             return prices;

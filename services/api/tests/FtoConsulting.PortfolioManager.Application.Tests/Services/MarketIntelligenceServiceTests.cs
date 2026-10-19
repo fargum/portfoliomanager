@@ -13,7 +13,6 @@ public class MarketIntelligenceServiceTests
     private readonly Mock<HttpClient> _mockHttpClient;
     private readonly Mock<ILogger<MarketIntelligenceService>> _mockLogger;
     private readonly Mock<IAiChatService> _mockAiChatService;
-    private readonly Mock<IMcpServerService> _mockMcpServerService;
     private readonly MarketIntelligenceService _service;
 
     public MarketIntelligenceServiceTests()
@@ -21,13 +20,11 @@ public class MarketIntelligenceServiceTests
         _mockHttpClient = new Mock<HttpClient>();
         _mockLogger = new Mock<ILogger<MarketIntelligenceService>>();
         _mockAiChatService = new Mock<IAiChatService>();
-        _mockMcpServerService = new Mock<IMcpServerService>();
 
         _service = new MarketIntelligenceService(
             _mockHttpClient.Object,
             _mockLogger.Object,
             _mockAiChatService.Object,
-            _mockMcpServerService.Object,
             null); // No EOD factory for these tests
     }
 

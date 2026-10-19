@@ -72,7 +72,6 @@ internal sealed class FixtureToolBoundary(McpServerService inner) : IMcpServerSe
     public Task InitializeAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
     public Task<IEnumerable<McpToolDefinition>> GetAvailableToolsAsync() => inner.GetAvailableToolsAsync();
     public Task<bool> IsHealthyAsync() => Task.FromResult(true);
-    public Task<object> CallMcpToolAsync(string serverId, string toolName, Dictionary<string, object> parameters, CancellationToken cancellationToken = default) => throw new NotSupportedException();
     public ValueTask DisposeAsync() => ValueTask.CompletedTask; // DI owns inner.
 }
 

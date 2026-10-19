@@ -664,7 +664,7 @@ public class HoldingService(
         try
         {
             var eodTool = eodMarketDataToolFactory();
-            var prices = await eodTool.GetRealTimePricesAsync(null, new List<string> { instrument.Ticker }, cancellationToken);
+            var prices = await eodTool.GetRealTimePricesAsync(new List<string> { instrument.Ticker }, cancellationToken);
 
             if (prices.TryGetValue(instrument.Ticker, out var livePrice) && livePrice > 0)
             {
@@ -747,7 +747,7 @@ public class HoldingService(
             if (tickers.Any())
             {
                 var eodTool = eodMarketDataToolFactory();
-                prices = await eodTool.GetRealTimePricesAsync(null, tickers, cancellationToken);
+                prices = await eodTool.GetRealTimePricesAsync(tickers, cancellationToken);
 
                 logger.LogInformation("Fetched {Count} real-time prices for {TotalTickers} tickers", 
                     prices.Count, tickers.Count);

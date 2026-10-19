@@ -41,7 +41,6 @@ services:
       
       # EOD Historical Data API Configuration
       - EodApi__Token=${EOD_API_TOKEN}
-      - EodApi__McpServerUrl=${EOD_MCP_SERVER_URL:-https://mcp.eodhd.dev/mcp}
 
       # Tavily Search API Configuration
       - Tavily__ApiKey=${TAVILY_API_KEY}

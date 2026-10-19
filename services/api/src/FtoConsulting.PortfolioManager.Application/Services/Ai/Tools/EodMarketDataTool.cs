@@ -4,13 +4,12 @@ using FtoConsulting.PortfolioManager.Application.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
-using FtoConsulting.PortfolioManager.Application.Services.Interfaces;
 
 
 namespace FtoConsulting.PortfolioManager.Application.Services.Ai.Tools;
 
 /// <summary>
-/// MCP tool for fetching real time market data from EOD Data MCP server
+/// Tool for fetching real time market data directly from the EOD REST API
 /// Uses the same EOD API configuration as the pricing service for consistency
 /// </summary>
 public class EodMarketDataTool : IDisposable
@@ -31,14 +30,12 @@ public class EodMarketDataTool : IDisposable
     /// <summary>
     /// Get real financial news from EOD  Data
     /// </summary>
-    /// <param name="mcpServerService">MCP server service for making external calls (not used for direct HTTP calls)</param>
     /// <param name="tickers">Stock tickers to get news for</param>
     /// <param name="fromDate">Start date for news search</param>
     /// <param name="toDate">End date for news search</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Financial news items</returns>
     public async Task<IEnumerable<NewsItemDto>> GetFinancialNewsAsync(
-        IMcpServerService? mcpServerService,
         IEnumerable<string> tickers,
         DateTime fromDate,
         DateTime toDate,
@@ -192,12 +189,10 @@ httpClient.Timeout = TimeSpan.FromSeconds(_eodApiOptions.TimeoutSeconds);
     /// Get real-time prices for specific tickers from EOD Historical Data
     /// Uses live pricing API endpoint: https://eodhd.com/api/real-time/{ticker}?api_token={token}&fmt=json
     /// </summary>
-    /// <param name="mcpServerService">MCP server service for making external calls (not used for direct HTTP calls)</param>
     /// <param name="tickers">Stock tickers to get real-time prices for</param>
     /// <param name="cancellationToken">Cancellation token</param>
     /// <returns>Real-time price data for the tickers</returns>
     public async Task<Dictionary<string, decimal>> GetRealTimePricesAsync(
-        IMcpServerService? mcpServerService,
         IEnumerable<string> tickers,
         CancellationToken cancellationToken = default)
     {
