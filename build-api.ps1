@@ -33,6 +33,7 @@ az containerapp update `
     --name $AppName `
     --resource-group $ResourceGroup `
     --image "$Registry.azurecr.io/portfoliomanager-api:latest" `
+    --set-env-vars AzureFoundry__CaptureSensitiveTelemetry=true `
     --revision-suffix $revisionSuffix
 
 if ($LASTEXITCODE -ne 0) {

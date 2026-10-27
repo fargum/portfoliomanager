@@ -57,18 +57,19 @@ This guide explains how to use the OpenTelemetry telemetry and observability fea
 |----------|---------|-------------|
 | `OpenTelemetry__OtlpEndpoint` | `http://localhost:18889` | OTLP endpoint for telemetry export |
 | `DOTNET_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS` | `true` | Allow anonymous Aspire Dashboard access |
+| `AzureFoundry__CaptureSensitiveTelemetry` | `false` in application settings; enabled by production deployment | Include LLM prompts, responses, and tool payloads in AI trace telemetry |
 
 ### Development vs Production
 
 **Development (docker-compose.dev.yml):**
 - Aspire Dashboard for local visualization
 - Console exporter for debugging
-- Sensitive data disabled for security
+- AI message content in traces is controlled by `AzureFoundry__CaptureSensitiveTelemetry`
 
-**Production (future):**
-- Azure Application Insights integration
-- Performance metrics and alerting
-- Enhanced security and compliance
+**Production:**
+- `build-api.ps1` enables `AzureFoundry__CaptureSensitiveTelemetry` on the Azure Container App.
+- `docker-compose.prod.yml` enables the same setting for production Compose deployments.
+- AI traces include prompt, response, and tool payload content. Treat exported telemetry and dashboard access as sensitive.
 
 ## 🔍 Using the Aspire Dashboard
 

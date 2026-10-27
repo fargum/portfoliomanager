@@ -15,6 +15,7 @@ services:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:8080
       - ASPNETCORE_HTTP_PORTS=8080
+      - AzureFoundry__CaptureSensitiveTelemetry=true
       
       # Database Connection
       - ConnectionStrings__DefaultConnection=Host=${DB_HOST};Port=${DB_PORT};Database=${DB_NAME};Username=${DB_USERNAME};Password=${Database:Password};Include Error Detail=false
